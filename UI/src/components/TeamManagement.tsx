@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { usersAPI } from '../services/dashboard'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 interface TeamMember {
   id: string
@@ -79,22 +79,22 @@ export default function TeamManagement() {
             
             {/* Nav Links */}
             <nav className="flex flex-col gap-1">
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors" href="/coming-soon">
+              <Link className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors" to="/coming-soon">
                 <span className="material-symbols-outlined">folder</span>
                 <p className="text-sm font-medium">Projects</p>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors" href="/dashboard">
+              </Link>
+              <Link className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors" to="/dashboard">
                 <span className="material-symbols-outlined">check_box</span>
                 <p className="text-sm font-medium">Tasks</p>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-600/10 text-blue-600" href="#">
+              </Link>
+              <Link className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-600/10 text-blue-600" to="/team" replace>
                 <span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>group</span>
                 <p className="text-sm font-semibold">Team</p>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors" href="/coming-soon">
+              </Link>
+              <Link className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors" to="/coming-soon">
                 <span className="material-symbols-outlined">settings</span>
                 <p className="text-sm font-medium">Settings</p>
-              </a>
+              </Link>
             </nav>
           </div>
           

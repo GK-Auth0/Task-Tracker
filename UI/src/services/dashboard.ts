@@ -53,6 +53,14 @@ export const projectsAPI = {
     const response = await api.get('/api/projects')
     return response.data
   },
+
+  createProject: async (data: {
+    name: string
+    description?: string
+  }): Promise<{ success: boolean; data: { id: string; name: string } }> => {
+    const response = await api.post('/api/projects', data)
+    return response.data
+  },
 }
 
 export const tasksAPI = {

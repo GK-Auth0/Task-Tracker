@@ -177,7 +177,7 @@ export default function Register() {
       {/* Footer Meta */}
       <footer className="py-6 text-center">
         <p className="text-slate-400 text-xs">
-          © 2024 Task Tracker. Built for professional productivity.
+          © 2026 Task Tracker Inc. All rights reserved.
         </p>
       </footer>
     </div>

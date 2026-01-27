@@ -28,6 +28,9 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [showCreateProject, setShowCreateProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [creatingProject, setCreatingProject] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -49,16 +52,40 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
       
       if (projectsResponse.success && projectsResponse.data.length > 0) {
         setProjects(projectsResponse.data)
-        setProjectId(projectsResponse.data[0].id) // Set first project as default
+        // Don't auto-select first project, let user choose
       }
     } catch (error) {
       console.error('Failed to fetch users and projects:', error)
     }
   }
 
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return
+    
+    setCreatingProject(true)
+    try {
+      const response = await projectsAPI.createProject({
+        name: newProjectName.trim(),
+        description: `Project created for task: ${title}`
+      })
+      
+      if (response.success) {
+        const newProject = response.data
+        setProjects([...projects, newProject])
+        setProjectId(newProject.id)
+        setNewProjectName('')
+        setShowCreateProject(false)
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error)
+    } finally {
+      setCreatingProject(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !projectId) return
+    if (!title.trim() || (projects.length > 0 && !projectId)) return
 
     setLoading(true)
     try {
@@ -77,6 +104,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
       setAssigneeId('')
       setDueDate('')
       setPriority('Medium')
+      setProjectId('')
       
       onTaskCreated()
       onClose()
@@ -120,6 +148,73 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
+            </div>
+
+            {/* Project */}
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-semibold">Project</label>
+              {projects.length > 0 ? (
+                <select 
+                  className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  required
+                >
+                  <option value="">Select a project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-3">
+                  {!showCreateProject ? (
+                    <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                      <div className="flex-1">
+                        <p className="text-slate-600 text-sm font-medium">No projects available</p>
+                        <p className="text-slate-500 text-xs">Create a project first to organize your tasks</p>
+                      </div>
+                      <button 
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        type="button"
+                        onClick={() => setShowCreateProject(true)}
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        Create Project
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-blue-900 text-sm font-medium">Create New Project</p>
+                        <button 
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          type="button"
+                          onClick={() => { setShowCreateProject(false); setNewProjectName('') }}
+                        >
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <input 
+                          className="flex-1 rounded-lg text-gray-900 border-blue-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-10 px-3 text-sm placeholder:text-slate-400"
+                          placeholder="Project name"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleCreateProject()}
+                        />
+                        <button 
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          type="button"
+                          onClick={handleCreateProject}
+                          disabled={!newProjectName.trim() || creatingProject}
+                        >
+                          {creatingProject ? 'Creating...' : 'Create'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Assignee & Due Date Row */}
@@ -252,7 +347,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }: Crea
             className="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2 disabled:opacity-50" 
             type="submit"
             onClick={handleSubmit}
-            disabled={loading || !title.trim()}
+            disabled={loading || !title.trim() || (projects.length > 0 && !projectId)}
           >
             <span className="material-symbols-outlined text-lg">add_task</span>
             {loading ? 'Creating...' : 'Create Task'}

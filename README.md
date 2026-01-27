@@ -209,6 +209,10 @@ After running migrations, these test users are available:
 | mike.johnson@company.com | password123 | Member |
 | sarah.wilson@company.com | password123 | Viewer |
 
+**Quick Test Login:**
+- **Admin Access**: giri.gk@company.com / password123
+- **Member Access**: giridharan.gk@company.com / password123
+
 ## Production Deployment
 
 ### Backend

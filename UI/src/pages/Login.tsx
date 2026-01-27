@@ -124,7 +124,7 @@ export default function Login() {
 
       {/* Simple Footer */}
       <footer className="p-6 text-center text-xs text-gray-500">
-        © 2024 Task Tracker Inc. All rights reserved.
+        © 2026 Task Tracker Inc. All rights reserved.
       </footer>
     </div>
   )
