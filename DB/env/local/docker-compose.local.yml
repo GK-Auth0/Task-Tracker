@@ -1,0 +1,33 @@
+services:
+  postgres:
+    env_file: ./env/local/local.env
+    image: postgres:15-alpine
+    platform: linux/amd64
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: task_tracker_local
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    networks:
+      - task-tracker-net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  migrator:
+    env_file: ./env/local/local.env
+    build:
+      context: .
+      dockerfile: ./env/Dockerfile
+    depends_on:
+      - postgres
+    networks:
+      - task-tracker-net
+
+volumes:
+  postgres_data:
+
+networks:
+  task-tracker-net:
+    external: false
+    name: task-tracker-net
