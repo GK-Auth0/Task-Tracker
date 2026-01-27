@@ -1,3 +1,2 @@
 #!/bin/bash
-cd env/local
-docker-compose -f docker-compose.local.yml down
+docker compose --project-directory . -f env/local/docker-compose.local.yml down

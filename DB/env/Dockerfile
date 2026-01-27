@@ -1,6 +1,10 @@
-FROM flyway/flyway:10-alpine
+FROM flyway/flyway:latest
 
-COPY migrations/ /flyway/sql/
-COPY flyway.conf /flyway/conf/
+COPY ./env/wait-for-it.sh ./wait-for-it.sh
+COPY ./env/docker-entrypoint.sh ./docker-entrypoint.sh
 
-CMD ["migrate"]
+RUN chmod 755 ./*.sh
+
+COPY ./migrations ./migrations
+
+ENTRYPOINT ["./docker-entrypoint.sh"]

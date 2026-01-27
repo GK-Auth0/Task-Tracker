@@ -1,33 +1,26 @@
 services:
   postgres:
     env_file: ./env/local/local.env
-    image: postgres:15-alpine
+    image: postgis/postgis:16-3.5
     platform: linux/amd64
     ports:
-      - "5432:5432"
+      - "5433:5433"
     environment:
-      POSTGRES_DB: task_tracker_local
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      - PGPORT=5433
     networks:
-      - task-tracker-net
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db-net
+    security_opt:
+      - seccomp:unconfined
 
   migrator:
     env_file: ./env/local/local.env
     build:
       context: .
       dockerfile: ./env/Dockerfile
-    depends_on:
-      - postgres
     networks:
-      - task-tracker-net
-
-volumes:
-  postgres_data:
+      - db-net
 
 networks:
-  task-tracker-net:
+  db-net:
     external: false
-    name: task-tracker-net
+    name: db-net
