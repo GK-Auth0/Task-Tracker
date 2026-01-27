@@ -1,4 +1,5 @@
-import express from "express";
+import express, { Request, Response } from "express";
+import router from ".";
 import helmet from "helmet";
 import cors from "cors";
 import { corsOptionsDelegate } from "./middleware/cors";
@@ -6,7 +7,6 @@ import { errorHandler404 } from "./middleware/errorHandler404";
 import { errorHandler } from "./middleware/errorHandler";
 import { responseHandler } from "./middleware/responseHandler";
 import { setupSwagger } from "./swagger";
-import router from "./routes";
 
 const app = express();
 
@@ -29,13 +29,21 @@ setupSwagger(app);
  *     responses:
  *       200:
  *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
  */
-app.get("/health", (req, res) => {
+app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
 // Main router
-app.use("/api", router);
+app.use(router);
 
 // 404 handler
 app.use(errorHandler404);

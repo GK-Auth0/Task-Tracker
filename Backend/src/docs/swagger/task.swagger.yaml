@@ -1,0 +1,239 @@
+paths:
+  /api/tasks:
+    get:
+      summary: Fetch tasks with query filters
+      tags: [Tasks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: ["To Do", "In Progress", "Completed"]
+          description: Filter by task status
+        - in: query
+          name: priority
+          schema:
+            type: string
+            enum: ["Low", "Medium", "High"]
+          description: Filter by task priority
+        - in: query
+          name: project_id
+          schema:
+            type: string
+            format: uuid
+          description: Filter by project ID
+      responses:
+        "200":
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Tasks retrieved successfully"
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskWithRelations'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create a new task
+      tags: [Tasks]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, project_id]
+              properties:
+                title:
+                  type: string
+                  example: "Implement user authentication"
+                description:
+                  type: string
+                  example: "Add JWT-based authentication system"
+                status:
+                  type: string
+                  enum: ["To Do", "In Progress", "Completed"]
+                  default: "To Do"
+                priority:
+                  type: string
+                  enum: ["Low", "Medium", "High"]
+                  default: "Medium"
+                project_id:
+                  type: string
+                  format: uuid
+                assignee_id:
+                  type: string
+                  format: uuid
+                due_date:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Task created successfully"
+                  data:
+                    $ref: '#/components/schemas/TaskWithRelations'
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/tasks/{id}:
+    get:
+      summary: Fetch full details for the Task Details View
+      tags: [Tasks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Task ID
+      responses:
+        "200":
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Task retrieved successfully"
+                  data:
+                    $ref: '#/components/schemas/TaskWithDetails'
+        "400":
+          description: Task not found or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      summary: Update task details, status (Drag & Drop), or priority
+      tags: [Tasks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Task ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: ["To Do", "In Progress", "Completed"]
+                priority:
+                  type: string
+                  enum: ["Low", "Medium", "High"]
+                assignee_id:
+                  type: string
+                  format: uuid
+                due_date:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Task updated successfully"
+                  data:
+                    $ref: '#/components/schemas/TaskWithRelations'
+        "400":
+          description: Task not found or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Remove a task
+      tags: [Tasks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Task ID
+      responses:
+        "200":
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Task deleted successfully"
+        "400":
+          description: Task not found or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

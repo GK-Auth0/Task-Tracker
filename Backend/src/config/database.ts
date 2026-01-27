@@ -1,5 +1,6 @@
 import { Sequelize } from "sequelize-typescript";
 import { appConfig } from "./app";
+import models from "../models";
 
 const database = new Sequelize({
   database: appConfig.database.name,
@@ -8,7 +9,7 @@ const database = new Sequelize({
   host: appConfig.database.host,
   port: appConfig.database.port,
   dialect: "postgres",
-  models: [__dirname + "/../models"],
+  models: models,
   logging: appConfig.env === "development" ? console.log : false,
 });
 

@@ -1,0 +1,29 @@
+paths:
+  /api/dashboard/summary:
+    get:
+      summary: Get counts (Total Tasks, Overdue, Completed) for header widgets
+      tags: [Dashboard]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Dashboard summary retrieved successfully"
+                  data:
+                    $ref: '#/components/schemas/DashboardSummary'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
