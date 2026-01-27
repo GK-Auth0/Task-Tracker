@@ -20,11 +20,22 @@ export const getTasks = async (req: Request, res: Response) => {
       project_id: req.query.project_id as string,
     };
 
-    const tasks = await getAllTasks(userId, filters);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 5;
+
+    const result = await getAllTasks(userId, filters, page, limit);
     return res.status(200).json({
       success: true,
       message: "Tasks retrieved successfully",
-      data: tasks,
+      data: result.tasks,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit),
+        hasNext: page < Math.ceil(result.total / limit),
+        hasPrev: page > 1,
+      },
     });
   } catch (error) {
     return res.status(400).json({

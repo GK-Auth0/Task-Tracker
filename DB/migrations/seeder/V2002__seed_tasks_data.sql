@@ -10,8 +10,8 @@ INSERT INTO tasks (id, project_id, title, description, status, priority, due_dat
  'In Progress',
  'High',
  CURRENT_DATE + INTERVAL '7 days',
- (SELECT id FROM users WHERE email = 'john.doe@company.com'),
- (SELECT id FROM users WHERE email = 'jane.smith@company.com'),
+ (SELECT id FROM users WHERE email = 'giri.gk@company.com'),
+ (SELECT id FROM users WHERE email = 'giridharan.gk@company.com'),
  NOW(), NOW()),
 (uuid_generate_v4(),
  (SELECT id FROM projects WHERE name = 'Brand Identity'),
@@ -20,7 +20,7 @@ INSERT INTO tasks (id, project_id, title, description, status, priority, due_dat
  'To Do',
  'Medium',
  CURRENT_DATE + INTERVAL '10 days',
- (SELECT id FROM users WHERE email = 'john.doe@company.com'),
+ (SELECT id FROM users WHERE email = 'giri.gk@company.com'),
  (SELECT id FROM users WHERE email = 'mike.johnson@company.com'),
  NOW(), NOW()),
 (uuid_generate_v4(),
@@ -30,7 +30,7 @@ INSERT INTO tasks (id, project_id, title, description, status, priority, due_dat
  'Done',
  'High',
  CURRENT_DATE - INTERVAL '2 days',
- (SELECT id FROM users WHERE email = 'jane.smith@company.com'),
+ (SELECT id FROM users WHERE email = 'giridharan.gk@company.com'),
  (SELECT id FROM users WHERE email = 'sarah.wilson@company.com'),
  NOW(), NOW());
 
@@ -56,12 +56,12 @@ INSERT INTO subtasks (id, task_id, title, is_completed, position) VALUES
 INSERT INTO comments (id, task_id, user_id, content, created_at) VALUES
 (uuid_generate_v4(),
  (SELECT id FROM tasks WHERE title = 'Create logo concepts'),
- (SELECT id FROM users WHERE email = 'john.doe@company.com'),
+ (SELECT id FROM users WHERE email = 'giri.gk@company.com'),
  'Great progress on the initial sketches! The third concept looks promising.',
  NOW()),
 (uuid_generate_v4(),
  (SELECT id FROM tasks WHERE title = 'Create logo concepts'),
- (SELECT id FROM users WHERE email = 'jane.smith@company.com'),
+ (SELECT id FROM users WHERE email = 'giridharan.gk@company.com'),
  'Thanks! I''ll work on refining that concept and create some variations.',
  NOW());
 

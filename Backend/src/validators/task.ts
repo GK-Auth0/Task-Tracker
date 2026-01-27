@@ -18,8 +18,8 @@ export const createTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [["To Do", "In Progress", "Completed"]],
-      errorMessage: "Status must be one of: To Do, In Progress, Completed",
+      options: [["To Do", "In Progress", "Done"]],
+      errorMessage: "Status must be one of: To Do, In Progress, Done",
     },
   },
   priority: {
@@ -69,8 +69,8 @@ export const updateTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [["To Do", "In Progress", "Completed"]],
-      errorMessage: "Status must be one of: To Do, In Progress, Completed",
+      options: [["To Do", "In Progress", "Done"]],
+      errorMessage: "Status must be one of: To Do, In Progress, Done",
     },
   },
   priority: {

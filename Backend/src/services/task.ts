@@ -27,7 +27,7 @@ interface UpdateTaskDto {
   due_date?: string;
 }
 
-export async function getAllTasks(userId: string, filters: TaskFilters) {
+export async function getAllTasks(userId: string, filters: TaskFilters, page: number = 1, limit: number = 5) {
   const whereClause: any = {
     [Op.or]: [
       { creator_id: userId },
@@ -47,7 +47,9 @@ export async function getAllTasks(userId: string, filters: TaskFilters) {
     whereClause.project_id = filters.project_id;
   }
 
-  const tasks = await Task.findAll({
+  const offset = (page - 1) * limit;
+
+  const { count, rows } = await Task.findAndCountAll({
     where: whereClause,
     include: [
       {
@@ -67,9 +69,14 @@ export async function getAllTasks(userId: string, filters: TaskFilters) {
       },
     ],
     order: [["created_at", "DESC"]],
+    limit,
+    offset,
   });
 
-  return tasks.map(task => task.get({ plain: true }));
+  return {
+    tasks: rows.map(task => task.get({ plain: true })),
+    total: count,
+  };
 }
 
 export async function createTask(dto: CreateTaskDto) {
