@@ -1,4 +1,13 @@
-import { Table, Column, Model, DataType, PrimaryKey, Default, ForeignKey, BelongsTo } from "sequelize-typescript";
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  PrimaryKey,
+  Default,
+  ForeignKey,
+  BelongsTo,
+} from "sequelize-typescript";
 import { Task } from "./index";
 
 @Table({

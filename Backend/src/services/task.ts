@@ -27,12 +27,14 @@ interface UpdateTaskDto {
   due_date?: string;
 }
 
-export async function getAllTasks(userId: string, filters: TaskFilters, page: number = 1, limit: number = 5) {
+export async function getAllTasks(
+  userId: string,
+  filters: TaskFilters,
+  page: number = 1,
+  limit: number = 5,
+) {
   const whereClause: any = {
-    [Op.or]: [
-      { creator_id: userId },
-      { assignee_id: userId },
-    ],
+    [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
   };
 
   if (filters.status) {
@@ -74,7 +76,7 @@ export async function getAllTasks(userId: string, filters: TaskFilters, page: nu
   });
 
   return {
-    tasks: rows.map(task => task.get({ plain: true })),
+    tasks: rows.map((task) => task.get({ plain: true })),
     total: count,
   };
 }
@@ -118,10 +120,7 @@ export async function getTaskById(taskId: string, userId: string) {
   const task = await Task.findOne({
     where: {
       id: taskId,
-      [Op.or]: [
-        { creator_id: userId },
-        { assignee_id: userId },
-      ],
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
     },
     include: [
       {
@@ -166,14 +165,15 @@ export async function getTaskById(taskId: string, userId: string) {
   return task.get({ plain: true });
 }
 
-export async function updateTask(taskId: string, dto: UpdateTaskDto, userId: string) {
+export async function updateTask(
+  taskId: string,
+  dto: UpdateTaskDto,
+  userId: string,
+) {
   const task = await Task.findOne({
     where: {
       id: taskId,
-      [Op.or]: [
-        { creator_id: userId },
-        { assignee_id: userId },
-      ],
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
     },
   });
 
@@ -187,7 +187,8 @@ export async function updateTask(taskId: string, dto: UpdateTaskDto, userId: str
   if (dto.status !== undefined) updateData.status = dto.status;
   if (dto.priority !== undefined) updateData.priority = dto.priority;
   if (dto.assignee_id !== undefined) updateData.assignee_id = dto.assignee_id;
-  if (dto.due_date !== undefined) updateData.due_date = dto.due_date ? new Date(dto.due_date) : null;
+  if (dto.due_date !== undefined)
+    updateData.due_date = dto.due_date ? new Date(dto.due_date) : null;
 
   await task.update(updateData);
 
@@ -218,10 +219,7 @@ export async function deleteTask(taskId: string, userId: string) {
   const task = await Task.findOne({
     where: {
       id: taskId,
-      [Op.or]: [
-        { creator_id: userId },
-        { assignee_id: userId },
-      ],
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
     },
   });
 

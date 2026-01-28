@@ -1,6 +1,12 @@
 import { Request, Response } from "express";
 import { handleValidationErrors } from "../utils/validation";
-import { getAllTasks, createTask, getTaskById, updateTask, deleteTask } from "../services/task";
+import {
+  getAllTasks,
+  createTask,
+  getTaskById,
+  updateTask,
+  deleteTask,
+} from "../services/task";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {

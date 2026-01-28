@@ -43,7 +43,10 @@ const options = {
             id: { type: "string", format: "uuid" },
             name: { type: "string" },
             description: { type: "string" },
-            status: { type: "string", enum: ["Active", "Completed", "On Hold"] },
+            status: {
+              type: "string",
+              enum: ["Active", "Completed", "On Hold"],
+            },
             owner_id: { type: "string", format: "uuid" },
             created_at: { type: "string", format: "date-time" },
             updated_at: { type: "string", format: "date-time" },
@@ -74,7 +77,10 @@ const options = {
             id: { type: "string", format: "uuid" },
             title: { type: "string" },
             description: { type: "string" },
-            status: { type: "string", enum: ["To Do", "In Progress", "Completed"] },
+            status: {
+              type: "string",
+              enum: ["To Do", "In Progress", "Completed"],
+            },
             priority: { type: "string", enum: ["Low", "Medium", "High"] },
             project_id: { type: "string", format: "uuid" },
             creator_id: { type: "string", format: "uuid" },
@@ -180,8 +186,14 @@ const options = {
                     properties: {
                       id: { type: "string", format: "uuid" },
                       title: { type: "string" },
-                      status: { type: "string", enum: ["To Do", "In Progress", "Completed"] },
-                      priority: { type: "string", enum: ["Low", "Medium", "High"] },
+                      status: {
+                        type: "string",
+                        enum: ["To Do", "In Progress", "Completed"],
+                      },
+                      priority: {
+                        type: "string",
+                        enum: ["Low", "Medium", "High"],
+                      },
                       due_date: { type: "string", format: "date-time" },
                     },
                   },

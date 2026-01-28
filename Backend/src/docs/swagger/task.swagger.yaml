@@ -41,13 +41,13 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/TaskWithRelations'
+                      $ref: "#/components/schemas/TaskWithRelations"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     post:
       summary: Create a new task
@@ -100,13 +100,13 @@ paths:
                     type: string
                     example: "Task created successfully"
                   data:
-                    $ref: '#/components/schemas/TaskWithRelations'
+                    $ref: "#/components/schemas/TaskWithRelations"
         "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/tasks/{id}:
     get:
@@ -137,13 +137,13 @@ paths:
                     type: string
                     example: "Task retrieved successfully"
                   data:
-                    $ref: '#/components/schemas/TaskWithDetails'
+                    $ref: "#/components/schemas/TaskWithDetails"
         "400":
           description: Task not found or access denied
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     patch:
       summary: Update task details, status (Drag & Drop), or priority
@@ -196,13 +196,13 @@ paths:
                     type: string
                     example: "Task updated successfully"
                   data:
-                    $ref: '#/components/schemas/TaskWithRelations'
+                    $ref: "#/components/schemas/TaskWithRelations"
         "400":
           description: Task not found or access denied
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     delete:
       summary: Remove a task
@@ -236,4 +236,4 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"

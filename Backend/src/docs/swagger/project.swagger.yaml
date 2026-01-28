@@ -22,13 +22,13 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/ProjectWithStats'
+                      $ref: "#/components/schemas/ProjectWithStats"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     post:
       summary: Create a new project
@@ -64,13 +64,13 @@ paths:
                     type: string
                     example: "Project created successfully"
                   data:
-                    $ref: '#/components/schemas/Project'
+                    $ref: "#/components/schemas/Project"
         "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/projects/{id}:
     get:
@@ -101,10 +101,10 @@ paths:
                     type: string
                     example: "Project retrieved successfully"
                   data:
-                    $ref: '#/components/schemas/ProjectWithStats'
+                    $ref: "#/components/schemas/ProjectWithStats"
         "400":
           description: Project not found or access denied
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"

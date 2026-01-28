@@ -6,24 +6,8 @@ import Comment from "./comment";
 import Label from "./label";
 import TaskLabel from "./taskLabel";
 
-const models = [
-  User,
-  Project,
-  Task,
-  Subtask,
-  Comment,
-  Label,
-  TaskLabel,
-];
+const models = [User, Project, Task, Subtask, Comment, Label, TaskLabel];
 
 export default models;
 
-export {
-  User,
-  Project,
-  Task,
-  Subtask,
-  Comment,
-  Label,
-  TaskLabel,
-};
+export { User, Project, Task, Subtask, Comment, Label, TaskLabel };

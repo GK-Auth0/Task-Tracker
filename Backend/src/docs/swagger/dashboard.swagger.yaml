@@ -20,10 +20,10 @@ paths:
                     type: string
                     example: "Dashboard summary retrieved successfully"
                   data:
-                    $ref: '#/components/schemas/DashboardSummary'
+                    $ref: "#/components/schemas/DashboardSummary"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"

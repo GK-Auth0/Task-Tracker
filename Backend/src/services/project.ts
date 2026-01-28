@@ -29,8 +29,11 @@ export async function getAllProjects(userId: string) {
     const tasks = project.tasks || [];
     const stats = {
       total_tasks: tasks.length,
-      completed_tasks: tasks.filter((task: any) => task.status === "Completed").length,
-      in_progress_tasks: tasks.filter((task: any) => task.status === "In Progress").length,
+      completed_tasks: tasks.filter((task: any) => task.status === "Completed")
+        .length,
+      in_progress_tasks: tasks.filter(
+        (task: any) => task.status === "In Progress",
+      ).length,
       todo_tasks: tasks.filter((task: any) => task.status === "To Do").length,
     };
 
@@ -79,8 +82,11 @@ export async function getProjectById(projectId: string, userId: string) {
   const tasks = project.tasks || [];
   const stats = {
     total_tasks: tasks.length,
-    completed_tasks: tasks.filter((task: any) => task.status === "Completed").length,
-    in_progress_tasks: tasks.filter((task: any) => task.status === "In Progress").length,
+    completed_tasks: tasks.filter((task: any) => task.status === "Completed")
+      .length,
+    in_progress_tasks: tasks.filter(
+      (task: any) => task.status === "In Progress",
+    ).length,
     todo_tasks: tasks.filter((task: any) => task.status === "To Do").length,
   };
 

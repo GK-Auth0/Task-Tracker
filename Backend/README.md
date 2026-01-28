@@ -21,11 +21,13 @@ yarn install
 ### 2. Environment Configuration
 
 Create environment file:
+
 ```bash
 cp config/env/.env.example config/env/.env
 ```
 
 Update `.env` with your configuration:
+
 ```env
 NODE_ENV=development
 PORT=3000
@@ -41,11 +43,13 @@ JWT_EXPIRES_IN=7d
 ### 3. Database Setup
 
 Start PostgreSQL with Docker:
+
 ```bash
 docker-compose up -d postgres
 ```
 
 Run database migrations:
+
 ```bash
 docker-compose up migrator
 ```
@@ -105,6 +109,7 @@ Swagger documentation available at: `http://localhost:3000/api-docs`
 ## Database Schema
 
 ### Users
+
 - `id` (UUID, Primary Key)
 - `full_name` (String)
 - `email` (String, Unique)
@@ -114,6 +119,7 @@ Swagger documentation available at: `http://localhost:3000/api-docs`
 - `created_at`, `updated_at` (Timestamps)
 
 ### Projects
+
 - `id` (UUID, Primary Key)
 - `name` (String)
 - `description` (Text, Optional)
@@ -122,6 +128,7 @@ Swagger documentation available at: `http://localhost:3000/api-docs`
 - `created_at` (Timestamp)
 
 ### Tasks
+
 - `id` (UUID, Primary Key)
 - `project_id` (UUID, Foreign Key to Projects)
 - `title` (String)
@@ -191,6 +198,7 @@ Backend/
 ### Database Migrations
 
 Create new migration:
+
 ```bash
 # Schema migration
 DB/migrations/schema/V1005__add_new_table.sql
@@ -200,6 +208,7 @@ DB/migrations/seeder/V2003__seed_new_data.sql
 ```
 
 Run migrations:
+
 ```bash
 docker-compose up migrator
 ```
@@ -207,6 +216,7 @@ docker-compose up migrator
 ## Production Deployment
 
 1. Build the application:
+
 ```bash
 yarn build
 ```
@@ -214,6 +224,7 @@ yarn build
 2. Set production environment variables
 3. Run database migrations
 4. Start the server:
+
 ```bash
 yarn start
 ```

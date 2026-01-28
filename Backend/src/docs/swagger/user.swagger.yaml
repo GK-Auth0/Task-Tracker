@@ -22,13 +22,13 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/UserProfile'
+                      $ref: "#/components/schemas/UserProfile"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/users/{id}:
     get:
@@ -59,10 +59,10 @@ paths:
                     type: string
                     example: "User retrieved successfully"
                   data:
-                    $ref: '#/components/schemas/UserWithTasks'
+                    $ref: "#/components/schemas/UserWithTasks"
         "400":
           description: User not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"

@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { handleValidationErrors } from "../utils/validation";
-import { getAllProjects, createProject, getProjectById } from "../services/project";
+import {
+  getAllProjects,
+  createProject,
+  getProjectById,
+} from "../services/project";
 
 export const getProjects = async (req: Request, res: Response) => {
   try {

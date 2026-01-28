@@ -59,7 +59,10 @@ export async function loginUser(dto: LoginDto) {
     throw new Error("Invalid email or password");
   }
 
-  const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
+  const isPasswordValid = await bcrypt.compare(
+    dto.password,
+    user.password_hash,
+  );
 
   if (!isPasswordValid) {
     throw new Error("Invalid email or password");

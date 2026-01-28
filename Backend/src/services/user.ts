@@ -6,12 +6,19 @@ export async function getAllUsers() {
     order: [["full_name", "ASC"]],
   });
 
-  return users.map(user => user.get({ plain: true }));
+  return users.map((user) => user.get({ plain: true }));
 }
 
 export async function getUserById(userId: string) {
   const user = await User.findByPk(userId, {
-    attributes: ["id", "full_name", "email", "role", "avatar_url", "created_at"],
+    attributes: [
+      "id",
+      "full_name",
+      "email",
+      "role",
+      "avatar_url",
+      "created_at",
+    ],
     include: [
       {
         model: Task,

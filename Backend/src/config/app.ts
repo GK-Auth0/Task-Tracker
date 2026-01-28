@@ -12,13 +12,17 @@ export const appConfig = {
     name: process.env.DATABASE_NAME || "task_tracker",
     user: process.env.DATABASE_USER || "postgres",
     password: process.env.DATABASE_PASSWORD || "password",
-    url: process.env.DATABASE_URL || "postgresql://postgres:password@localhost:5432/task_tracker",
+    url:
+      process.env.DATABASE_URL ||
+      "postgresql://postgres:password@localhost:5432/task_tracker",
   },
   jwt: {
     secret: process.env.JWT_SECRET || "your-super-secret-jwt-key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   },
   cors: {
-    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:3000"],
+    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",") || [
+      "http://localhost:3000",
+    ],
   },
 };

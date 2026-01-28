@@ -178,13 +178,20 @@ yarn type-check   # TypeScript checking
 
 ### Database Management
 ```bash
-# Run migrations
-docker-compose up migrator
+# Start database and run migrations
+cd DB
+./up.sh
 
-# Reset database
-docker-compose down postgres
-docker-compose up -d postgres
-docker-compose up migrator
+# Stop database
+./down.sh
+
+# Local development environment
+./env/local/_up.sh    # Start local DB with migrations
+./env/local/_down.sh  # Stop local DB
+
+# Reset database (from DB folder)
+docker-compose down
+docker-compose up -d
 ```
 
 ## API Documentation
