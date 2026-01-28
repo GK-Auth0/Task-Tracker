@@ -20,11 +20,13 @@ yarn install
 ### 2. Environment Configuration
 
 Create environment file:
+
 ```bash
 cp .env.example .env
 ```
 
 Update `.env` with your configuration:
+
 ```env
 VITE_API_BASE_URL=http://localhost:3000
 ```
@@ -48,18 +50,21 @@ The application will be available at `http://localhost:3001`
 ## Features
 
 ### Authentication
+
 - **User Registration** - Create new account with email/password
 - **User Login** - Secure JWT-based authentication
 - **Protected Routes** - Automatic redirect for unauthenticated users
 - **Persistent Sessions** - Token stored in localStorage
 
 ### Dashboard
+
 - **Task Overview** - Summary statistics and metrics
 - **Task List** - Paginated task display (5 items per page)
 - **Filtering** - Filter by status, priority, and project
 - **Real-time Updates** - Automatic data refresh
 
 ### Task Management
+
 - **Create Tasks** - Modal form with project assignment
 - **Task Details** - Full task view with status updates
 - **Status Management** - Dropdown and quick complete actions
@@ -67,12 +72,14 @@ The application will be available at `http://localhost:3001`
 - **Due Dates** - Date formatting with overdue detection
 
 ### Team Management
+
 - **User Listing** - Team member overview
 - **Role Filtering** - Filter by Admin, Member, Viewer
 - **Statistics** - Team performance metrics
 - **User Actions** - Member management interface
 
 ### UI/UX
+
 - **Responsive Design** - Mobile-first approach
 - **Material Icons** - Consistent iconography
 - **Tailwind CSS** - Utility-first styling
@@ -121,24 +128,28 @@ UI/
 ## Components
 
 ### Authentication Context
+
 - Global authentication state management
 - JWT token handling
 - User session persistence
 - Protected route wrapper
 
 ### Dashboard
+
 - Task list with pagination
 - Filter controls (status, priority)
 - Summary statistics
 - Create task modal
 
 ### Task Details
+
 - Full task information display
 - Status update dropdown
 - Priority and due date display
 - Modal overlay interface
 
 ### Team Management
+
 - User listing with role badges
 - Filter tabs by role
 - Statistics cards
@@ -147,44 +158,49 @@ UI/
 ## API Integration
 
 ### Authentication Service
+
 ```typescript
 // Login user
-authAPI.login(email, password)
+authAPI.login(email, password);
 
 // Register user
-authAPI.register(userData)
+authAPI.register(userData);
 
 // Get current user
-authAPI.getCurrentUser()
+authAPI.getCurrentUser();
 ```
 
 ### Dashboard Service
+
 ```typescript
 // Get dashboard summary
-dashboardAPI.getSummary()
+dashboardAPI.getSummary();
 
 // Get tasks with pagination
-tasksAPI.getTasks({ page: 1, limit: 5, status: 'In Progress' })
+tasksAPI.getTasks({ page: 1, limit: 5, status: "In Progress" });
 
 // Update task
-tasksAPI.updateTask(taskId, { status: 'Done' })
+tasksAPI.updateTask(taskId, { status: "Done" });
 ```
 
 ## Styling
 
 ### Tailwind CSS
+
 - Utility-first CSS framework
 - Custom color palette
 - Responsive breakpoints
 - Dark mode support (prepared)
 
 ### Material Icons
+
 - Google Material Symbols
 - Consistent iconography
 - Outlined and filled variants
 - Proper font loading
 
 ### Design System
+
 - **Colors**: Blue primary, slate secondary
 - **Typography**: Inter font family
 - **Spacing**: 4px base unit
@@ -194,16 +210,19 @@ tasksAPI.updateTask(taskId, { status: 'Done' })
 ## State Management
 
 ### React Context
+
 - Authentication state
 - User information
 - Token management
 
 ### Local State
+
 - Component-specific state
 - Form handling
 - UI interactions
 
 ### API State
+
 - Loading states
 - Error handling
 - Data caching
@@ -234,11 +253,13 @@ tasksAPI.updateTask(taskId, { status: 'Done' })
 ## Production Build
 
 1. Build the application:
+
 ```bash
 yarn build
 ```
 
 2. Preview the build:
+
 ```bash
 yarn preview
 ```
