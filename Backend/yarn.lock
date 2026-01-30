@@ -1138,7 +1138,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/multer@npm:^2":
+"@types/multer@npm:^2.0.0":
   version: 2.0.0
   resolution: "@types/multer@npm:2.0.0"
   dependencies:
@@ -1897,6 +1897,15 @@ __metadata:
     strip-ansi: "npm:^6.0.1"
     wrap-ansi: "npm:^7.0.0"
   checksum: 10c0/4bda0f09c340cbb6dfdc1ed508b3ca080f12992c18d68c6be4d9cf51756033d5266e61ec57529e610dacbf4da1c634423b0c1b11037709cc6b09045cbd815df5
+  languageName: node
+  linkType: hard
+
+"cloudinary@npm:^2.9.0":
+  version: 2.9.0
+  resolution: "cloudinary@npm:2.9.0"
+  dependencies:
+    lodash: "npm:^4.17.21"
+  checksum: 10c0/263e843b3ca6446ece4312dc2b84892aaeab35847b0fdbd0e80086ce2485a755f647e02ef60e4ebcf4e700f223d91efb8afcc1f7ee5bc41f8973f3bb34fe573f
   languageName: node
   linkType: hard
 
@@ -5060,12 +5069,13 @@ __metadata:
     "@types/express": "npm:^5.0.6"
     "@types/jest": "npm:^30.0.0"
     "@types/jsonwebtoken": "npm:^9.0.10"
-    "@types/multer": "npm:^2"
+    "@types/multer": "npm:^2.0.0"
     "@types/node": "npm:^24.10.1"
     "@types/pg": "npm:^8"
     "@types/swagger-jsdoc": "npm:^6.0.4"
     "@types/swagger-ui-express": "npm:^4.1.6"
     bcrypt: "npm:^6.0.0"
+    cloudinary: "npm:^2.9.0"
     cors: "npm:^2.8.5"
     dotenv: "npm:^17.2.3"
     express: "npm:^5.2.1"

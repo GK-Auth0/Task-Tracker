@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { usersAPI } from "../services/dashboard";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 interface TeamMember {
   id: string;
@@ -12,7 +12,7 @@ interface TeamMember {
 }
 
 export default function TeamManagement() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,131 +73,8 @@ export default function TeamManagement() {
   }
 
   return (
-    <div className="bg-gray-50 text-gray-900 antialiased min-h-screen">
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 border-r border-slate-200 bg-white flex flex-col justify-between p-6">
-          <div className="flex flex-col gap-8">
-            {/* Logo/Brand */}
-            <div className="flex gap-3 items-center">
-              <div className="bg-blue-600 rounded-lg size-10 flex items-center justify-center text-white">
-                <span className="material-symbols-outlined">check_circle</span>
-              </div>
-              <div className="flex flex-col">
-                <h1 className="text-gray-900 text-base font-bold leading-tight">
-                  TaskTracker
-                </h1>
-                <p className="text-gray-600 text-xs font-normal">
-                  Pro Team Edition
-                </p>
-              </div>
-            </div>
-
-            {/* Nav Links */}
-            <nav className="flex flex-col gap-1">
-              <Link
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-                to="/coming-soon"
-              >
-                <span className="material-symbols-outlined">folder</span>
-                <p className="text-sm font-medium">Projects</p>
-              </Link>
-              <Link
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-                to="/dashboard"
-              >
-                <span className="material-symbols-outlined">check_box</span>
-                <p className="text-sm font-medium">Tasks</p>
-              </Link>
-              <Link
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-600/10 text-blue-600"
-                to="/team"
-                replace
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  group
-                </span>
-                <p className="text-sm font-semibold">Team</p>
-              </Link>
-              <Link
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-                to="/coming-soon"
-              >
-                <span className="material-symbols-outlined">settings</span>
-                <p className="text-sm font-medium">Settings</p>
-              </Link>
-            </nav>
-          </div>
-
-          {/* Sidebar Footer */}
-          <div className="pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-3 px-2">
-              <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
-                {user?.full_name
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("") || "U"}
-              </div>
-              <div className="flex flex-col overflow-hidden">
-                <p className="text-sm font-medium truncate">
-                  {user?.full_name || "User"}
-                </p>
-                <p className="text-xs text-slate-500 truncate">
-                  {user?.role || "Member"}
-                </p>
-              </div>
-              <button
-                onClick={logout}
-                className="ml-auto p-1 text-slate-400 hover:text-slate-600"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  logout
-                </span>
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Navigation */}
-          <header className="flex items-center justify-between bg-white border-b border-slate-200 px-8 py-3">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
-                  search
-                </span>
-                <input
-                  className="w-full bg-slate-50 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-blue-600/20"
-                  placeholder="Search team..."
-                  type="text"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative">
-                <span className="material-symbols-outlined">notifications</span>
-                <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-              <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
-                <span className="material-symbols-outlined">help_outline</span>
-              </button>
-              <div className="h-8 w-px bg-slate-200 mx-2"></div>
-              <div className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold">
-                {user?.full_name
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("") || "U"}
-              </div>
-            </div>
-          </header>
-
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-8">
-            <div className="w-full max-w-[1200px] mx-auto flex flex-col gap-8">
+    <div className="flex-1 overflow-y-auto bg-gray-50 p-8">
+      <div className="w-full max-w-[1200px] mx-auto flex flex-col gap-8">
               {/* Page Heading */}
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div className="flex flex-col gap-2">
@@ -467,9 +344,6 @@ export default function TeamManagement() {
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-        </main>
       </div>
     </div>
   );

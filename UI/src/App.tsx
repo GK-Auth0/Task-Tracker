@@ -7,11 +7,14 @@ import {
 import { QueryClient, QueryClientProvider } from "react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import TaskDetails from "./components/TaskDetails";
 import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
+import Layout from "./components/Layout";
 
 const queryClient = new QueryClient();
 
@@ -71,34 +74,24 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/dashboard"
+        path="/"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Layout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="projects" element={<Projects />} />
+        <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="coming-soon" element={<ComingSoon />} />
+        <Route path="team" element={<TeamManagement />} />
+      </Route>
       <Route
         path="/task/:id"
         element={
           <ProtectedRoute>
             <TaskDetails />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/coming-soon"
-        element={
-          <ProtectedRoute>
-            <ComingSoon />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/team"
-        element={
-          <ProtectedRoute>
-            <TeamManagement />
           </ProtectedRoute>
         }
       />

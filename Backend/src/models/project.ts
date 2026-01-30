@@ -5,17 +5,18 @@ import {
   DataType,
   PrimaryKey,
   Default,
-  ForeignKey,
+  CreatedAt,
+  UpdatedAt,
   BelongsTo,
   HasMany,
-  CreatedAt,
+  ForeignKey,
 } from "sequelize-typescript";
-import { User } from "./index";
-import { Task } from "./index";
+import User from "./user";
+import ProjectMember from "./ProjectMember";
 
 @Table({
   tableName: "projects",
-  timestamps: false,
+  timestamps: true,
 })
 export default class Project extends Model {
   @PrimaryKey
@@ -35,6 +36,32 @@ export default class Project extends Model {
   })
   description?: string;
 
+  @Column({
+    type: DataType.ENUM('planning', 'active', 'on_hold', 'completed', 'cancelled', 'Active', 'Archived'),
+    allowNull: false,
+    defaultValue: 'planning',
+  })
+  status!: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled' | 'Active' | 'Archived';
+
+  @Column({
+    type: DataType.ENUM('low', 'medium', 'high'),
+    allowNull: false,
+    defaultValue: 'medium',
+  })
+  priority!: 'low' | 'medium' | 'high';
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  start_date?: Date;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  end_date?: Date;
+
   @ForeignKey(() => User)
   @Column({
     type: DataType.UUID,
@@ -42,19 +69,15 @@ export default class Project extends Model {
   })
   owner_id!: string;
 
-  @Column({
-    type: DataType.ENUM("Active", "Archived"),
-    allowNull: false,
-    defaultValue: "Active",
-  })
-  status!: "Active" | "Archived";
-
   @CreatedAt
   created_at!: Date;
+
+  @UpdatedAt
+  updated_at!: Date;
 
   @BelongsTo(() => User, "owner_id")
   owner!: User;
 
-  @HasMany(() => Task, "project_id")
-  tasks!: Task[];
+  @HasMany(() => ProjectMember, "project_id")
+  members!: ProjectMember[];
 }

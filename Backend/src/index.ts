@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import authRoutes from "./routes/auth";
-import projectRoutes from "./routes/project";
+import projectRoutes from "./routes/projects";
 import taskRoutes from "./routes/task";
 import userRoutes from "./routes/user";
 import dashboardRoutes from "./routes/dashboard";

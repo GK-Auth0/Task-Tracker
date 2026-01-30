@@ -33,9 +33,7 @@ export async function getAllTasks(
   page: number = 1,
   limit: number = 5,
 ) {
-  const whereClause: any = {
-    [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
-  };
+  const whereClause: any = {};
 
   if (filters.status) {
     whereClause.status = filters.status;
@@ -46,7 +44,12 @@ export async function getAllTasks(
   }
 
   if (filters.project_id) {
+    // If filtering by project, show all tasks in that project
+    // (assuming user has access to the project)
     whereClause.project_id = filters.project_id;
+  } else {
+    // If not filtering by project, only show user's tasks
+    whereClause[Op.or] = [{ creator_id: userId }, { assignee_id: userId }];
   }
 
   const offset = (page - 1) * limit;

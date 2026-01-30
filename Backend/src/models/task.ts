@@ -61,6 +61,12 @@ export default class Task extends Model {
     type: DataType.DATEONLY,
     allowNull: true,
   })
+  start_date?: Date;
+
+  @Column({
+    type: DataType.DATEONLY,
+    allowNull: true,
+  })
   due_date?: Date;
 
   @ForeignKey(() => User)
