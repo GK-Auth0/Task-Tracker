@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CreateProjectRequest } from '../types/project';
 import axios from 'axios';
 
+import { API_BASE_URL } from '../config/api';
+
 interface User {
   id: string;
   full_name: string;
@@ -31,7 +33,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose, onSubm
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 
   // Fetch users when search term changes
   useEffect(() => {

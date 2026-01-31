@@ -6,6 +6,8 @@ import { Project } from '../types/project';
 import { Task } from '../types/task';
 import CreateTaskModal from '../components/CreateTaskModal';
 
+import { API_BASE_URL } from '../config/api';
+
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -103,7 +105,7 @@ const ProjectDetail: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/projects/${project.id}/files/upload`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${project.id}/files/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

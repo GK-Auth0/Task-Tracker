@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
 
+import { API_BASE_URL } from '../config/api';
+
 const Profile: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
@@ -60,7 +62,7 @@ const Profile: React.FC = () => {
     
     setUpdating(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/users/${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
