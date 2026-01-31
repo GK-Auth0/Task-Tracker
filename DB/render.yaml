@@ -23,7 +23,6 @@ services:
   - type: job
     name: task-tracker-migrations
     env: docker
-    startCommand: ["-url=$DATABASE_URL", "-locations=filesystem:/flyway/sql", "migrate"]
     envVars:
       - key: DATABASE_URL
         fromDatabase:
