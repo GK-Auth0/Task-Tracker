@@ -6,5 +6,5 @@ COPY migrations /flyway/sql
 # Set working directory
 WORKDIR /flyway
 
-# Default command to run migrations
-CMD ["migrate"]
+# Default entrypoint will use flyway command
+ENTRYPOINT ["flyway"]
