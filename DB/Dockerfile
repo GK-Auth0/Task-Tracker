@@ -1,4 +1,7 @@
-FROM flyway/flyway:latest
+FROM flyway/flyway:latest-alpine
+
+# Install PostgreSQL JDBC driver
+RUN wget -O /flyway/drivers/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.1.jar
 
 # Copy migration files
 COPY migrations /flyway/sql
