@@ -80,4 +80,7 @@ export default class Project extends Model {
 
   @HasMany(() => ProjectMember, "project_id")
   members!: ProjectMember[];
+
+  @HasMany(() => require("./task").default, "project_id")
+  tasks!: any[];
 }
