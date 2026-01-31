@@ -93,13 +93,22 @@ export default function CreateTaskModal({
 
     setLoading(true);
     try {
-      await tasksAPI.createTask({
+      console.log('Creating task with data:', {
         title: title.trim(),
         description: description.trim() || undefined,
         project_id: projectId,
         assignee_id: assigneeId || undefined,
         due_date: dueDate || undefined,
         priority,
+      });
+      
+      await tasksAPI.createTask({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        project_id: projectId,
+        assignee_id: assigneeId || undefined,
+        due_date: dueDate || undefined,
+        priority: priority || "Medium", // Ensure priority is never undefined
       });
 
       // Reset form

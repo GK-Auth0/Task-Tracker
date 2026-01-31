@@ -68,6 +68,9 @@ export const createNewTask = async (req: Request, res: Response) => {
       });
     }
 
+    console.log('Received task data:', req.body);
+    console.log('Priority value:', req.body.priority, 'Type:', typeof req.body.priority);
+
     const taskData = {
       title: req.body.title,
       description: req.body.description,
