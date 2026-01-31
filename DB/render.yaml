@@ -1,16 +1,44 @@
+# services:
+#   # Database Migration Job
+#   - type: job
+#     name: task-tracker-migrations
+#     env: docker
+#     dockerfilePath: ./Dockerfile
+#     buildCommand: echo "Building migration job"
+#     startCommand: flyway -url="$DATABASE_URL" -locations=filesystem:/flyway/sql migrate
+#     envVars:
+#       - key: DATABASE_URL
+#         fromDatabase:
+#           name: task-tracker-db
+#           property: connectionString
+
+# databases:
+#   - name: task-tracker-db
+#     databaseName: task_tracker_db
+#     user: postgres
+#     plan: free
+
+
 services:
-  # Database Migration Job
   - type: job
     name: task-tracker-migrations
     env: docker
-    dockerfilePath: ./Dockerfile
-    buildCommand: echo "Building migration job"
-    startCommand: flyway -url="$DATABASE_URL" -locations=filesystem:/flyway/sql migrate
+    startCommand: flyway migrate
     envVars:
-      - key: DATABASE_URL
+      - key: FLYWAY_URL
         fromDatabase:
           name: task-tracker-db
-          property: connectionString
+          property: jdbcConnectionString
+      - key: FLYWAY_USER
+        fromDatabase:
+          name: task-tracker-db
+          property: user
+      - key: FLYWAY_PASSWORD
+        fromDatabase:
+          name: task-tracker-db
+          property: password
+      - key: FLYWAY_LOCATIONS
+        value: filesystem:/flyway/sql
 
 databases:
   - name: task-tracker-db
