@@ -21,9 +21,10 @@ export const appConfig = {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   },
   cors: {
-    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",") || [
+    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",").map(origin => origin.trim()) || [
       "http://localhost:3000",
       "http://localhost:3001",
+      "https://task-tracker-2im2zy279-giridharans-projects.vercel.app",
     ],
   },
 };

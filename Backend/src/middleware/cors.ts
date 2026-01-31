@@ -5,11 +5,24 @@ export const corsOptionsDelegate = {
     origin: string | undefined,
     callback: (err: Error | null, allow?: boolean) => void,
   ) => {
-    if (!origin || appConfig.cors.allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
     }
+    
+    // Check if origin is in allowed list
+    if (appConfig.cors.allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Allow any vercel.app domain in production
+    if (appConfig.env === 'production' && origin.includes('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    console.log('CORS blocked origin:', origin);
+    console.log('Allowed origins:', appConfig.cors.allowedOrigins);
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
 };
