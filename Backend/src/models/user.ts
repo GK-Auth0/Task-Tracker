@@ -9,10 +9,12 @@ import {
   CreatedAt,
   UpdatedAt,
   HasMany,
+  HasOne,
 } from "sequelize-typescript";
 import { Project } from "./index";
 import { Task } from "./index";
 import { Comment } from "./index";
+import UserMetadata from "./userMetadata";
 
 @Table({
   tableName: "users",
@@ -72,4 +74,7 @@ export default class User extends Model {
 
   @HasMany(() => Comment, "user_id")
   comments!: Comment[];
+
+  @HasOne(() => UserMetadata, "user_id")
+  metadata!: UserMetadata;
 }

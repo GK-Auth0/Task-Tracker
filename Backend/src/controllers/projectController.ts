@@ -158,6 +158,17 @@ export class ProjectController {
             model: User,
             as: 'owner',
             attributes: ['id', 'full_name', 'email', 'avatar_url']
+          },
+          {
+            model: ProjectMember,
+            as: 'members',
+            include: [
+              {
+                model: User,
+                as: 'user',
+                attributes: ['id', 'full_name', 'email', 'avatar_url']
+              }
+            ]
           }
         ]
       });

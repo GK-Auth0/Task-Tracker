@@ -6,6 +6,8 @@ import {
   getTaskById,
   updateTask,
   deleteTask,
+  getTaskPullRequests,
+  getTaskCommits,
 } from "../services/task";
 
 export const getTasks = async (req: Request, res: Response) => {
@@ -181,6 +183,62 @@ export const removeTask = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to delete task",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const getTaskPRs = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const pullRequests = await getTaskPullRequests(taskId, userId);
+    return res.status(200).json({
+      success: true,
+      message: "Pull requests retrieved successfully",
+      data: pullRequests,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to get pull requests",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const getTaskCommitHistory = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const commits = await getTaskCommits(taskId, userId);
+    return res.status(200).json({
+      success: true,
+      message: "Commits retrieved successfully",
+      data: commits,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to get commits",
       error: (error as any).message,
     });
   }

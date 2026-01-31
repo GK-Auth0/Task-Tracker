@@ -1,0 +1,51 @@
+services:
+  # Backend API Service
+  - type: web
+    name: task-tracker-api
+    env: node
+    buildCommand: cd Backend && yarn install && yarn build
+    startCommand: cd Backend && yarn start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DB_HOST
+        fromDatabase:
+          name: task-tracker-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: task-tracker-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: task-tracker-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: task-tracker-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: task-tracker-db
+          property: password
+
+  # Frontend Service
+  - type: web
+    name: task-tracker-frontend
+    env: static
+    buildCommand: cd UI && yarn install && yarn build
+    staticPublishPath: ./UI/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://task-tracker-api.onrender.com
+
+databases:
+  - name: task-tracker-db
+    databaseName: task_tracker_db
+    user: postgres

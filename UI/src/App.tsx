@@ -9,6 +9,10 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
+import Profile from "./pages/Profile";
+import Calendar from "./pages/Calendar";
+import ActivityLog from "./pages/ActivityLog";
+import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import TaskDetails from "./components/TaskDetails";
@@ -84,6 +88,10 @@ function AppRoutes() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="calendar" element={<Calendar />} />
+        <Route path="activity" element={<ActivityLog />} />
+        <Route path="chat" element={<Chat />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="coming-soon" element={<ComingSoon />} />
         <Route path="team" element={<TeamManagement />} />
       </Route>

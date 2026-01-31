@@ -17,6 +17,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(responseHandler as express.RequestHandler);
 app.use(helmet());
 
+// Trust proxy for accurate IP addresses
+app.set('trust proxy', true);
+
 // Swagger documentation
 setupSwagger(app);
 

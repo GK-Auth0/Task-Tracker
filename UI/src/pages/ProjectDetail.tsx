@@ -4,6 +4,7 @@ import { projectService } from '../services/projectService';
 import { taskService } from '../services/taskService';
 import { Project } from '../types/project';
 import { Task } from '../types/task';
+import CreateTaskModal from '../components/CreateTaskModal';
 
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +15,11 @@ const ProjectDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
   const [uploading, setUploading] = useState(false);
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
+  const [showDependencies, setShowDependencies] = useState(true);
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+  const [showMembersTooltip, setShowMembersTooltip] = useState(false);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
 
   useEffect(() => {
     console.log('Project ID from URL:', id);
@@ -139,6 +145,47 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  const getFilteredTasks = () => {
+    if (currentWeekOffset === 0) return tasks;
+    
+    const currentDate = new Date();
+    
+    if (viewMode === 'day') {
+      const targetDate = new Date();
+      targetDate.setDate(currentDate.getDate() + currentWeekOffset);
+      
+      return tasks.filter(task => {
+        if (!task.dueDate && !task.startDate) return false;
+        const taskDate = new Date(task.dueDate || task.startDate || task.createdAt);
+        return taskDate.toDateString() === targetDate.toDateString();
+      });
+    } else if (viewMode === 'week') {
+      const targetWeekStart = new Date();
+      targetWeekStart.setDate(currentDate.getDate() + (currentWeekOffset * 7));
+      const targetWeekEnd = new Date(targetWeekStart);
+      targetWeekEnd.setDate(targetWeekStart.getDate() + 6);
+      
+      return tasks.filter(task => {
+        if (!task.dueDate && !task.startDate) return false;
+        const taskDate = new Date(task.dueDate || task.startDate || task.createdAt);
+        return taskDate >= targetWeekStart && taskDate <= targetWeekEnd;
+      });
+    } else if (viewMode === 'month') {
+      const targetDate = new Date();
+      targetDate.setMonth(currentDate.getMonth() + currentWeekOffset);
+      
+      return tasks.filter(task => {
+        if (!task.dueDate && !task.startDate) return false;
+        const taskDate = new Date(task.dueDate || task.startDate || task.createdAt);
+        return taskDate.getMonth() === targetDate.getMonth() && taskDate.getFullYear() === targetDate.getFullYear();
+      });
+    }
+    
+    return tasks;
+  };
+
+  const filteredTasks = getFilteredTasks();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -218,6 +265,51 @@ const ProjectDetail: React.FC = () => {
                     <option value="completed">Completed</option>
                   </select>
                 </h2>
+                <div className="flex items-center gap-3 mt-2">
+                  <div className="flex items-center gap-2 relative">
+                    <div 
+                      className="flex -space-x-2 cursor-pointer"
+                      onClick={() => setShowMembersTooltip(!showMembersTooltip)}
+                    >
+                      {project.members?.slice(0, 4).map((member, index) => (
+                        <div
+                          key={member.id}
+                          className="size-8 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white text-xs font-bold hover:z-10 transition-all"
+                        >
+                          {(member.user?.full_name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      ))}
+                      {(project.members?.length || 0) > 4 && (
+                        <div className="size-8 rounded-full bg-slate-400 border-2 border-white flex items-center justify-center text-white text-xs font-bold">
+                          +{(project.members?.length || 0) - 4}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-sm text-slate-500 font-medium">
+                      {project.members?.length || 0} member{(project.members?.length || 0) !== 1 ? 's' : ''}
+                    </span>
+                    
+                    {/* Members Tooltip */}
+                    {showMembersTooltip && (
+                      <div className="absolute top-10 left-0 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-50 min-w-64">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Team Members</div>
+                        <div className="space-y-2">
+                          {project.members?.map((member) => (
+                            <div key={member.id} className="flex items-center gap-3">
+                              <div className="size-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                                {(member.user?.full_name || 'U').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-slate-700">{member.user?.full_name || 'Unknown'}</div>
+                                <div className="text-xs text-slate-500">{member.role}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -227,7 +319,10 @@ const ProjectDetail: React.FC = () => {
               <button className="p-2.5 text-slate-400 hover:text-slate-600 border border-slate-200 rounded-lg bg-white transition-all">
                 <span className="material-symbols-outlined">more_vert</span>
               </button>
-              <button className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-lg transition-all shadow-sm">
+              <button 
+                onClick={() => setShowCreateTaskModal(true)}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-lg transition-all shadow-sm"
+              >
                 <span className="material-symbols-outlined text-[20px]">add</span>
                 <span>New Task</span>
               </button>
@@ -434,27 +529,81 @@ const ProjectDetail: React.FC = () => {
             <div className="px-8 py-4 bg-white border-b border-slate-200 flex justify-between items-center flex-shrink-0">
               <div className="flex items-center gap-6">
                 <div className="flex bg-slate-100 p-1 rounded-lg">
-                  <button className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700">Day</button>
-                  <button className="px-3 py-1.5 text-xs font-bold bg-white rounded shadow-sm">Week</button>
-                  <button className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700">Month</button>
+                  <button 
+                    onClick={() => setViewMode('day')}
+                    className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                      viewMode === 'day' ? 'bg-white rounded shadow-sm font-bold' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Day
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('week')}
+                    className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                      viewMode === 'week' ? 'bg-white rounded shadow-sm font-bold' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Week
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('month')}
+                    className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                      viewMode === 'month' ? 'bg-white rounded shadow-sm font-bold' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Month
+                  </button>
                 </div>
                 <div className="h-6 w-px bg-slate-200"></div>
                 <label className="relative inline-flex items-center cursor-pointer group">
-                  <input className="sr-only peer" type="checkbox" defaultChecked />
+                  <input 
+                    className="sr-only peer" 
+                    type="checkbox" 
+                    checked={showDependencies}
+                    onChange={(e) => setShowDependencies(e.target.checked)}
+                  />
                   <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                   <span className="ms-3 text-sm font-semibold text-slate-600 group-hover:text-slate-900">Task Dependencies</span>
                 </label>
                 <div className="h-6 w-px bg-slate-200"></div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">Current Week</span>
+                  <span className="text-sm font-bold">
+                    {(() => {
+                      if (viewMode === 'day') {
+                        if (currentWeekOffset === 0) return 'Current Day';
+                        const date = new Date();
+                        date.setDate(date.getDate() + currentWeekOffset);
+                        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                      } else if (viewMode === 'week') {
+                        if (currentWeekOffset === 0) return 'Current Week';
+                        const date = new Date();
+                        date.setDate(date.getDate() + (currentWeekOffset * 7));
+                        return `Week of ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                      } else {
+                        if (currentWeekOffset === 0) return 'Current Month';
+                        const date = new Date();
+                        date.setMonth(date.getMonth() + currentWeekOffset);
+                        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                      }
+                    })()
+                  }</span>
                   <div className="flex gap-1">
-                    <button className="p-1 hover:bg-slate-100 rounded">
+                    <button 
+                      onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}
+                      className="p-1 hover:bg-slate-100 rounded transition-colors"
+                    >
                       <span className="material-symbols-outlined text-lg">chevron_left</span>
                     </button>
-                    <button className="p-1 hover:bg-slate-100 rounded text-blue-600">
+                    <button 
+                      onClick={() => setCurrentWeekOffset(0)}
+                      className="p-1 hover:bg-slate-100 rounded text-blue-600 transition-colors"
+                    >
                       <span className="material-symbols-outlined text-lg">today</span>
                     </button>
-                    <button className="p-1 hover:bg-slate-100 rounded">
+                    <button 
+                      onClick={() => setCurrentWeekOffset(currentWeekOffset + 1)}
+                      className="p-1 hover:bg-slate-100 rounded transition-colors"
+                    >
                       <span className="material-symbols-outlined text-lg">chevron_right</span>
                     </button>
                   </div>
@@ -473,7 +622,7 @@ const ProjectDetail: React.FC = () => {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Task Details & Timeline</span>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {tasks.map((task, index) => (
+                  {filteredTasks.map((task, index) => (
                     <div key={task.id} className="h-12 flex items-center px-4 group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => navigate(`/task/${task.id}`)}>
                       <div className="flex items-center gap-3 w-full">
                         <span className="material-symbols-outlined text-slate-300 text-lg group-hover:text-blue-600 cursor-grab">drag_indicator</span>
@@ -486,37 +635,80 @@ const ProjectDetail: React.FC = () => {
               
               {/* Timeline Grid */}
               <div className="flex-1 gantt-grid relative min-h-[600px]">
-                {/* Week Header */}
+                {/* Timeline Header */}
                 <div className="h-10 border-b border-slate-200 flex sticky top-0 bg-white/95 backdrop-blur-md z-10">
-                  {Array.from({length: 7}, (_, i) => {
-                    const date = new Date();
-                    date.setDate(date.getDate() + i);
-                    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                    const isToday = i === 2;
-                    return (
-                      <div key={i} className={`w-40 border-r border-slate-200 flex flex-col items-center justify-center ${
-                        isToday ? 'bg-blue-600/5' : i === 0 || i === 6 ? 'bg-slate-50/50' : ''
-                      }`}>
-                        <span className={`text-[9px] uppercase font-bold ${
-                          isToday ? 'text-blue-600' : 'text-slate-400'
-                        }`}>{dayNames[date.getDay()]}</span>
-                        <span className={`text-[11px] font-bold ${
-                          isToday ? 'text-blue-600' : 'text-slate-600'
-                        }`}>{date.getDate()}</span>
-                      </div>
-                    );
-                  })}
+                  {(() => {
+                    if (viewMode === 'day') {
+                      return Array.from({length: 24}, (_, i) => {
+                        const hour = i;
+                        const isCurrentHour = new Date().getHours() === hour;
+                        return (
+                          <div key={i} className={`w-20 border-r border-slate-200 flex flex-col items-center justify-center ${
+                            isCurrentHour ? 'bg-blue-600/5' : ''
+                          }`}>
+                            <span className={`text-[9px] uppercase font-bold ${
+                              isCurrentHour ? 'text-blue-600' : 'text-slate-400'
+                            }`}>{hour === 0 ? '12 AM' : hour <= 12 ? `${hour} AM` : `${hour - 12} PM`}</span>
+                          </div>
+                        );
+                      });
+                    } else if (viewMode === 'week') {
+                      return Array.from({length: 7}, (_, i) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() + i + (currentWeekOffset * 7));
+                        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const isToday = currentWeekOffset === 0 && i === new Date().getDay();
+                        return (
+                          <div key={i} className={`w-40 border-r border-slate-200 flex flex-col items-center justify-center ${
+                            isToday ? 'bg-blue-600/5' : i === 0 || i === 6 ? 'bg-slate-50/50' : ''
+                          }`}>
+                            <span className={`text-[9px] uppercase font-bold ${
+                              isToday ? 'text-blue-600' : 'text-slate-400'
+                            }`}>{dayNames[date.getDay()]}</span>
+                            <span className={`text-[11px] font-bold ${
+                              isToday ? 'text-blue-600' : 'text-slate-600'
+                            }`}>{date.getDate()}</span>
+                          </div>
+                        );
+                      });
+                    } else {
+                      return Array.from({length: 4}, (_, i) => {
+                        const date = new Date();
+                        date.setMonth(date.getMonth() + i + currentWeekOffset);
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const isCurrentMonth = currentWeekOffset === 0 && i === 0;
+                        return (
+                          <div key={i} className={`w-60 border-r border-slate-200 flex flex-col items-center justify-center ${
+                            isCurrentMonth ? 'bg-blue-600/5' : ''
+                          }`}>
+                            <span className={`text-[9px] uppercase font-bold ${
+                              isCurrentMonth ? 'text-blue-600' : 'text-slate-400'
+                            }`}>{monthNames[date.getMonth()]}</span>
+                            <span className={`text-[11px] font-bold ${
+                              isCurrentMonth ? 'text-blue-600' : 'text-slate-600'
+                            }`}>{date.getFullYear()}</span>
+                          </div>
+                        );
+                      });
+                    }
+                  })()}
                 </div>
 
-                {/* Current Day Indicator */}
-                <div className="absolute left-80 top-0 bottom-0 w-px bg-blue-600 z-10">
-                  <div className="size-2 rounded-full bg-blue-600 -ml-[4px] mt-10 shadow-sm shadow-blue-600/50"></div>
-                  <div className="h-full w-px bg-gradient-to-b from-blue-600 via-blue-600/20 to-transparent"></div>
-                </div>
+                {/* Current Time Indicator */}
+                {currentWeekOffset === 0 && (
+                  <div className={`absolute top-0 bottom-0 w-px bg-blue-600 z-10 ${
+                    viewMode === 'day' ? 'left-' + (new Date().getHours() * 20 + 320) :
+                    viewMode === 'week' ? 'left-' + (new Date().getDay() * 160 + 320) :
+                    'left-320'
+                  }`}>
+                    <div className="size-2 rounded-full bg-blue-600 -ml-[4px] mt-10 shadow-sm shadow-blue-600/50"></div>
+                    <div className="h-full w-px bg-gradient-to-b from-blue-600 via-blue-600/20 to-transparent"></div>
+                  </div>
+                )}
 
                 {/* Task Bars */}
                 <div className="divide-y divide-slate-100">
-                  {tasks.map((task, index) => {
+                  {filteredTasks.map((task, index) => {
                     const getStatusColor = () => {
                       switch (task.status) {
                         case 'Done': return 'bg-emerald-500 border-emerald-400/20 shadow-emerald-500/10';
@@ -533,7 +725,12 @@ const ProjectDetail: React.FC = () => {
                       }
                     };
 
-                    const barWidth = task.status === 'Done' ? 192 : task.status === 'In Progress' ? 288 : 224;
+                    const getBarWidth = () => {
+                      if (viewMode === 'day') return task.status === 'Done' ? 80 : task.status === 'In Progress' ? 120 : 100;
+                      if (viewMode === 'week') return task.status === 'Done' ? 192 : task.status === 'In Progress' ? 288 : 224;
+                      return task.status === 'Done' ? 240 : task.status === 'In Progress' ? 360 : 300;
+                    };
+                    const barWidth = getBarWidth();
                     const leftPosition = 10 + (index * 20);
 
                     return (
@@ -558,6 +755,11 @@ const ProjectDetail: React.FC = () => {
                           )}
                           {task.status === 'Done' && (
                             <span className="material-symbols-outlined text-white text-[12px] ml-auto opacity-0 group-hover:opacity-100">open_in_full</span>
+                          )}
+                          {showDependencies && index > 0 && (
+                            <div className="absolute -left-4 top-1/2 w-4 h-px bg-slate-300">
+                              <div className="absolute -left-1 -top-1 size-2 rounded-full bg-slate-300"></div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -674,6 +876,11 @@ const ProjectDetail: React.FC = () => {
           </div>
         )}
       </div>
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        onTaskCreated={fetchProjectData}
+      />
     </div>
   );
 };

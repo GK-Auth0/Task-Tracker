@@ -89,6 +89,57 @@ export default function Sidebar() {
           </Link>
           <Link
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''} ${
+              isActive('/calendar') 
+                ? 'bg-blue-600/10 text-blue-600' 
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+            to="/calendar"
+            title="Calendar"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontVariationSettings: isActive('/calendar') ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              calendar_month
+            </span>
+            {!sidebarCollapsed && <p className={`text-sm ${isActive('/calendar') ? 'font-semibold' : 'font-medium'}`}>Calendar</p>}
+          </Link>
+          <Link
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''} ${
+              isActive('/activity') 
+                ? 'bg-blue-600/10 text-blue-600' 
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+            to="/activity"
+            title="Activity Log"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontVariationSettings: isActive('/activity') ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              list_alt
+            </span>
+            {!sidebarCollapsed && <p className={`text-sm ${isActive('/activity') ? 'font-semibold' : 'font-medium'}`}>Activity Log</p>}
+          </Link>
+          <Link
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''} ${
+              isActive('/chat') 
+                ? 'bg-blue-600/10 text-blue-600' 
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+            to="/chat"
+            title="Chat"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontVariationSettings: isActive('/chat') ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              chat_bubble
+            </span>
+            {!sidebarCollapsed && <p className={`text-sm ${isActive('/chat') ? 'font-semibold' : 'font-medium'}`}>Chat</p>}
+          </Link>
+          <Link
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''} ${
               isActive('/team') 
                 ? 'bg-blue-600/10 text-blue-600' 
                 : 'text-slate-600 hover:bg-slate-50'

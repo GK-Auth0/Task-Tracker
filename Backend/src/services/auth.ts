@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
-import { User } from "../models";
+import { User, UserMetadata } from "../models";
+import { getIPGeolocation, parseUserAgent } from "./geolocation";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
@@ -10,6 +11,8 @@ interface RegisterDto {
   password: string;
   firstName: string;
   lastName: string;
+  ip?: string;
+  userAgent?: string;
 }
 
 interface LoginDto {
@@ -32,6 +35,18 @@ export async function registerUser(dto: RegisterDto) {
     full_name: `${dto.firstName} ${dto.lastName}`,
     role: "Member",
   });
+
+  // Create user metadata with IP geolocation
+  if (dto.ip) {
+    const geoData = await getIPGeolocation(dto.ip);
+    const userAgentData = dto.userAgent ? parseUserAgent(dto.userAgent) : {};
+    
+    await UserMetadata.create({
+      user_id: user.id,
+      ...geoData,
+      ...userAgentData,
+    });
+  }
 
   const tokenPayload = {
     id: user.id,

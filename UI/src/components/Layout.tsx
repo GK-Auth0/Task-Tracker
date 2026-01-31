@@ -1,9 +1,10 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Sidebar from './Sidebar'
 
 export default function Layout() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   return (
     <div className="bg-gray-50 text-gray-900 antialiased min-h-screen">
@@ -35,12 +36,15 @@ export default function Layout() {
                 <span className="material-symbols-outlined">help_outline</span>
               </button>
               <div className="h-8 w-px bg-slate-200 mx-2"></div>
-              <div className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold">
+              <button 
+                onClick={() => navigate('/profile')}
+                className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold hover:bg-blue-600/30 transition-colors cursor-pointer"
+              >
                 {user?.full_name
                   ?.split(" ")
                   .map((n) => n[0])
                   .join("") || "U"}
-              </div>
+              </button>
             </div>
           </header>
 

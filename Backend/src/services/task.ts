@@ -1,4 +1,4 @@
-import { Task, Project, User, Subtask, Comment } from "../models";
+import { Task, Project, User, Subtask, Comment, PullRequest, Commit } from "../models";
 import { Op } from "sequelize";
 
 interface TaskFilters {
@@ -231,4 +231,65 @@ export async function deleteTask(taskId: string, userId: string) {
   }
 
   await task.destroy();
+}
+
+export async function getTaskPullRequests(taskId: string, userId: string) {
+  // First verify user has access to the task
+  const task = await Task.findOne({
+    where: {
+      id: taskId,
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const pullRequests = await PullRequest.findAll({
+    where: { task_id: taskId },
+    order: [["created_at", "DESC"]],
+  });
+
+  return pullRequests.map((pr) => ({
+    id: pr.id,
+    title: pr.title,
+    status: pr.status,
+    repository: pr.repository,
+    branch: pr.branch,
+    number: pr.number,
+    author: pr.author,
+    github_url: pr.github_url,
+    created_at: pr.created_at,
+  }));
+}
+
+export async function getTaskCommits(taskId: string, userId: string) {
+  // First verify user has access to the task
+  const task = await Task.findOne({
+    where: {
+      id: taskId,
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const commits = await Commit.findAll({
+    where: { task_id: taskId },
+    order: [["created_at", "DESC"]],
+  });
+
+  return commits.map((commit) => ({
+    id: commit.id,
+    hash: commit.hash,
+    message: commit.message,
+    author: {
+      name: commit.author_name,
+      avatar: commit.author_avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    },
+    created_at: commit.created_at,
+  }));
 }

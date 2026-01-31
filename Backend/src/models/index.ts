@@ -7,9 +7,12 @@ import Subtask from "./subtask";
 import Comment from "./comment";
 import Label from "./label";
 import TaskLabel from "./taskLabel";
+import { PullRequest } from "./pullRequest";
+import { Commit } from "./commit";
+import UserMetadata from "./userMetadata";
 
-const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel];
+const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata];
 
 export default models;
 
-export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel };
+export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata };

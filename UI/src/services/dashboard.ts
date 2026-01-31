@@ -34,6 +34,29 @@ export interface Task {
   updated_at: string;
 }
 
+export interface PullRequest {
+  id: string;
+  title: string;
+  status: 'open' | 'merged' | 'closed';
+  repository: string;
+  branch: string;
+  number: number;
+  author: string;
+  created_at: string;
+  github_url: string;
+}
+
+export interface Commit {
+  id: string;
+  hash: string;
+  message: string;
+  author: {
+    name: string;
+    avatar: string;
+  };
+  created_at: string;
+}
+
 export const dashboardAPI = {
   getSummary: async (): Promise<{
     success: boolean;
@@ -124,6 +147,22 @@ export const tasksAPI = {
     data: Partial<Task>,
   ): Promise<{ success: boolean; data: Task }> => {
     const response = await api.patch(`/api/tasks/${id}`, data);
+    return response.data;
+  },
+
+  getPullRequests: async (taskId: string): Promise<{
+    success: boolean;
+    data: PullRequest[];
+  }> => {
+    const response = await api.get(`/api/tasks/${taskId}/pull-requests`);
+    return response.data;
+  },
+
+  getCommits: async (taskId: string): Promise<{
+    success: boolean;
+    data: Commit[];
+  }> => {
+    const response = await api.get(`/api/tasks/${taskId}/commits`);
     return response.data;
   },
 };

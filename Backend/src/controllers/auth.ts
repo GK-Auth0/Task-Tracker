@@ -6,11 +6,16 @@ export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
 
   try {
+    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
+    const userAgent = req.headers['user-agent'];
+    
     const userData = {
       email: req.body.email,
       password: req.body.password,
       firstName: req.body.firstName,
       lastName: req.body.lastName,
+      ip: clientIP,
+      userAgent,
     };
 
     const result = await registerUser(userData);

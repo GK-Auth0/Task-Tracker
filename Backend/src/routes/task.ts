@@ -6,6 +6,8 @@ import {
   getTask,
   updateTaskDetails,
   removeTask,
+  getTaskPRs,
+  getTaskCommitHistory,
 } from "../controllers/task";
 import { createTaskSchema, updateTaskSchema } from "../validators/task";
 import { authenticateToken } from "../middleware/auth";
@@ -20,6 +22,8 @@ router.post(
   createNewTask,
 );
 router.get("/:id", authenticateToken, getTask);
+router.get("/:id/pull-requests", authenticateToken, getTaskPRs);
+router.get("/:id/commits", authenticateToken, getTaskCommitHistory);
 router.patch(
   "/:id",
   authenticateToken,

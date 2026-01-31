@@ -14,8 +14,12 @@
 }
 
 .gantt-grid {
-  background-size: 40px 100%;
+  background-size: 160px 100%;
   background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px);
+}
+
+.gantt-grid .h-12:hover {
+  background-color: rgba(248, 250, 252, 0.8);
 }
 
 body {
