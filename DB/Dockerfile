@@ -1,4 +1,4 @@
-FROM redgate/flyway:10.10.0
+FROM flyway/flyway:8.5.13
 
 # Copy migration files
 COPY migrations /flyway/sql
