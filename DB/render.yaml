@@ -19,18 +19,19 @@
 #     plan: free
 
 
-databases:
-  - name: task-tracker-db
-    databaseName: task_tracker_db
-    user: postgres
-    plan: free
-
 services:
   - type: job
     name: task-tracker-migrations
     env: docker
+    startCommand: flyway migrate
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: task-tracker-db
-          property: connectionString
+      - key: FLYWAY_URL
+        value: jdbc:postgresql://ep-divine-cell-a1gyosjn-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+      - key: FLYWAY_USER
+        value: neondb_owner
+      - key: FLYWAY_PASSWORD
+        value: npg_N06aIYFAUEiS
+      - key: FLYWAY_LOCATIONS
+        value: filesystem:/flyway/sql
+      - key: FLYWAY_BASELINE_ON_MIGRATE
+        value: true
