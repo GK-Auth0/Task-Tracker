@@ -1,7 +1,12 @@
-FROM flyway/flyway:latest-alpine
+FROM openjdk:11-jre-slim
 
-# Install PostgreSQL JDBC driver
-RUN wget -O /flyway/drivers/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.1.jar
+# Install wget and flyway
+RUN apt-get update && apt-get install -y wget && \
+    wget -qO- https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.3/flyway-commandline-9.22.3-linux-x64.tar.gz | tar xvz && \
+    ln -s `pwd`/flyway-9.22.3/flyway /usr/local/bin
+
+# Download PostgreSQL JDBC driver
+RUN wget -O /flyway-9.22.3/drivers/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.1.jar
 
 # Copy migration files
 COPY migrations /flyway/sql
