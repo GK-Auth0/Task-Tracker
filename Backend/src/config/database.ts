@@ -11,6 +11,12 @@ const database = new Sequelize({
   dialect: "postgres",
   models: models,
   logging: appConfig.env === "development" ? console.log : false,
+  dialectOptions: {
+    ssl: appConfig.env === "production" ? {
+      require: true,
+      rejectUnauthorized: false
+    } : false
+  }
 });
 
 export default database;
