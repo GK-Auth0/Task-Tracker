@@ -19,6 +19,12 @@
 #     plan: free
 
 
+databases:
+  - name: task-tracker-db
+    databaseName: task_tracker_db
+    user: postgres
+    plan: free
+
 services:
   - type: job
     name: task-tracker-migrations
@@ -28,9 +34,3 @@ services:
         fromDatabase:
           name: task-tracker-db
           property: connectionString
-
-databases:
-  - name: task-tracker-db
-    databaseName: task_tracker_db
-    user: postgres
-    plan: free
