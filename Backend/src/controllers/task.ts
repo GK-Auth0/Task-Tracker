@@ -9,6 +9,7 @@ import {
   getTaskPullRequests,
   getTaskCommits,
 } from "../services/task";
+import { createAuditLog } from "../services/auditService";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -80,6 +81,20 @@ export const createNewTask = async (req: Request, res: Response) => {
     };
 
     const task = await createTask(taskData);
+    
+    // Log task creation
+    await createAuditLog({
+      entity_type: "task",
+      entity_id: task.id,
+      action: "created",
+      user_id: userId,
+      new_values: taskData,
+      changes: {
+        timestamp: new Date().toISOString(),
+        action_time: new Date(),
+      },
+    });
+    
     return res.status(201).json({
       success: true,
       message: "Task created successfully",
@@ -137,6 +152,9 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
       });
     }
 
+    // Get current task data for audit log
+    const currentTask = await getTaskById(taskId, userId);
+    
     const updateData = {
       title: req.body.title,
       description: req.body.description,
@@ -147,6 +165,51 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
     };
 
     const task = await updateTask(taskId, updateData, userId);
+    
+    // Determine audit action and log changes
+    let action = "updated";
+    const changes: any = {};
+    
+    if (currentTask.status !== updateData.status && updateData.status) {
+      action = "status_changed";
+      changes.status = { from: currentTask.status, to: updateData.status };
+    }
+    
+    if (currentTask.assignee?.id !== updateData.assignee_id) {
+      if (!currentTask.assignee?.id && updateData.assignee_id) {
+        action = "assigned";
+      } else if (currentTask.assignee?.id && !updateData.assignee_id) {
+        action = "unassigned";
+      }
+      changes.assignee = { 
+        from: currentTask.assignee?.id || null, 
+        to: updateData.assignee_id || null 
+      };
+    }
+    
+    // Log other changes
+    const updateDataKeys = Object.keys(updateData) as (keyof typeof updateData)[];
+    updateDataKeys.forEach(key => {
+      if (updateData[key] !== undefined && (currentTask as any)[key] !== updateData[key]) {
+        changes[key] = { from: (currentTask as any)[key], to: updateData[key] };
+      }
+    });
+    
+    // Create audit log
+    await createAuditLog({
+      entity_type: "task",
+      entity_id: taskId,
+      action: action as any,
+      user_id: userId,
+      old_values: currentTask,
+      new_values: updateData,
+      changes: {
+        ...changes,
+        timestamp: new Date().toISOString(),
+        action_time: new Date(),
+      },
+    });
+    
     return res.status(200).json({
       success: true,
       message: "Task updated successfully",
@@ -174,7 +237,24 @@ export const removeTask = async (req: Request, res: Response) => {
       });
     }
 
+    // Get task data before deletion for audit log
+    const task = await getTaskById(taskId, userId);
+    
     await deleteTask(taskId, userId);
+    
+    // Log task deletion
+    await createAuditLog({
+      entity_type: "task",
+      entity_id: taskId,
+      action: "deleted",
+      user_id: userId,
+      old_values: task,
+      changes: {
+        timestamp: new Date().toISOString(),
+        action_time: new Date(),
+      },
+    });
+    
     return res.status(200).json({
       success: true,
       message: "Task deleted successfully",

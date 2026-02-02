@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { tasksAPI, PullRequest, Commit } from "../services/dashboard";
+import { tasksAPI, PullRequest, Commit, ActivityLog } from "../services/dashboard";
 
 interface TaskDetails {
   id: string;
@@ -36,7 +36,9 @@ export default function TaskDetails() {
   const [activeTab, setActiveTab] = useState<'overview' | 'prs' | 'activity' | 'attachments'>('overview');
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [commits, setCommits] = useState<Commit[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [prLoading, setPrLoading] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [showLinkPRModal, setShowLinkPRModal] = useState(false);
   
   // Debug log for modal state
@@ -62,6 +64,8 @@ export default function TaskDetails() {
   useEffect(() => {
     if (id && activeTab === 'prs') {
       fetchPRData();
+    } else if (id && activeTab === 'activity') {
+      fetchActivityLogs();
     }
   }, [id, activeTab]);
 
@@ -100,6 +104,21 @@ export default function TaskDetails() {
     }
   };
 
+  const fetchActivityLogs = async () => {
+    if (!id) return;
+    try {
+      setActivityLoading(true);
+      const response = await tasksAPI.getActivityLogs(id);
+      if (response.success) {
+        setActivityLogs(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch activity logs:", error);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
   const handleStatusUpdate = async (
     newStatus: "To Do" | "In Progress" | "Done",
   ) => {
@@ -110,6 +129,10 @@ export default function TaskDetails() {
       });
       if (response.success) {
         setTask({ ...task, status: newStatus });
+        // Refresh activity logs if on activity tab
+        if (activeTab === 'activity') {
+          fetchActivityLogs();
+        }
       }
     } catch (error) {
       console.error("Failed to update task status:", error);
@@ -557,17 +580,108 @@ export default function TaskDetails() {
               {activeTab === 'activity' && (
                 <div className="space-y-6 pt-4">
                   <h3 className="text-lg font-bold text-slate-900">Activity Log</h3>
-                  <div className="text-slate-500 text-center py-8">
-                    Activity log content will be displayed here.
-                  </div>
+                  {activityLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-slate-500 mt-2">Loading activity...</p>
+                    </div>
+                  ) : activityLogs.length > 0 ? (
+                    <div className="space-y-4">
+                      {activityLogs.map((log) => {
+                        const getActionIcon = (action: string) => {
+                          switch (action) {
+                            case 'created': return { icon: 'add_circle', color: 'text-green-600' };
+                            case 'status_changed': return { icon: 'swap_horiz', color: 'text-blue-600' };
+                            case 'assigned': return { icon: 'person_add', color: 'text-purple-600' };
+                            case 'unassigned': return { icon: 'person_remove', color: 'text-orange-600' };
+                            case 'updated': return { icon: 'edit', color: 'text-amber-600' };
+                            case 'deleted': return { icon: 'delete', color: 'text-red-600' };
+                            default: return { icon: 'history', color: 'text-slate-600' };
+                          }
+                        };
+                        
+                        const getActionText = (log: ActivityLog) => {
+                          switch (log.action) {
+                            case 'created': return 'created this task';
+                            case 'status_changed': 
+                              return `changed status from "${log.changes?.status?.from}" to "${log.changes?.status?.to}"`;
+                            case 'assigned':
+                              return 'assigned this task';
+                            case 'unassigned':
+                              return 'unassigned this task';
+                            case 'updated':
+                              const changes = Object.keys(log.changes || {}).filter(key => key !== 'timestamp' && key !== 'action_time');
+                              return `updated ${changes.join(', ')}`;
+                            case 'deleted': return 'deleted this task';
+                            default: return log.action;
+                          }
+                        };
+                        
+                        const actionIcon = getActionIcon(log.action);
+                        
+                        return (
+                          <div key={log.id} className="flex gap-3 p-4 bg-white border border-slate-200 rounded-lg">
+                            <div className="flex-shrink-0">
+                              <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
+                                {log.user.full_name.split(' ').map(n => n[0]).join('')}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`material-symbols-outlined ${actionIcon.color} text-lg`}>
+                                  {actionIcon.icon}
+                                </span>
+                                <span className="font-semibold text-slate-900">{log.user.full_name}</span>
+                                <span className="text-slate-600">{getActionText(log)}</span>
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {new Date(log.created_at).toLocaleString()}
+                              </div>
+                              {log.changes && Object.keys(log.changes).length > 2 && (
+                                <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded">
+                                  <details>
+                                    <summary className="cursor-pointer font-medium">View changes</summary>
+                                    <pre className="mt-1 text-[10px] overflow-x-auto">
+                                      {JSON.stringify(log.changes, null, 2)}
+                                    </pre>
+                                  </details>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-slate-500 text-center py-8">
+                      No activity found for this task.
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeTab === 'attachments' && (
                 <div className="space-y-6 pt-4">
-                  <h3 className="text-lg font-bold text-slate-900">Attachments</h3>
-                  <div className="text-slate-500 text-center py-8">
-                    No attachments found.
+                  <div className="flex flex-wrap justify-between items-center gap-4">
+                    <h3 className="text-lg font-bold text-slate-900">Attachments</h3>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm cursor-pointer">
+                        <span className="material-symbols-outlined text-lg">upload</span>
+                        Upload File
+                        <input type="file" className="hidden" onChange={() => {}} />
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
+                    <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">attach_file</span>
+                    <h3 className="text-lg font-semibold text-slate-600 mb-2">No Attachments Yet</h3>
+                    <p className="text-slate-500 mb-4">Upload files related to this task.</p>
+                    <label className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all cursor-pointer">
+                      <span className="material-symbols-outlined text-[18px]">upload</span>
+                      Upload First File
+                      <input type="file" className="hidden" onChange={() => {}} />
+                    </label>
                   </div>
                 </div>
               )}
