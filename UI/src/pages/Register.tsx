@@ -1,40 +1,24 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth0 } from "@auth0/auth0-react";
 import AuthNavbar from "../components/AuthNavbar";
 
 export default function Register() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const { loginWithRedirect, isLoading } = useAuth0();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const { register } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignup = async () => {
     setLoading(true);
-    setError("");
-
-    if (!termsAccepted) {
-      setError("Please accept the terms and conditions");
-      setLoading(false);
-      return;
-    }
-
     try {
-      const [firstName, ...lastNameParts] = fullName.trim().split(" ");
-      const lastName = lastNameParts.join(" ") || firstName;
-
-      await register(email, password, firstName, lastName);
-      navigate("/dashboard");
-    } catch (error: any) {
-      setError(error.response?.data?.error || "Registration failed");
-    } finally {
+      await loginWithRedirect({
+        authorizationParams: {
+          screen_hint: "signup"
+        },
+        appState: {
+          returnTo: "/dashboard"
+        }
+      });
+    } catch (error) {
+      console.error("Signup failed:", error);
       setLoading(false);
     }
   };
@@ -57,128 +41,25 @@ export default function Register() {
               </p>
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-sm">{error}</p>
-              </div>
-            )}
-
-            {/* Form */}
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              {/* Full Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-slate-700 text-sm font-semibold">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <input
-                    className="w-full h-12 px-4 rounded-lg border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
-                    placeholder="John Doe"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-slate-700 text-sm font-semibold">
-                  Work Email
-                </label>
-                <div className="relative">
-                  <input
-                    className="w-full h-12 px-4 rounded-lg border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
-                    placeholder="name@company.com"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-slate-700 text-sm font-semibold">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    className="w-full h-12 px-4 rounded-lg border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
-                    placeholder="Min. 8 characters"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    <span className="material-symbols-outlined text-[20px]">
-                      {showPassword ? "visibility_off" : "visibility"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Terms Checkbox */}
-              <div className="flex items-start gap-3 py-2">
-                <div className="flex items-center h-5">
-                  <input
-                    className="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-600 focus:ring-2"
-                    id="terms"
-                    type="checkbox"
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                  />
-                </div>
-                <label
-                  className="text-sm text-slate-600 leading-tight"
-                  htmlFor="terms"
-                >
-                  I agree to the{" "}
-                  <a
-                    className="text-blue-600 font-medium hover:underline"
-                    href="#"
-                  >
-                    Terms and Conditions
-                  </a>{" "}
-                  and{" "}
-                  <a
-                    className="text-blue-600 font-medium hover:underline"
-                    href="#"
-                  >
-                    Privacy Policy
-                  </a>
-                </label>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center disabled:opacity-50"
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? "Creating Account..." : "Create Account"}
-              </button>
-            </form>
+            {/* Auth0 Signup Button */}
+            <button
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center disabled:opacity-50"
+              onClick={handleSignup}
+              disabled={loading || isLoading}
+            >
+              {loading || isLoading ? "Creating Account..." : "Continue with Auth0"}
+            </button>
 
             {/* Footer Link */}
             <div className="mt-8 text-center border-t border-slate-100 pt-6">
               <p className="text-slate-600 text-sm font-medium">
                 Already have an account?{" "}
-                <Link
-                  className="text-blue-600 hover:underline ml-1"
-                  to="/login"
+                <a
+                  className="text-blue-600 hover:underline ml-1 cursor-pointer"
+                  onClick={() => loginWithRedirect()}
                 >
                   Log in
-                </Link>
+                </a>
               </p>
             </div>
           </div>
