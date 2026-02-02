@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "react-query";
 import { useAuth0 } from "@auth0/auth0-react";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { useAuth, AuthProvider } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -45,7 +45,9 @@ function CallbackPage() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
+  const loading = auth?.loading;
 
   if (loading) {
     return (
@@ -59,7 +61,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
+  const loading = auth?.loading;
 
   if (loading) {
     return (

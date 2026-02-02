@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { handleValidationErrors } from "../utils/validation";
-import { registerUser, loginUser, getCurrentUser } from "../services/auth";
+import { registerUser, loginUser, getCurrentUser, syncAuth0User } from "../services/auth";
 
 export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
@@ -79,6 +79,38 @@ export const me = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to get user profile",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const syncAuth0 = async (req: Request, res: Response) => {
+  try {
+    const { auth0Id, email, name, picture } = req.body;
+
+    if (!auth0Id || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Auth0 ID and email are required",
+      });
+    }
+
+    const result = await syncAuth0User({
+      auth0Id,
+      email,
+      name,
+      picture,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User synced successfully",
+      data: result,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to sync Auth0 user",
       error: (error as any).message,
     });
   }

@@ -283,6 +283,8 @@ export default function TaskDetails() {
                         )
                       }
                       className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium bg-white hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                      title="Change task status"
+                      aria-label="Task status selector"
                     >
                       <option value="To Do">To Do</option>
                       <option value="In Progress">In Progress</option>
@@ -829,6 +831,8 @@ export default function TaskDetails() {
                     value={prForm.status}
                     onChange={(e) => setPrForm(prev => ({ ...prev, status: e.target.value as 'open' | 'merged' | 'closed' }))}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    title="Select pull request status"
+                    aria-label="Pull request status selector"
                   >
                     <option value="open">Open</option>
                     <option value="merged">Merged</option>

@@ -11,16 +11,45 @@ const api = axios.create({
 
 // Add token to requests if available
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  // First try to get Auth0 token from localStorage
+  const auth0Token = localStorage.getItem("auth0_token");
+  // Fallback to custom JWT token
+  const customToken = localStorage.getItem("token");
+  
+  const token = auth0Token || customToken;
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    console.log('API Request with token:', token ? 'Token present' : 'No token');
+  } else {
+    console.log('API Request without token');
   }
   return config;
 });
 
+// Add response interceptor to handle auth errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.log('401 Unauthorized - clearing tokens');
+      localStorage.removeItem("token");
+      localStorage.removeItem("auth0_token");
+    }
+    return Promise.reject(error);
+  }
+);
+
 export interface LoginData {
   email: string;
   password: string;
+}
+
+export interface Auth0SyncData {
+  auth0Id: string;
+  email: string;
+  name: string;
+  picture?: string;
 }
 
 export interface RegisterData {
@@ -52,6 +81,16 @@ export const authAPI = {
 
   register: async (data: RegisterData): Promise<AuthResponse> => {
     const response = await api.post("/api/auth/register", data);
+    return response.data;
+  },
+
+  syncAuth0User: async (data: Auth0SyncData) => {
+    // Don't send auth header for sync endpoint since we're establishing auth
+    const response = await axios.post(`${API_BASE_URL}/api/auth/sync-auth0`, data, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
     return response.data;
   },
 

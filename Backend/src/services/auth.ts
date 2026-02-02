@@ -112,3 +112,36 @@ export async function getCurrentUser(userId: string) {
   const { password_hash, ...userWithoutPassword } = user.get({ plain: true });
   return userWithoutPassword;
 }
+interface Auth0SyncDto {
+  auth0Id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+}
+
+export async function syncAuth0User(dto: Auth0SyncDto) {
+  // Check if user already exists by Auth0 ID or email
+  let user = await User.findOne({ 
+    where: { 
+      email: dto.email 
+    } 
+  });
+
+  if (!user) {
+    // Create new user from Auth0 data
+    user = await User.create({
+      email: dto.email,
+      password_hash: '', // Auth0 users don't need password
+      full_name: dto.name || dto.email.split('@')[0],
+      role: "Member",
+    });
+  } else {
+    // Update existing user with Auth0 data if needed
+    if (dto.name && user.full_name !== dto.name) {
+      await user.update({ full_name: dto.name });
+    }
+  }
+
+  const { password_hash, ...userWithoutPassword } = user.get({ plain: true });
+  return userWithoutPassword;
+}
