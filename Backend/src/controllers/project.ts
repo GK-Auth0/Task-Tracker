@@ -5,6 +5,7 @@ import {
   createProject,
   getProjectById,
 } from "../services/project";
+import { createAuditLog } from "../services/auditService";
 
 export const getProjects = async (req: Request, res: Response) => {
   try {
@@ -54,6 +55,20 @@ export const createNewProject = async (req: Request, res: Response) => {
     };
 
     const project = await createProject(projectData);
+    
+    // Log project creation
+    await createAuditLog({
+      entity_type: "project",
+      entity_id: project.id,
+      action: "created",
+      user_id: userId,
+      new_values: projectData,
+      changes: {
+        timestamp: new Date().toISOString(),
+        action_time: new Date(),
+      },
+    });
+    
     return res.status(201).json({
       success: true,
       message: "Project created successfully",

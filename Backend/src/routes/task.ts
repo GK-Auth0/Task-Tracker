@@ -9,6 +9,7 @@ import {
   getTaskPRs,
   getTaskCommitHistory,
 } from "../controllers/task";
+import { getEntityAuditLogs } from "../controllers/auditLog";
 import { createTaskSchema, updateTaskSchema } from "../validators/task";
 import { authenticateToken } from "../middleware/auth";
 
@@ -22,6 +23,7 @@ router.post(
   createNewTask,
 );
 router.get("/:id", authenticateToken, getTask);
+router.get("/:id/activity", authenticateToken, getEntityAuditLogs);
 router.get("/:id/pull-requests", authenticateToken, getTaskPRs);
 router.get("/:id/commits", authenticateToken, getTaskCommitHistory);
 router.patch(

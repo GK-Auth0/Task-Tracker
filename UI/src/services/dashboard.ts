@@ -57,6 +57,22 @@ export interface Commit {
   created_at: string;
 }
 
+export interface ActivityLog {
+  id: string;
+  entity_type: "task" | "project";
+  entity_id: string;
+  action: "created" | "updated" | "deleted" | "status_changed" | "assigned" | "unassigned";
+  user: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
+  old_values?: any;
+  new_values?: any;
+  changes?: any;
+  created_at: string;
+}
+
 export const dashboardAPI = {
   getSummary: async (): Promise<{
     success: boolean;
@@ -91,6 +107,14 @@ export const projectsAPI = {
     description?: string;
   }): Promise<{ success: boolean; data: { id: string; name: string } }> => {
     const response = await api.post("/api/projects", data);
+    return response.data;
+  },
+
+  getActivityLogs: async (projectId: string): Promise<{
+    success: boolean;
+    data: ActivityLog[];
+  }> => {
+    const response = await api.get(`/api/projects/${projectId}/activity`);
     return response.data;
   },
 };
@@ -163,6 +187,14 @@ export const tasksAPI = {
     data: Commit[];
   }> => {
     const response = await api.get(`/api/tasks/${taskId}/commits`);
+    return response.data;
+  },
+
+  getActivityLogs: async (taskId: string): Promise<{
+    success: boolean;
+    data: ActivityLog[];
+  }> => {
+    const response = await api.get(`/api/tasks/${taskId}/activity`);
     return response.data;
   },
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectService } from '../services/projectService';
 import { taskService } from '../services/taskService';
+import { projectsAPI, ActivityLog } from '../services/dashboard';
 import { Project } from '../types/project';
 import { Task } from '../types/task';
 import CreateTaskModal from '../components/CreateTaskModal';
@@ -22,6 +23,8 @@ const ProjectDetail: React.FC = () => {
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [showMembersTooltip, setShowMembersTooltip] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   useEffect(() => {
     console.log('Project ID from URL:', id);
@@ -91,8 +94,27 @@ const ProjectDetail: React.FC = () => {
     try {
       await projectService.updateProject(project.id, { status: newStatus as 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled' });
       setProject({ ...project, status: newStatus as 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled' });
+      // Refresh activity logs if on activity tab
+      if (activeTab === 'activity') {
+        fetchActivityLogs();
+      }
     } catch (error) {
       console.error('Error updating project status:', error);
+    }
+  };
+
+  const fetchActivityLogs = async () => {
+    if (!id) return;
+    try {
+      setActivityLoading(true);
+      const response = await projectsAPI.getActivityLogs(id);
+      if (response.success) {
+        setActivityLogs(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch activity logs:', error);
+    } finally {
+      setActivityLoading(false);
     }
   };
 
@@ -365,6 +387,20 @@ const ProjectDetail: React.FC = () => {
             >
               <span className="material-symbols-outlined text-xl">folder</span>
               Files
+            </button>
+            <button 
+              onClick={() => {
+                setActiveTab('activity');
+                if (id) fetchActivityLogs();
+              }}
+              className={`px-1 py-4 border-b-2 text-sm font-bold flex items-center gap-2 ${
+                activeTab === 'activity' 
+                  ? 'border-blue-600 text-blue-600' 
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span className="material-symbols-outlined text-xl">history</span>
+              Activity
             </button>
           </div>
         </div>
@@ -873,6 +909,83 @@ const ProjectDetail: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-bold text-slate-900">Project Activity</h3>
+            {activityLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-slate-500 mt-2">Loading activity...</p>
+              </div>
+            ) : activityLogs.length > 0 ? (
+              <div className="space-y-4">
+                {activityLogs.map((log: ActivityLog) => {
+                  const getActionIcon = (action: string) => {
+                    switch (action) {
+                      case 'created': return { icon: 'add_circle', color: 'text-green-600' };
+                      case 'status_changed': return { icon: 'swap_horiz', color: 'text-blue-600' };
+                      case 'updated': return { icon: 'edit', color: 'text-amber-600' };
+                      case 'deleted': return { icon: 'delete', color: 'text-red-600' };
+                      default: return { icon: 'history', color: 'text-slate-600' };
+                    }
+                  };
+                  
+                  const getActionText = (log: ActivityLog) => {
+                    switch (log.action) {
+                      case 'created': return 'created this project';
+                      case 'status_changed': 
+                        return `changed status from "${log.changes?.status?.from}" to "${log.changes?.status?.to}"`;
+                      case 'updated':
+                        const changes = Object.keys(log.changes || {}).filter(key => key !== 'timestamp' && key !== 'action_time');
+                        return `updated ${changes.join(', ')}`;
+                      case 'deleted': return 'deleted this project';
+                      default: return log.action;
+                    }
+                  };
+                  
+                  const actionIcon = getActionIcon(log.action);
+                  
+                  return (
+                    <div key={log.id} className="flex gap-3 p-4 bg-white border border-slate-200 rounded-lg">
+                      <div className="flex-shrink-0">
+                        <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
+                          {log.user.full_name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`material-symbols-outlined ${actionIcon.color} text-lg`}>
+                            {actionIcon.icon}
+                          </span>
+                          <span className="font-semibold text-slate-900">{log.user.full_name}</span>
+                          <span className="text-slate-600">{getActionText(log)}</span>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {new Date(log.created_at).toLocaleString()}
+                        </div>
+                        {log.changes && Object.keys(log.changes).length > 2 && (
+                          <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded">
+                            <details>
+                              <summary className="cursor-pointer font-medium">View changes</summary>
+                              <pre className="mt-1 text-[10px] overflow-x-auto">
+                                {JSON.stringify(log.changes, null, 2)}
+                              </pre>
+                            </details>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-slate-500 text-center py-8">
+                No activity found for this project.
               </div>
             )}
           </div>

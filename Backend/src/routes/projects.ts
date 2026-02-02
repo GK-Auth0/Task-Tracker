@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { projectController } from '../controllers/projectController';
+import { getEntityAuditLogs } from '../controllers/auditLog';
 import { authenticateToken } from '../middleware/auth';
 import { validateProject, validateProjectUpdate } from '../middleware/projectValidation';
 import { upload } from '../middleware/upload';
@@ -206,6 +207,10 @@ router.get('/users', projectController.getUsers);
  *         description: Project not found
  */
 router.get('/:id', projectController.getProject);
+router.get('/:id/activity', (req, res) => {
+  req.query.entity_type = 'project';
+  return getEntityAuditLogs(req, res);
+});
 
 /**
  * @swagger
