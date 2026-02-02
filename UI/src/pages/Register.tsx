@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import AuthNavbar from "../components/AuthNavbar";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -40,57 +41,7 @@ export default function Register() {
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col font-display transition-colors duration-300">
-      {/* Top Navigation Bar */}
-      <header className="w-full bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="text-blue-600">
-              <svg
-                className="w-8 h-8"
-                fill="none"
-                viewBox="0 0 48 48"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M42.1739 20.1739L27.8261 5.82609C29.1366 7.13663 28.3989 10.1876 26.2002 13.7654C24.8538 15.9564 22.9595 18.3449 20.6522 20.6522C18.3449 22.9595 15.9564 24.8538 13.7654 26.2002C10.1876 28.3989 7.13663 29.1366 5.82609 27.8261L20.1739 42.1739C21.4845 43.4845 24.5355 42.7467 28.1133 40.548C30.3042 39.2016 32.6927 37.3073 35 35C37.3073 32.6927 39.2016 30.3042 40.548 28.1133C42.7467 24.5355 43.4845 21.4845 42.1739 20.1739Z"
-                  fill="currentColor"
-                ></path>
-              </svg>
-            </div>
-            <h2 className="text-slate-900 text-xl font-bold tracking-tight">
-              Task Tracker
-            </h2>
-          </div>
-          <div className="flex items-center gap-6">
-            <nav className="hidden md:flex items-center gap-6">
-              <a
-                className="text-slate-600 text-sm font-medium hover:text-blue-600 transition-colors"
-                href="#"
-              >
-                Product
-              </a>
-              <a
-                className="text-slate-600 text-sm font-medium hover:text-blue-600 transition-colors"
-                href="#"
-              >
-                Pricing
-              </a>
-              <a
-                className="text-slate-600 text-sm font-medium hover:text-blue-600 transition-colors"
-                href="#"
-              >
-                Solutions
-              </a>
-            </nav>
-            <Link
-              to="/login"
-              className="bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-all"
-            >
-              Log in
-            </Link>
-          </div>
-        </div>
-      </header>
+      <AuthNavbar buttonText="Log in" buttonLink="/login" />
 
       {/* Main Content */}
       <main className="flex-grow flex items-center justify-center py-12 px-4">

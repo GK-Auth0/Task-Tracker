@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import AuthNavbar from "../components/AuthNavbar";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -29,34 +30,7 @@ export default function Login() {
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
-      {/* Top Navigation Bar */}
-      <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white">
-        <div className="flex items-center gap-4 text-gray-900">
-          <div className="size-6 text-blue-600">
-            <svg
-              fill="none"
-              viewBox="0 0 48 48"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                clipRule="evenodd"
-                d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z"
-                fill="currentColor"
-                fillRule="evenodd"
-              ></path>
-            </svg>
-          </div>
-          <h2 className="text-lg font-bold leading-tight tracking-tight">
-            Task Tracker
-          </h2>
-        </div>
-        <Link
-          to="/register"
-          className="flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal hover:bg-blue-700"
-        >
-          <span className="truncate">Sign up</span>
-        </Link>
-      </header>
+      <AuthNavbar buttonText="Sign up" buttonLink="/register" />
 
       {/* Main Content Area */}
       <main className="flex-1 flex items-center justify-center p-6">
