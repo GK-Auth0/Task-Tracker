@@ -142,6 +142,22 @@ export async function syncAuth0User(dto: Auth0SyncDto) {
     }
   }
 
+  // Generate JWT token for the user
+  const tokenPayload = {
+    id: user.id,
+    email: user.email,
+    full_name: user.full_name,
+    role: user.role,
+  };
+
+  const token = jwt.sign(tokenPayload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+  } as SignOptions);
+
   const { password_hash, ...userWithoutPassword } = user.get({ plain: true });
-  return userWithoutPassword;
+  
+  return {
+    user: userWithoutPassword,
+    token,
+  };
 }

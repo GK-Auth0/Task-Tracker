@@ -26,8 +26,17 @@ export const projectService = {
     limit?: number;
     status?: string;
     search?: string;
+    ownerId?: string;
   }): Promise<ProjectsResponse> => {
-    const response = await api.get('/projects', { params });
+    // Map ownerId to owner_id for backend
+    const backendParams = { ...params };
+    if (params?.ownerId) {
+      backendParams.ownerId = params.ownerId;
+      delete backendParams.ownerId; // Remove the frontend param
+      (backendParams as any).ownerId = params.ownerId; // Add backend param
+    }
+    
+    const response = await api.get('/projects', { params: backendParams });
     return response.data;
   },
 

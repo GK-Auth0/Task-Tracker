@@ -62,3 +62,5 @@ export class Commit extends Model {
   @UpdatedAt
   updated_at!: Date;
 }
+
+export default Commit;

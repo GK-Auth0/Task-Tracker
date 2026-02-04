@@ -81,3 +81,5 @@ export class PullRequest extends Model {
   @UpdatedAt
   updated_at!: Date;
 }
+
+export default PullRequest;

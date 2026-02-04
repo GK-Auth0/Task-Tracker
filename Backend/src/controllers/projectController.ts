@@ -77,7 +77,7 @@ export class ProjectController {
         whereClause.priority = priority;
       }
       if (ownerId) {
-        whereClause.ownerId = ownerId;
+        whereClause.owner_id = ownerId;
       }
       if (search) {
         whereClause[Op.or] = [

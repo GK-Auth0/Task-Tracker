@@ -7,6 +7,7 @@ import {
   updateTask,
   deleteTask,
   getTaskPullRequests,
+  createTaskPullRequest,
   getTaskCommits,
 } from "../services/task";
 import { createAuditLog } from "../services/auditService";
@@ -291,6 +292,45 @@ export const getTaskPRs = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to get pull requests",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const createTaskPR = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const prData = {
+      title: req.body.title,
+      repository: req.body.repository,
+      branch: req.body.branch,
+      number: req.body.number,
+      author: req.body.author,
+      github_url: req.body.github_url,
+      status: req.body.status || 'open',
+      task_id: taskId,
+    };
+
+    const pullRequest = await createTaskPullRequest(prData, userId);
+    return res.status(201).json({
+      success: true,
+      message: "Pull request created successfully",
+      data: pullRequest,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to create pull request",
       error: (error as any).message,
     });
   }

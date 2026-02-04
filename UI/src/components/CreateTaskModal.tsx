@@ -25,7 +25,7 @@ export default function CreateTaskModal({
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium");
   const [projectId, setProjectId] = useState("");
@@ -97,7 +97,7 @@ export default function CreateTaskModal({
         title: title.trim(),
         description: description.trim() || undefined,
         project_id: projectId,
-        assignee_id: assigneeId || undefined,
+        assignee_id: assigneeIds.length > 0 ? assigneeIds[0] : undefined, // For now, use first assignee
         due_date: dueDate || undefined,
         priority,
       });
@@ -105,7 +105,7 @@ export default function CreateTaskModal({
       // Reset form
       setTitle("");
       setDescription("");
-      setAssigneeId("");
+      setAssigneeIds([]);
       setDueDate("");
       setPriority("Medium");
       setProjectId("");
@@ -171,6 +171,7 @@ export default function CreateTaskModal({
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
                   required
+                  aria-label="Select project"
                 >
                   <option value="">Select a project</option>
                   {projects.map((project) => (
@@ -248,19 +249,50 @@ export default function CreateTaskModal({
 
             {/* Assignee & Due Date Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Assignee */}
-              <div className="flex flex-col gap-2">
-                <label className="text-gray-900 text-sm font-semibold">
-                  Assignee
-                </label>
+            {/* Assignees */}
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-semibold">
+                Assignees
+              </label>
+              <div className="space-y-3">
+                {/* Selected Assignees */}
+                {assigneeIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {assigneeIds.map(assigneeId => {
+                      const user = users.find(u => u.id === assigneeId);
+                      return user ? (
+                        <div key={assigneeId} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
+                          <div className="size-5 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                            {user.full_name.charAt(0)}
+                          </div>
+                          <span>{user.full_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAssigneeIds(prev => prev.filter(id => id !== assigneeId))}
+                            className="text-blue-500 hover:text-blue-700"
+                          >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+                
+                {/* Add Assignee Dropdown */}
                 <div className="relative">
                   <select
                     className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 pl-10 pr-4 appearance-none"
-                    value={assigneeId}
-                    onChange={(e) => setAssigneeId(e.target.value)}
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !assigneeIds.includes(e.target.value)) {
+                        setAssigneeIds(prev => [...prev, e.target.value]);
+                      }
+                    }}
+                    aria-label="Add team member"
                   >
-                    <option value="">Select a team member</option>
-                    {users.map((user) => (
+                    <option value="">Add team member...</option>
+                    {users.filter(user => !assigneeIds.includes(user.id)).map((user) => (
                       <option key={user.id} value={user.id}>
                         {user.full_name}
                       </option>
@@ -269,12 +301,13 @@ export default function CreateTaskModal({
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
                     <div className="size-6 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
                       <span className="material-symbols-outlined text-lg text-slate-500">
-                        person
+                        person_add
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
 
               {/* Due Date */}
               <div className="flex flex-col gap-2">
@@ -380,11 +413,18 @@ export default function CreateTaskModal({
                 placeholder="Describe the work to be done..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                aria-label="Task description"
               ></textarea>
             </div>
 
             {/* Attachments Placeholder */}
-            <div className="p-4 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center gap-2 text-slate-400 hover:border-blue-600/50 hover:text-blue-600 transition-all cursor-pointer">
+            <div 
+              className="p-4 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center gap-2 text-slate-400 hover:border-blue-600/50 hover:text-blue-600 transition-all cursor-pointer"
+              role="button"
+              tabIndex={0}
+              aria-label="Upload attachments"
+              title="Drop files to attach or click to browse"
+            >
               <span className="material-symbols-outlined">attach_file</span>
               <span className="text-sm font-medium">
                 Drop files to attach or click to browse

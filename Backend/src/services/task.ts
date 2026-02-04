@@ -259,9 +259,46 @@ export async function getTaskPullRequests(taskId: string, userId: string) {
     branch: pr.branch,
     number: pr.number,
     author: pr.author,
-    github_url: pr.github_url,
+    github_url: pr.github_url.startsWith('http') ? pr.github_url : `https://${pr.github_url}`,
     created_at: pr.created_at,
   }));
+}
+
+export async function createTaskPullRequest(prData: any, userId: string) {
+  // First verify user has access to the task
+  const task = await Task.findOne({
+    where: {
+      id: prData.task_id,
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const pullRequest = await PullRequest.create({
+    title: prData.title,
+    repository: prData.repository,
+    branch: prData.branch,
+    number: prData.number,
+    author: prData.author,
+    github_url: prData.github_url,
+    status: prData.status,
+    task_id: prData.task_id,
+  });
+
+  return {
+    id: pullRequest.id,
+    title: pullRequest.title,
+    status: pullRequest.status,
+    repository: pullRequest.repository,
+    branch: pullRequest.branch,
+    number: pullRequest.number,
+    author: pullRequest.author,
+    github_url: pullRequest.github_url,
+    created_at: pullRequest.created_at,
+  };
 }
 
 export async function getTaskCommits(taskId: string, userId: string) {

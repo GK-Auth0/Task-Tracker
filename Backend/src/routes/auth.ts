@@ -9,6 +9,7 @@ const router = express.Router();
 router.post("/register", checkSchema(registerSchema), register);
 router.post("/login", checkSchema(loginSchema), login);
 router.post("/sync-auth0", syncAuth0);
+router.post("/auth0-login", syncAuth0); // Alias for Auth0 login
 router.get("/me", authenticateToken, me);
 
 export default router;

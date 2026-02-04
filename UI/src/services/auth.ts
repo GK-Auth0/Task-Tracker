@@ -84,7 +84,7 @@ export const authAPI = {
     return response.data;
   },
 
-  syncAuth0User: async (data: Auth0SyncData) => {
+  syncAuth0User: async (data: Auth0SyncData): Promise<AuthResponse> => {
     // Don't send auth header for sync endpoint since we're establishing auth
     const response = await axios.post(`${API_BASE_URL}/api/auth/sync-auth0`, data, {
       headers: {

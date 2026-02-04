@@ -23,51 +23,56 @@ export const authenticateToken = async (
   }
 
   try {
-    // Decode token to check issuer
-    const decoded = jwt.decode(token, { complete: true }) as any;
-    
-    if (decoded?.payload?.iss?.includes('auth0.com')) {
-      // Handle Auth0 token - verify with Auth0 userinfo endpoint
-      try {
-        const response = await axios.get(`https://${AUTH0_DOMAIN}/userinfo`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        
-        const auth0User = response.data;
-        
-        // Find or create user from Auth0 data
-        let user = await User.findOne({ where: { email: auth0User.email } });
-        if (!user) {
-          user = await User.create({
-            email: auth0User.email,
-            password_hash: '',
-            full_name: auth0User.name || auth0User.email.split('@')[0],
-            role: "Member",
-          });
-        }
-        
-        (req as any).user = { id: user.id, email: user.email, role: user.role };
-        next();
-      } catch (auth0Error) {
-        console.error('Auth0 token verification error:', auth0Error.response?.data || auth0Error.message);
-        return res.status(403).json({
-          success: false,
-          message: "Invalid Auth0 token",
-          error: "UNAUTHORIZED",
-        });
-      }
-    } else {
-      // Handle custom JWT
+    // First try to verify as custom JWT
+    try {
       const customDecoded = jwt.verify(token, JWT_SECRET) as any;
       (req as any).user = customDecoded;
-      next();
+      return next();
+    } catch (jwtError) {
+      // If custom JWT fails, try Auth0 token
+      console.log('Custom JWT verification failed, trying Auth0...');
     }
-  } catch (error) {
+
+    // Try Auth0 token verification
+    try {
+      const response = await axios.get(`https://${AUTH0_DOMAIN}/userinfo`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      const auth0User = response.data;
+      console.log('Auth0 user verified:', auth0User.email);
+      
+      // Find or create user from Auth0 data
+      let user = await User.findOne({ where: { email: auth0User.email } });
+      if (!user) {
+        console.log('Creating new user from Auth0 data');
+        user = await User.create({
+          email: auth0User.email,
+          password_hash: '',
+          full_name: auth0User.name || auth0User.email.split('@')[0],
+          role: "Member",
+        });
+      }
+      
+      (req as any).user = { id: user.id, email: user.email, role: user.role };
+      return next();
+    } catch (auth0Error: any) {
+      console.error('Auth0 token verification failed:', auth0Error.response?.data || auth0Error.message);
+    }
+
+    // If both fail, return unauthorized
     return res.status(403).json({
       success: false,
       message: "Invalid token",
+      error: "UNAUTHORIZED",
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return res.status(403).json({
+      success: false,
+      message: "Token verification failed",
       error: "UNAUTHORIZED",
     });
   }

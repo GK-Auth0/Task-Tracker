@@ -57,11 +57,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       if (isAuthenticated && auth0User) {
         try {
-          // Check if email is verified
-          if (!auth0User.email_verified) {
-            console.log('Email not verified, logging out');
-            auth0Logout({ logoutParams: { returnTo: window.location.origin } });
-            return;
+          // Check if email is verified (only enforce for database connections)
+          if (!auth0User.email_verified && auth0User.sub?.startsWith('auth0|')) {
+            console.log('Email not verified for database user, but allowing login');
+            // You can add email verification UI here if needed
           }
           
           console.log('Getting Auth0 access token...');
@@ -75,34 +74,45 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           
           console.log('Auth0 token retrieved:', auth0Token ? 'Success' : 'Failed');
           
-          // Sync Auth0 user to database
+          // Sync Auth0 user to database and get backend JWT
           try {
             console.log('Syncing user to database...');
-            await authAPI.syncAuth0User({
+            const syncResponse = await authAPI.syncAuth0User({
               auth0Id: auth0User.sub || '',
               email: auth0User.email || '',
               name: auth0User.name || '',
               picture: auth0User.picture
             });
-            console.log('User sync successful');
+            console.log('User sync successful:', syncResponse);
+            
+            // Use the user and token from sync response
+            const mappedUser: User = {
+              id: syncResponse.data.user.id,
+              email: syncResponse.data.user.email,
+              full_name: syncResponse.data.user.full_name,
+              role: syncResponse.data.user.role
+            };
+            
+            console.log('Setting user and backend token in context');
+            setUser(mappedUser);
+            setToken(syncResponse.data.token);
+            localStorage.setItem("token", syncResponse.data.token);
+            // Clear Auth0 token since we're using backend JWT
+            localStorage.removeItem("auth0_token");
           } catch (syncError) {
-            console.error('Failed to sync user to database:', syncError);
+            console.error('Failed to sync user or get backend token:', syncError);
+            // Fallback: use Auth0 data directly
+            const mappedUser: User = {
+              id: auth0User.sub || '',
+              email: auth0User.email || '',
+              full_name: auth0User.name || '',
+              role: 'Member'
+            };
+            
+            setUser(mappedUser);
+            setToken(auth0Token);
+            localStorage.setItem("auth0_token", auth0Token);
           }
-          
-          // Create user object from Auth0 data
-          const mappedUser: User = {
-            id: auth0User.sub || '',
-            email: auth0User.email || '',
-            full_name: auth0User.name || '',
-            role: 'Member' // Default role, can be customized
-          };
-          
-          console.log('Setting user and token in context');
-          setUser(mappedUser);
-          setToken(auth0Token);
-          localStorage.setItem("auth0_token", auth0Token);
-          // Clear any old custom tokens
-          localStorage.removeItem("token");
         } catch (error) {
           console.error('Auth0 token error:', error);
         }
