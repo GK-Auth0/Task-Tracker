@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { projectService } from '../services/projectService';
-import { Project, CreateProjectRequest } from '../types/project';
-import ProjectCard from '../components/ProjectCard';
-import CreateProjectModal from '../components/CreateProjectModal';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { projectService } from "../services/projectService";
+import { Project, CreateProjectRequest } from "../types/project";
+import ProjectCard from "../components/ProjectCard";
+import CreateProjectModal from "../components/CreateProjectModal";
 
 const Projects: React.FC = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ const Projects: React.FC = () => {
       const response = await projectService.getProjects();
       setProjects(response.data);
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error("Error fetching projects:", error);
     } finally {
       setLoading(false);
     }
@@ -31,25 +31,28 @@ const Projects: React.FC = () => {
 
   const handleCreateProject = async (projectData: CreateProjectRequest) => {
     try {
-      console.log('Creating project with data:', projectData);
+      console.log("Creating project with data:", projectData);
       const response = await projectService.createProject(projectData);
-      console.log('Project created successfully:', response);
+      console.log("Project created successfully:", response);
       setShowCreateModal(false);
       fetchProjects();
     } catch (error: any) {
-      console.error('Error creating project:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
+      console.error("Error creating project:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
       // Show error to user
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      const errorMessage =
+        error.response?.data?.message || error.message || "Unknown error";
       alert(`Failed to create project: ${errorMessage}`);
     }
   };
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+  const filteredProjects = projects.filter((project) => {
+    const matchesSearch =
+      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || project.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -66,10 +69,14 @@ const Projects: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
-          <h2 className="text-gray-900 text-3xl font-black tracking-tight">Projects</h2>
-          <p className="text-gray-600 mt-1">Manage and track your ongoing team initiatives.</p>
+          <h2 className="text-gray-900 text-3xl font-black tracking-tight">
+            Projects
+          </h2>
+          <p className="text-gray-600 mt-1">
+            Manage and track your ongoing team initiatives.
+          </p>
         </div>
-        <button 
+        <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
         >
@@ -84,8 +91,8 @@ const Projects: React.FC = () => {
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
             <span className="material-symbols-outlined">search</span>
           </div>
-          <input 
-            className="block w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all text-sm" 
+          <input
+            className="block w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all text-sm"
             placeholder="Search projects by name or description..."
             type="text"
             value={searchTerm}
@@ -93,32 +100,32 @@ const Projects: React.FC = () => {
           />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-          <button 
-            onClick={() => setStatusFilter('all')}
+          <button
+            onClick={() => setStatusFilter("all")}
             className={`px-4 py-2 border rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-              statusFilter === 'all' 
-                ? 'bg-blue-600 text-white border-blue-600' 
-                : 'bg-white border-slate-200 hover:bg-slate-50'
+              statusFilter === "all"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white border-slate-200 hover:bg-slate-50"
             }`}
           >
             All Status
           </button>
-          <button 
-            onClick={() => setStatusFilter('active')}
+          <button
+            onClick={() => setStatusFilter("active")}
             className={`px-4 py-2 border rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-              statusFilter === 'active' 
-                ? 'bg-blue-600 text-white border-blue-600' 
-                : 'bg-white border-slate-200 hover:bg-slate-50'
+              statusFilter === "active"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white border-slate-200 hover:bg-slate-50"
             }`}
           >
             Active
           </button>
-          <button 
-            onClick={() => setStatusFilter('completed')}
+          <button
+            onClick={() => setStatusFilter("completed")}
             className={`px-4 py-2 border rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-              statusFilter === 'completed' 
-                ? 'bg-blue-600 text-white border-blue-600' 
-                : 'bg-white border-slate-200 hover:bg-slate-50'
+              statusFilter === "completed"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white border-slate-200 hover:bg-slate-50"
             }`}
           >
             Completed
@@ -131,9 +138,9 @@ const Projects: React.FC = () => {
         {filteredProjects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}
-        
+
         {/* Add New Card Skeleton */}
-        <button 
+        <button
           onClick={() => setShowCreateModal(true)}
           className="border-2 border-dashed border-slate-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-all text-slate-400 hover:text-blue-600 group"
         >

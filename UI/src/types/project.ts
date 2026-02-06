@@ -2,8 +2,8 @@ export interface Project {
   id: string;
   name: string;
   description?: string;
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
+  status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
+  priority: "low" | "medium" | "high";
   startDate?: string;
   endDate?: string;
   ownerId: string;
@@ -24,7 +24,7 @@ export interface ProjectMember {
   id: string;
   projectId: string;
   userId: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
+  role: "owner" | "admin" | "member" | "viewer";
   joinedAt: string;
   user: {
     id: string;
@@ -38,8 +38,8 @@ export interface ProjectTask {
   id: string;
   projectId: string;
   title: string;
-  status: 'todo' | 'in_progress' | 'done';
-  priority: 'low' | 'medium' | 'high';
+  status: "todo" | "in_progress" | "done";
+  priority: "low" | "medium" | "high";
   assigneeId?: string;
   dueDate?: string;
   createdAt: string;
@@ -49,8 +49,8 @@ export interface ProjectTask {
 export interface CreateProjectRequest {
   name: string;
   description?: string;
-  status?: 'planning' | 'active' | 'on_hold';
-  priority?: 'low' | 'medium' | 'high';
+  status?: "planning" | "active" | "on_hold";
+  priority?: "low" | "medium" | "high";
   startDate?: string;
   endDate?: string;
   memberIds?: string[];
@@ -59,8 +59,8 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
-  status?: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high';
+  status?: "planning" | "active" | "on_hold" | "completed" | "cancelled";
+  priority?: "low" | "medium" | "high";
   startDate?: string;
   endDate?: string;
 }

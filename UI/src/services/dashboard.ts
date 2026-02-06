@@ -37,7 +37,7 @@ export interface Task {
 export interface PullRequest {
   id: string;
   title: string;
-  status: 'open' | 'merged' | 'closed';
+  status: "open" | "merged" | "closed";
   repository: string;
   branch: string;
   number: number;
@@ -61,7 +61,13 @@ export interface ActivityLog {
   id: string;
   entity_type: "task" | "project";
   entity_id: string;
-  action: "created" | "updated" | "deleted" | "status_changed" | "assigned" | "unassigned";
+  action:
+    | "created"
+    | "updated"
+    | "deleted"
+    | "status_changed"
+    | "assigned"
+    | "unassigned";
   user: {
     id: string;
     full_name: string;
@@ -84,11 +90,36 @@ export const dashboardAPI = {
 };
 
 export const usersAPI = {
-  getUsers: async (): Promise<{
+  getUsers: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: string;
+  }): Promise<{
     success: boolean;
-    data: { id: string; full_name: string; email: string }[];
+    data: {
+      id: string;
+      full_name: string;
+      email: string;
+      role: "Admin" | "Member" | "Viewer";
+      avatar_url?: string;
+    }[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
   }> => {
-    const response = await api.get("/api/users");
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.role) queryParams.append("role", params.role);
+
+    const response = await api.get(`/api/users?${queryParams.toString()}`);
     return response.data;
   },
 };
@@ -110,7 +141,9 @@ export const projectsAPI = {
     return response.data;
   },
 
-  getActivityLogs: async (projectId: string): Promise<{
+  getActivityLogs: async (
+    projectId: string,
+  ): Promise<{
     success: boolean;
     data: ActivityLog[];
   }> => {
@@ -174,7 +207,9 @@ export const tasksAPI = {
     return response.data;
   },
 
-  getPullRequests: async (taskId: string): Promise<{
+  getPullRequests: async (
+    taskId: string,
+  ): Promise<{
     success: boolean;
     data: PullRequest[];
   }> => {
@@ -182,7 +217,9 @@ export const tasksAPI = {
     return response.data;
   },
 
-  getCommits: async (taskId: string): Promise<{
+  getCommits: async (
+    taskId: string,
+  ): Promise<{
     success: boolean;
     data: Commit[];
   }> => {
@@ -190,7 +227,9 @@ export const tasksAPI = {
     return response.data;
   },
 
-  getActivityLogs: async (taskId: string): Promise<{
+  getActivityLogs: async (
+    taskId: string,
+  ): Promise<{
     success: boolean;
     data: ActivityLog[];
   }> => {

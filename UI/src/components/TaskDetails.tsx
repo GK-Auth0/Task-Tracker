@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { tasksAPI, PullRequest, Commit, ActivityLog } from "../services/dashboard";
+import {
+  tasksAPI,
+  PullRequest,
+  Commit,
+  ActivityLog,
+} from "../services/dashboard";
 
 interface TaskDetails {
   id: string;
@@ -33,26 +38,28 @@ export default function TaskDetails() {
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState("");
-  const [activeTab, setActiveTab] = useState<'overview' | 'prs' | 'activity' | 'attachments'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "prs" | "activity" | "attachments"
+  >("overview");
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [prLoading, setPrLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [showLinkPRModal, setShowLinkPRModal] = useState(false);
-  
+
   // Debug log for modal state
   useEffect(() => {
-    console.log('showLinkPRModal state changed:', showLinkPRModal);
+    console.log("showLinkPRModal state changed:", showLinkPRModal);
   }, [showLinkPRModal]);
   const [prForm, setPrForm] = useState({
-    title: '',
-    repository: '',
-    branch: '',
-    number: '',
-    author: '',
-    github_url: '',
-    status: 'open' as 'open' | 'merged' | 'closed'
+    title: "",
+    repository: "",
+    branch: "",
+    number: "",
+    author: "",
+    github_url: "",
+    status: "open" as "open" | "merged" | "closed",
   });
 
   useEffect(() => {
@@ -62,9 +69,9 @@ export default function TaskDetails() {
   }, [id]);
 
   useEffect(() => {
-    if (id && activeTab === 'prs') {
+    if (id && activeTab === "prs") {
       fetchPRData();
-    } else if (id && activeTab === 'activity') {
+    } else if (id && activeTab === "activity") {
       fetchActivityLogs();
     }
   }, [id, activeTab]);
@@ -88,9 +95,9 @@ export default function TaskDetails() {
       setPrLoading(true);
       const [prResponse, commitResponse] = await Promise.all([
         tasksAPI.getPullRequests(id),
-        tasksAPI.getCommits(id)
+        tasksAPI.getCommits(id),
       ]);
-      
+
       if (prResponse.success) {
         setPullRequests(prResponse.data);
       }
@@ -130,7 +137,7 @@ export default function TaskDetails() {
       if (response.success) {
         setTask({ ...task, status: newStatus });
         // Refresh activity logs if on activity tab
-        if (activeTab === 'activity') {
+        if (activeTab === "activity") {
           fetchActivityLogs();
         }
       }
@@ -152,24 +159,24 @@ export default function TaskDetails() {
 
   const handleLinkPR = async () => {
     if (!id || !prForm.title || !prForm.repository || !prForm.number) return;
-    
+
     try {
       // This would be an API call to link the PR
-      console.log('Linking PR:', prForm);
+      console.log("Linking PR:", prForm);
       setShowLinkPRModal(false);
       setPrForm({
-        title: '',
-        repository: '',
-        branch: '',
-        number: '',
-        author: '',
-        github_url: '',
-        status: 'open'
+        title: "",
+        repository: "",
+        branch: "",
+        number: "",
+        author: "",
+        github_url: "",
+        status: "open",
       });
       // Refresh PR data
       fetchPRData();
     } catch (error) {
-      console.error('Failed to link PR:', error);
+      console.error("Failed to link PR:", error);
     }
   };
 
@@ -322,11 +329,11 @@ export default function TaskDetails() {
                 <div className="flex gap-8 overflow-x-auto scrollbar-hide">
                   <button
                     className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === 'overview' 
-                        ? 'border-b-blue-600 text-blue-600' 
-                        : 'border-b-transparent text-slate-500 hover:text-blue-600 transition-colors'
+                      activeTab === "overview"
+                        ? "border-b-blue-600 text-blue-600"
+                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
                     }`}
-                    onClick={() => setActiveTab('overview')}
+                    onClick={() => setActiveTab("overview")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       description
@@ -335,11 +342,11 @@ export default function TaskDetails() {
                   </button>
                   <button
                     className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === 'prs' 
-                        ? 'border-b-blue-600 text-blue-600' 
-                        : 'border-b-transparent text-slate-500 hover:text-blue-600 transition-colors'
+                      activeTab === "prs"
+                        ? "border-b-blue-600 text-blue-600"
+                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
                     }`}
-                    onClick={() => setActiveTab('prs')}
+                    onClick={() => setActiveTab("prs")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       code
@@ -353,11 +360,11 @@ export default function TaskDetails() {
                   </button>
                   <button
                     className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === 'activity' 
-                        ? 'border-b-blue-600 text-blue-600' 
-                        : 'border-b-transparent text-slate-500 hover:text-blue-600 transition-colors'
+                      activeTab === "activity"
+                        ? "border-b-blue-600 text-blue-600"
+                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
                     }`}
-                    onClick={() => setActiveTab('activity')}
+                    onClick={() => setActiveTab("activity")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       history
@@ -366,11 +373,11 @@ export default function TaskDetails() {
                   </button>
                   <button
                     className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === 'attachments' 
-                        ? 'border-b-blue-600 text-blue-600' 
-                        : 'border-b-transparent text-slate-500 hover:text-blue-600 transition-colors'
+                      activeTab === "attachments"
+                        ? "border-b-blue-600 text-blue-600"
+                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
                     }`}
-                    onClick={() => setActiveTab('attachments')}
+                    onClick={() => setActiveTab("attachments")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       attach_file
@@ -381,7 +388,7 @@ export default function TaskDetails() {
               </div>
 
               {/* Tab Content */}
-              {activeTab === 'overview' && (
+              {activeTab === "overview" && (
                 <>
                   {/* Description */}
                   <div className="space-y-3 group relative">
@@ -403,7 +410,9 @@ export default function TaskDetails() {
 
                   {/* Activity Log */}
                   <div className="space-y-6 pt-4">
-                    <h3 className="text-lg font-bold text-slate-900">Activity</h3>
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Activity
+                    </h3>
                     <div className="space-y-6">
                       {/* Comment Input */}
                       <div className="flex gap-4 pt-4">
@@ -447,7 +456,7 @@ export default function TaskDetails() {
                 </>
               )}
 
-              {activeTab === 'prs' && (
+              {activeTab === "prs" && (
                 <div className="space-y-10">
                   {prLoading ? (
                     <div className="text-center py-8">
@@ -459,15 +468,19 @@ export default function TaskDetails() {
                       {/* Linked Pull Requests */}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-bold text-slate-900">Linked Pull Requests</h3>
-                          <button 
+                          <h3 className="text-lg font-bold text-slate-900">
+                            Linked Pull Requests
+                          </h3>
+                          <button
                             onClick={() => {
-                              console.log('Link PR button clicked');
+                              console.log("Link PR button clicked");
                               setShowLinkPRModal(true);
                             }}
                             className="text-blue-600 text-sm font-semibold flex items-center gap-1 hover:underline"
                           >
-                            <span className="material-symbols-outlined text-lg">add</span>
+                            <span className="material-symbols-outlined text-lg">
+                              add
+                            </span>
                             Link Pull Request
                           </button>
                         </div>
@@ -476,44 +489,91 @@ export default function TaskDetails() {
                             {pullRequests.map((pr) => {
                               const getStatusIcon = (status: string) => {
                                 switch (status) {
-                                  case 'open': return { icon: 'data_check', color: 'text-green-500' };
-                                  case 'merged': return { icon: 'merge', color: 'text-purple-500' };
-                                  case 'closed': return { icon: 'close', color: 'text-red-500' };
-                                  default: return { icon: 'code', color: 'text-slate-500' };
+                                  case "open":
+                                    return {
+                                      icon: "data_check",
+                                      color: "text-green-500",
+                                    };
+                                  case "merged":
+                                    return {
+                                      icon: "merge",
+                                      color: "text-purple-500",
+                                    };
+                                  case "closed":
+                                    return {
+                                      icon: "close",
+                                      color: "text-red-500",
+                                    };
+                                  default:
+                                    return {
+                                      icon: "code",
+                                      color: "text-slate-500",
+                                    };
                                 }
                               };
-                              
+
                               const getStatusBadge = (status: string) => {
                                 switch (status) {
-                                  case 'open': return 'bg-green-100 text-green-600';
-                                  case 'merged': return 'bg-purple-100 text-purple-600';
-                                  case 'closed': return 'bg-red-100 text-red-600';
-                                  default: return 'bg-slate-100 text-slate-600';
+                                  case "open":
+                                    return "bg-green-100 text-green-600";
+                                  case "merged":
+                                    return "bg-purple-100 text-purple-600";
+                                  case "closed":
+                                    return "bg-red-100 text-red-600";
+                                  default:
+                                    return "bg-slate-100 text-slate-600";
                                 }
                               };
-                              
+
                               const statusIcon = getStatusIcon(pr.status);
                               const statusBadge = getStatusBadge(pr.status);
-                              
+
                               return (
-                                <div key={pr.id} className="p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-600/40 transition-colors shadow-sm">
+                                <div
+                                  key={pr.id}
+                                  className="p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-600/40 transition-colors shadow-sm"
+                                >
                                   <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 mb-1">
-                                        <span className={`material-symbols-outlined ${statusIcon.color} text-lg`}>{statusIcon.icon}</span>
-                                        <h4 className="font-bold text-slate-900 truncate">{pr.title}</h4>
+                                        <span
+                                          className={`material-symbols-outlined ${statusIcon.color} text-lg`}
+                                        >
+                                          {statusIcon.icon}
+                                        </span>
+                                        <h4 className="font-bold text-slate-900 truncate">
+                                          {pr.title}
+                                        </h4>
                                       </div>
                                       <div className="flex items-center gap-3 text-xs text-slate-500">
-                                        <span className="font-medium text-slate-600">{pr.repository} / {pr.branch}</span>
-                                        <span>#{pr.number} • {pr.status} {new Date(pr.created_at).toLocaleDateString()} by {pr.author}</span>
+                                        <span className="font-medium text-slate-600">
+                                          {pr.repository} / {pr.branch}
+                                        </span>
+                                        <span>
+                                          #{pr.number} • {pr.status}{" "}
+                                          {new Date(
+                                            pr.created_at,
+                                          ).toLocaleDateString()}{" "}
+                                          by {pr.author}
+                                        </span>
                                       </div>
                                     </div>
                                     <div className="flex flex-col items-end gap-2 shrink-0">
-                                      <span className={`px-2 py-0.5 ${statusBadge} text-[10px] font-bold rounded-full uppercase tracking-wider`}>
+                                      <span
+                                        className={`px-2 py-0.5 ${statusBadge} text-[10px] font-bold rounded-full uppercase tracking-wider`}
+                                      >
                                         {pr.status}
                                       </span>
-                                      <a className="text-blue-600 text-xs font-semibold flex items-center gap-1 hover:underline" href={pr.github_url} target="_blank" rel="noopener noreferrer">
-                                        View in GitHub <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                      <a
+                                        className="text-blue-600 text-xs font-semibold flex items-center gap-1 hover:underline"
+                                        href={pr.github_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        View in GitHub{" "}
+                                        <span className="material-symbols-outlined text-sm">
+                                          open_in_new
+                                        </span>
                                       </a>
                                     </div>
                                   </div>
@@ -530,7 +590,9 @@ export default function TaskDetails() {
 
                       {/* Related Commits */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-bold text-slate-900">Related Commits</h3>
+                        <h3 className="text-lg font-bold text-slate-900">
+                          Related Commits
+                        </h3>
                         {commits.length > 0 ? (
                           <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
                             <table className="w-full text-left text-sm">
@@ -544,22 +606,31 @@ export default function TaskDetails() {
                               </thead>
                               <tbody className="divide-y divide-slate-200">
                                 {commits.map((commit) => (
-                                  <tr key={commit.id} className="hover:bg-white transition-colors group">
+                                  <tr
+                                    key={commit.id}
+                                    className="hover:bg-white transition-colors group"
+                                  >
                                     <td className="px-4 py-3 whitespace-nowrap">
                                       <code className="text-xs font-mono text-blue-600 bg-blue-600/5 px-1.5 py-0.5 rounded">
                                         {commit.hash.substring(0, 7)}
                                       </code>
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">{commit.message}</td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                      {commit.message}
+                                    </td>
                                     <td className="px-4 py-3 whitespace-nowrap flex items-center gap-2">
-                                      <div 
-                                        className="size-5 rounded-full bg-slate-300 bg-cover" 
-                                        style={{ backgroundImage: `url('${commit.author.avatar}')` }}
+                                      <div
+                                        className="size-5 rounded-full bg-slate-300 bg-cover"
+                                        style={{
+                                          backgroundImage: `url('${commit.author.avatar}')`,
+                                        }}
                                       ></div>
                                       <span>{commit.author.name}</span>
                                     </td>
                                     <td className="px-4 py-3 text-right text-slate-500">
-                                      {new Date(commit.created_at).toLocaleDateString()}
+                                      {new Date(
+                                        commit.created_at,
+                                      ).toLocaleDateString()}
                                     </td>
                                   </tr>
                                 ))}
@@ -577,9 +648,11 @@ export default function TaskDetails() {
                 </div>
               )}
 
-              {activeTab === 'activity' && (
+              {activeTab === "activity" && (
                 <div className="space-y-6 pt-4">
-                  <h3 className="text-lg font-bold text-slate-900">Activity Log</h3>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Activity Log
+                  </h3>
                   {activityLoading ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -590,63 +663,108 @@ export default function TaskDetails() {
                       {activityLogs.map((log) => {
                         const getActionIcon = (action: string) => {
                           switch (action) {
-                            case 'created': return { icon: 'add_circle', color: 'text-green-600' };
-                            case 'status_changed': return { icon: 'swap_horiz', color: 'text-blue-600' };
-                            case 'assigned': return { icon: 'person_add', color: 'text-purple-600' };
-                            case 'unassigned': return { icon: 'person_remove', color: 'text-orange-600' };
-                            case 'updated': return { icon: 'edit', color: 'text-amber-600' };
-                            case 'deleted': return { icon: 'delete', color: 'text-red-600' };
-                            default: return { icon: 'history', color: 'text-slate-600' };
+                            case "created":
+                              return {
+                                icon: "add_circle",
+                                color: "text-green-600",
+                              };
+                            case "status_changed":
+                              return {
+                                icon: "swap_horiz",
+                                color: "text-blue-600",
+                              };
+                            case "assigned":
+                              return {
+                                icon: "person_add",
+                                color: "text-purple-600",
+                              };
+                            case "unassigned":
+                              return {
+                                icon: "person_remove",
+                                color: "text-orange-600",
+                              };
+                            case "updated":
+                              return { icon: "edit", color: "text-amber-600" };
+                            case "deleted":
+                              return { icon: "delete", color: "text-red-600" };
+                            default:
+                              return {
+                                icon: "history",
+                                color: "text-slate-600",
+                              };
                           }
                         };
-                        
+
                         const getActionText = (log: ActivityLog) => {
                           switch (log.action) {
-                            case 'created': return 'created this task';
-                            case 'status_changed': 
+                            case "created":
+                              return "created this task";
+                            case "status_changed":
                               return `changed status from "${log.changes?.status?.from}" to "${log.changes?.status?.to}"`;
-                            case 'assigned':
-                              return 'assigned this task';
-                            case 'unassigned':
-                              return 'unassigned this task';
-                            case 'updated':
-                              const changes = Object.keys(log.changes || {}).filter(key => key !== 'timestamp' && key !== 'action_time');
-                              return `updated ${changes.join(', ')}`;
-                            case 'deleted': return 'deleted this task';
-                            default: return log.action;
+                            case "assigned":
+                              return "assigned this task";
+                            case "unassigned":
+                              return "unassigned this task";
+                            case "updated":
+                              const changes = Object.keys(
+                                log.changes || {},
+                              ).filter(
+                                (key) =>
+                                  key !== "timestamp" && key !== "action_time",
+                              );
+                              return `updated ${changes.join(", ")}`;
+                            case "deleted":
+                              return "deleted this task";
+                            default:
+                              return log.action;
                           }
                         };
-                        
+
                         const actionIcon = getActionIcon(log.action);
-                        
+
                         return (
-                          <div key={log.id} className="flex gap-3 p-4 bg-white border border-slate-200 rounded-lg">
+                          <div
+                            key={log.id}
+                            className="flex gap-3 p-4 bg-white border border-slate-200 rounded-lg"
+                          >
                             <div className="flex-shrink-0">
                               <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
-                                {log.user.full_name.split(' ').map(n => n[0]).join('')}
+                                {log.user.full_name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className={`material-symbols-outlined ${actionIcon.color} text-lg`}>
+                                <span
+                                  className={`material-symbols-outlined ${actionIcon.color} text-lg`}
+                                >
                                   {actionIcon.icon}
                                 </span>
-                                <span className="font-semibold text-slate-900">{log.user.full_name}</span>
-                                <span className="text-slate-600">{getActionText(log)}</span>
+                                <span className="font-semibold text-slate-900">
+                                  {log.user.full_name}
+                                </span>
+                                <span className="text-slate-600">
+                                  {getActionText(log)}
+                                </span>
                               </div>
                               <div className="text-xs text-slate-500">
                                 {new Date(log.created_at).toLocaleString()}
                               </div>
-                              {log.changes && Object.keys(log.changes).length > 2 && (
-                                <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded">
-                                  <details>
-                                    <summary className="cursor-pointer font-medium">View changes</summary>
-                                    <pre className="mt-1 text-[10px] overflow-x-auto">
-                                      {JSON.stringify(log.changes, null, 2)}
-                                    </pre>
-                                  </details>
-                                </div>
-                              )}
+                              {log.changes &&
+                                Object.keys(log.changes).length > 2 && (
+                                  <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded">
+                                    <details>
+                                      <summary className="cursor-pointer font-medium">
+                                        View changes
+                                      </summary>
+                                      <pre className="mt-1 text-[10px] overflow-x-auto">
+                                        {JSON.stringify(log.changes, null, 2)}
+                                      </pre>
+                                    </details>
+                                  </div>
+                                )}
                             </div>
                           </div>
                         );
@@ -660,27 +778,47 @@ export default function TaskDetails() {
                 </div>
               )}
 
-              {activeTab === 'attachments' && (
+              {activeTab === "attachments" && (
                 <div className="space-y-6 pt-4">
                   <div className="flex flex-wrap justify-between items-center gap-4">
-                    <h3 className="text-lg font-bold text-slate-900">Attachments</h3>
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Attachments
+                    </h3>
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm cursor-pointer">
-                        <span className="material-symbols-outlined text-lg">upload</span>
+                        <span className="material-symbols-outlined text-lg">
+                          upload
+                        </span>
                         Upload File
-                        <input type="file" className="hidden" onChange={() => {}} />
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={() => {}}
+                        />
                       </label>
                     </div>
                   </div>
-                  
+
                   <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
-                    <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">attach_file</span>
-                    <h3 className="text-lg font-semibold text-slate-600 mb-2">No Attachments Yet</h3>
-                    <p className="text-slate-500 mb-4">Upload files related to this task.</p>
+                    <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">
+                      attach_file
+                    </span>
+                    <h3 className="text-lg font-semibold text-slate-600 mb-2">
+                      No Attachments Yet
+                    </h3>
+                    <p className="text-slate-500 mb-4">
+                      Upload files related to this task.
+                    </p>
                     <label className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all cursor-pointer">
-                      <span className="material-symbols-outlined text-[18px]">upload</span>
+                      <span className="material-symbols-outlined text-[18px]">
+                        upload
+                      </span>
                       Upload First File
-                      <input type="file" className="hidden" onChange={() => {}} />
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={() => {}}
+                      />
                     </label>
                   </div>
                 </div>
@@ -777,36 +915,53 @@ export default function TaskDetails() {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-6 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">Link Pull Request</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                Link Pull Request
+              </h3>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Title
+                </label>
                 <input
                   type="text"
                   value={prForm.title}
-                  onChange={(e) => setPrForm(prev => ({ ...prev, title: e.target.value }))}
+                  onChange={(e) =>
+                    setPrForm((prev) => ({ ...prev, title: e.target.value }))
+                  }
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   placeholder="PR title"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Repository</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Repository
+                  </label>
                   <input
                     type="text"
                     value={prForm.repository}
-                    onChange={(e) => setPrForm(prev => ({ ...prev, repository: e.target.value }))}
+                    onChange={(e) =>
+                      setPrForm((prev) => ({
+                        ...prev,
+                        repository: e.target.value,
+                      }))
+                    }
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                     placeholder="repo-name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Branch</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Branch
+                  </label>
                   <input
                     type="text"
                     value={prForm.branch}
-                    onChange={(e) => setPrForm(prev => ({ ...prev, branch: e.target.value }))}
+                    onChange={(e) =>
+                      setPrForm((prev) => ({ ...prev, branch: e.target.value }))
+                    }
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                     placeholder="feature-branch"
                   />
@@ -814,20 +969,31 @@ export default function TaskDetails() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">PR Number</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    PR Number
+                  </label>
                   <input
                     type="number"
                     value={prForm.number}
-                    onChange={(e) => setPrForm(prev => ({ ...prev, number: e.target.value }))}
+                    onChange={(e) =>
+                      setPrForm((prev) => ({ ...prev, number: e.target.value }))
+                    }
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                     placeholder="123"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Status
+                  </label>
                   <select
                     value={prForm.status}
-                    onChange={(e) => setPrForm(prev => ({ ...prev, status: e.target.value as 'open' | 'merged' | 'closed' }))}
+                    onChange={(e) =>
+                      setPrForm((prev) => ({
+                        ...prev,
+                        status: e.target.value as "open" | "merged" | "closed",
+                      }))
+                    }
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   >
                     <option value="open">Open</option>
@@ -837,21 +1003,32 @@ export default function TaskDetails() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Author</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Author
+                </label>
                 <input
                   type="text"
                   value={prForm.author}
-                  onChange={(e) => setPrForm(prev => ({ ...prev, author: e.target.value }))}
+                  onChange={(e) =>
+                    setPrForm((prev) => ({ ...prev, author: e.target.value }))
+                  }
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   placeholder="username"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">GitHub URL</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  GitHub URL
+                </label>
                 <input
                   type="url"
                   value={prForm.github_url}
-                  onChange={(e) => setPrForm(prev => ({ ...prev, github_url: e.target.value }))}
+                  onChange={(e) =>
+                    setPrForm((prev) => ({
+                      ...prev,
+                      github_url: e.target.value,
+                    }))
+                  }
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   placeholder="https://github.com/..."
                 />
