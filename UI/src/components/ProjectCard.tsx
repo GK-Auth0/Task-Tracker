@@ -1,6 +1,6 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Project } from '../types/project';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { Project } from "../types/project";
 
 interface ProjectCardProps {
   project: Project;
@@ -14,43 +14,43 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
   };
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed':
-        return 'text-emerald-600';
-      case 'active':
-        return 'text-blue-600';
-      case 'on_hold':
-        return 'text-amber-600';
-      case 'planning':
-        return 'text-slate-500';
+      case "completed":
+        return "text-emerald-600";
+      case "active":
+        return "text-blue-600";
+      case "on_hold":
+        return "text-amber-600";
+      case "planning":
+        return "text-slate-500";
       default:
-        return 'text-slate-500';
+        return "text-slate-500";
     }
   };
 
   const getProgressColor = (status: string) => {
     switch (status) {
-      case 'completed':
-        return 'bg-emerald-500';
-      case 'active':
-        return 'bg-blue-600';
-      case 'on_hold':
-        return 'bg-amber-500';
-      case 'planning':
-        return 'bg-slate-400';
+      case "completed":
+        return "bg-emerald-500";
+      case "active":
+        return "bg-blue-600";
+      case "on_hold":
+        return "bg-amber-500";
+      case "planning":
+        return "bg-slate-400";
       default:
-        return 'bg-slate-400';
+        return "bg-slate-400";
     }
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'No date set';
+    if (!dateString) return "No date set";
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
     return date.toLocaleDateString();
@@ -59,14 +59,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
   const progress = project.progress || 0;
 
   return (
-    <div 
+    <div
       onClick={handleClick}
       className="bg-white border border-slate-100 rounded-xl p-5 flex flex-col gap-5 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
     >
       <div className="flex justify-between items-start">
         <div className="flex flex-col">
-          <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${getStatusColor(project.status)}`}>
-            {project.status.replace('_', ' ')}
+          <span
+            className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${getStatusColor(project.status)}`}
+          >
+            {project.status.replace("_", " ")}
           </span>
           <h3 className="text-lg font-bold group-hover:text-blue-600 transition-colors">
             {project.name}
@@ -88,7 +90,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
           <span className="font-bold">{Math.round(progress)}%</span>
         </div>
         <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-          <div 
+          <div
             className={`h-full rounded-full ${getProgressColor(project.status)}`}
             style={{ width: `${progress}%` }}
           />
@@ -98,12 +100,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
       <div className="flex items-center justify-between mt-2 pt-4 border-t border-slate-100">
         <div className="flex -space-x-2">
           {project.owner && (
-            <div 
+            <div
               className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
               title={project.owner.full_name}
             >
               {project.owner.avatar_url ? (
-                <img src={project.owner.avatar_url} alt={project.owner.full_name} className="w-full h-full rounded-full object-cover" />
+                <img
+                  src={project.owner.avatar_url}
+                  alt={project.owner.full_name}
+                  className="w-full h-full rounded-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
                   {project.owner.full_name.charAt(0).toUpperCase()}
@@ -112,13 +118,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
             </div>
           )}
           {project.members?.slice(0, 3).map((member) => (
-            <div 
+            <div
               key={member.id}
               className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
               title={member.user.full_name}
             >
               {member.user.avatar_url ? (
-                <img src={member.user.avatar_url} alt={member.user.full_name} className="w-full h-full rounded-full object-cover" />
+                <img
+                  src={member.user.avatar_url}
+                  alt={member.user.full_name}
+                  className="w-full h-full rounded-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full rounded-full bg-slate-400 flex items-center justify-center text-white text-xs font-bold">
                   {member.user.full_name.charAt(0).toUpperCase()}

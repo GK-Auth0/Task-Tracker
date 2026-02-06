@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { dashboardAPI, tasksAPI } from '../services/dashboard';
-import CreateTaskModal from '../components/CreateTaskModal';
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { dashboardAPI, tasksAPI } from "../services/dashboard";
+import CreateTaskModal from "../components/CreateTaskModal";
 
 interface DashboardSummary {
   total_tasks: number;
@@ -14,8 +14,8 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  status: 'To Do' | 'In Progress' | 'Done';
-  priority: 'Low' | 'Medium' | 'High';
+  status: "To Do" | "In Progress" | "Done";
+  priority: "Low" | "Medium" | "High";
   due_date?: string;
   assignee?: {
     id: string;
@@ -100,7 +100,11 @@ export default function Dashboard() {
     const date = new Date(dateString);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const taskDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
 
     if (taskDate < today) {
       return {
@@ -133,7 +137,8 @@ export default function Dashboard() {
             My Tasks
           </h2>
           <p className="text-gray-600 mt-1">
-            You have {summary?.total_tasks || 0} tasks, {summary?.overdue_tasks || 0} overdue.
+            You have {summary?.total_tasks || 0} tasks,{" "}
+            {summary?.overdue_tasks || 0} overdue.
           </p>
         </div>
         <button
@@ -149,7 +154,7 @@ export default function Dashboard() {
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">
           Filter by:
         </span>
-        
+
         <div className="relative">
           <button
             className="flex h-9 items-center gap-x-2 rounded-lg bg-white border border-slate-200 px-4 hover:border-blue-600/50 transition-colors"
@@ -373,9 +378,7 @@ export default function Dashboard() {
                     {task.priority}
                   </div>
                   <button className="p-1 text-slate-300 hover:text-slate-500 transition-colors">
-                    <span className="material-symbols-outlined">
-                      more_vert
-                    </span>
+                    <span className="material-symbols-outlined">more_vert</span>
                   </button>
                 </div>
               </div>
@@ -403,7 +406,8 @@ export default function Dashboard() {
               {Array.from(
                 { length: Math.min(5, pagination.totalPages) },
                 (_, i) => {
-                  const pageNum = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                  const pageNum =
+                    currentPage <= 3 ? i + 1 : currentPage - 2 + i;
                   if (pageNum > pagination.totalPages) return null;
                   return (
                     <button

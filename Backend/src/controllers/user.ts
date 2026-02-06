@@ -3,11 +3,17 @@ import { getAllUsers, getUserById } from "../services/user";
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const users = await getAllUsers();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string || "";
+    const role = req.query.role as string || "";
+    
+    const result = await getAllUsers({ page, limit, search, role });
     return res.status(200).json({
       success: true,
       message: "Users retrieved successfully",
-      data: users,
+      data: result.users,
+      pagination: result.pagination,
     });
   } catch (error) {
     return res.status(400).json({

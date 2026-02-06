@@ -5,7 +5,10 @@ interface AuthNavbarProps {
   buttonLink: string;
 }
 
-export default function AuthNavbar({ buttonText, buttonLink }: AuthNavbarProps) {
+export default function AuthNavbar({
+  buttonText,
+  buttonLink,
+}: AuthNavbarProps) {
   return (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white">
       <div className="flex items-center gap-4 text-gray-900">
