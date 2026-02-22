@@ -336,6 +336,7 @@ const ProjectDetail: React.FC = () => {
                   <select
                     value={project.status}
                     onChange={(e) => handleStatusUpdate(e.target.value)}
+                    aria-label="Project status"
                     className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-600 text-[10px] font-bold uppercase tracking-wide border-none cursor-pointer hover:bg-emerald-200 transition-colors"
                   >
                     <option value="planning">Planning</option>
@@ -355,7 +356,7 @@ const ProjectDetail: React.FC = () => {
                           key={member.id}
                           className="size-8 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white text-xs font-bold hover:z-10 transition-all"
                         >
-                          {(member.user?.full_name || "U")
+                          {(member.user?.name || "U")
                             .charAt(0)
                             .toUpperCase()}
                         </div>
@@ -384,13 +385,13 @@ const ProjectDetail: React.FC = () => {
                               className="flex items-center gap-3"
                             >
                               <div className="size-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                                {(member.user?.full_name || "U")
+                                {(member.user?.name || "U")
                                   .charAt(0)
                                   .toUpperCase()}
                               </div>
                               <div>
                                 <div className="text-sm font-medium text-slate-700">
-                                  {member.user?.full_name || "Unknown"}
+                                  {member.user?.name || "Unknown"}
                                 </div>
                                 <div className="text-xs text-slate-500">
                                   {member.role}

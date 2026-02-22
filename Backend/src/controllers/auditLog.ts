@@ -13,7 +13,7 @@ export const getEntityAuditLogs = async (req: Request, res: Response) => {
       });
     }
 
-    const entity_type = (req.query.entity_type as "task" | "project") || "task";
+    const entity_type = req.query.entity_type as "task" | "project" | undefined;
     const entity_id = (req.query.entity_id as string) || (req.params.id as string);
     const limit = parseInt(req.query.limit as string) || 50;
 

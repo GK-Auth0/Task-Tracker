@@ -289,6 +289,7 @@ export default function TaskDetails() {
                           e.target.value as "To Do" | "In Progress" | "Done",
                         )
                       }
+                      aria-label="Task status"
                       className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium bg-white hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     >
                       <option value="To Do">To Do</option>
@@ -661,6 +662,8 @@ export default function TaskDetails() {
                   ) : activityLogs.length > 0 ? (
                     <div className="space-y-4">
                       {activityLogs.map((log) => {
+                        const actorName = log.user?.full_name || "System";
+
                         const getActionIcon = (action: string) => {
                           switch (action) {
                             case "created":
@@ -729,7 +732,7 @@ export default function TaskDetails() {
                           >
                             <div className="flex-shrink-0">
                               <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
-                                {log.user.full_name
+                                {actorName
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
@@ -743,7 +746,7 @@ export default function TaskDetails() {
                                   {actionIcon.icon}
                                 </span>
                                 <span className="font-semibold text-slate-900">
-                                  {log.user.full_name}
+                                  {actorName}
                                 </span>
                                 <span className="text-slate-600">
                                   {getActionText(log)}
@@ -994,6 +997,7 @@ export default function TaskDetails() {
                         status: e.target.value as "open" | "merged" | "closed",
                       }))
                     }
+                    aria-label="Pull request status"
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   >
                     <option value="open">Open</option>

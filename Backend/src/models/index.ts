@@ -11,9 +11,12 @@ import { PullRequest } from "./pullRequest";
 import { Commit } from "./commit";
 import UserMetadata from "./userMetadata";
 import AuditLog from "./auditLog";
+import ChatGroup from "./chatGroup";
+import ChatMessage from "./chatMessage";
+import ChatGroupMember from "./chatGroupMember";
 
-const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuditLog];
+const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuditLog, ChatGroup, ChatMessage, ChatGroupMember];
 
 export default models;
 
-export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuditLog };
+export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuditLog, ChatGroup, ChatMessage, ChatGroupMember };

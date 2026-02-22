@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-
-interface ChatGroup {
-  id: string;
-  name: string;
-  memberCount: number;
-  isActive?: boolean;
-  hasUnread?: boolean;
-}
+import { chatAPI, ChatGroup, ChatMessage } from "../services/chatService";
 
 interface Message {
   id: string;
@@ -28,75 +21,90 @@ interface Message {
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"direct" | "groups">("groups");
-  const [selectedGroup, setSelectedGroup] = useState<string>("design-team");
+  const [selectedGroup, setSelectedGroup] = useState<string>("general");
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
-  const chatGroups: ChatGroup[] = [
-    {
-      id: "design-team",
-      name: "#design-team",
-      memberCount: 12,
-      isActive: true,
-      hasUnread: true,
-    },
-    { id: "q4-marketing", name: "#q4-marketing", memberCount: 8 },
-    { id: "dev-sprint", name: "#dev-sprint", memberCount: 24 },
-    {
-      id: "general-announcements",
-      name: "#general-announcements",
-      memberCount: 150,
-    },
-  ];
+  useEffect(() => {
+    fetchChatGroups();
+  }, []);
 
-  const messages: Message[] = [
-    {
-      id: "1",
-      user: {
-        name: "Sarah Jenkins",
-        avatar:
-          "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150",
-      },
-      content:
-        "Has everyone reviewed the new Figma prototypes? I've updated the mobile navigation flow based on yesterday's feedback.",
-      timestamp: "10:24 AM",
-    },
-    {
-      id: "2",
-      user: {
-        name: "Marcus Chen",
-        avatar:
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150",
-      },
-      content:
-        "Looking great! I'll add my comments by EOD. The new typography feels much cleaner.",
-      timestamp: "10:28 AM",
-      attachment: {
-        name: "Dashboard_v2_final.png",
-        url: "#",
-        preview:
-          "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400",
-      },
-    },
-    {
-      id: "3",
-      user: {
-        name: "You",
-        avatar:
-          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-        isCurrentUser: true,
-      },
-      content:
-        "Thanks Marcus! @Sarah Jenkins let's sync for 5 mins after the standup to finalize the icon set.",
-      timestamp: "10:45 AM",
-    },
-  ];
+  useEffect(() => {
+    if (selectedGroup) {
+      fetchMessages(selectedGroup);
+    }
+  }, [selectedGroup]);
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      // Handle message sending logic here
-      console.log("Sending message:", message);
-      setMessage("");
+  const fetchChatGroups = async () => {
+    try {
+      setLoading(true);
+      const response = await chatAPI.getGroups();
+      if (response.success) {
+        setChatGroups(response.data);
+        if (response.data.length > 0 && !selectedGroup) {
+          setSelectedGroup(response.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch chat groups:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMessages = async (groupId: string) => {
+    try {
+      setMessagesLoading(true);
+      const response = await chatAPI.getMessages(groupId, 50);
+      if (response.success) {
+        setMessages(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) return;
+    
+    try {
+      const response = await chatAPI.createGroup({
+        name: newGroupName,
+      });
+      
+      if (response.success) {
+        setChatGroups(prev => [...prev, response.data]);
+        setNewGroupName("");
+        setShowCreateGroup(false);
+        setSelectedGroup(response.data.id);
+      }
+    } catch (error) {
+      console.error('Failed to create group:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!message.trim() || !selectedGroup) return;
+    
+    try {
+      const response = await chatAPI.sendMessage(selectedGroup, {
+        content: message,
+      });
+      
+      if (response.success) {
+        setMessages(prev => [...prev, response.data]);
+        setMessage("");
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
     }
   };
 
@@ -158,53 +166,101 @@ const Chat: React.FC = () => {
 
         {/* Group List */}
         <div className="flex-1 overflow-y-auto">
-          {chatGroups.map((group) => (
-            <div
-              key={group.id}
-              className={`flex items-center gap-3 px-4 min-h-[64px] py-2 cursor-pointer transition-colors ${
-                group.isActive
-                  ? "bg-white border-l-4 border-blue-600"
-                  : "hover:bg-slate-100"
-              }`}
-              onClick={() => setSelectedGroup(group.id)}
-            >
-              <div
-                className={`flex items-center justify-center rounded-lg shrink-0 size-10 ${
-                  group.isActive
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-200 text-slate-500"
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">tag</span>
-              </div>
-              <div className="flex flex-col justify-center flex-1">
-                <p
-                  className={`text-sm line-clamp-1 ${
-                    group.isActive
-                      ? "font-semibold text-slate-900"
-                      : "font-medium text-slate-900"
-                  }`}
-                >
-                  {group.name}
-                </p>
-                <p className="text-slate-500 text-xs line-clamp-1">
-                  {group.memberCount} members
-                </p>
-              </div>
-              {group.hasUnread && (
-                <div className="shrink-0">
-                  <div className="size-2 rounded-full bg-green-500"></div>
-                </div>
-              )}
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             </div>
-          ))}
+          ) : (
+            chatGroups
+              .filter(group => 
+                group.name.toLowerCase().includes(searchQuery.toLowerCase())
+              )
+              .map((group) => (
+                <div
+                  key={group.id}
+                  className={`flex items-center gap-3 px-4 min-h-[64px] py-2 cursor-pointer transition-colors ${
+                    selectedGroup === group.id
+                      ? "bg-white border-l-4 border-blue-600"
+                      : "hover:bg-slate-100"
+                  }`}
+                  onClick={() => setSelectedGroup(group.id)}
+                >
+                  <div
+                    className={`flex items-center justify-center rounded-lg shrink-0 size-10 ${
+                      selectedGroup === group.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-200 text-slate-500"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      {group.is_project_group ? "folder" : "tag"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col justify-center flex-1">
+                    <p
+                      className={`text-sm line-clamp-1 ${
+                        selectedGroup === group.id
+                          ? "font-semibold text-slate-900"
+                          : "font-medium text-slate-900"
+                      }`}
+                    >
+                      {group.name}
+                    </p>
+                    <p className="text-slate-500 text-xs line-clamp-1">
+                      {group.memberCount} members
+                      {group.is_project_group && " • Project Group"}
+                    </p>
+                  </div>
+                  {Math.random() > 0.7 && (
+                    <div className="shrink-0">
+                      <div className="size-2 rounded-full bg-green-500"></div>
+                    </div>
+                  )}
+                </div>
+              ))
+          )}
         </div>
 
         <div className="p-4">
-          <button className="w-full flex cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold transition-all hover:bg-blue-700">
-            <span className="material-symbols-outlined text-lg mr-2">add</span>
-            <span className="truncate">New Group</span>
-          </button>
+          {showCreateGroup ? (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="Group name..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup()}
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateGroup}
+                  disabled={!newGroupName.trim()}
+                  className="flex-1 bg-blue-600 text-white text-sm font-bold py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreateGroup(false);
+                    setNewGroupName("");
+                  }}
+                  className="flex-1 bg-slate-200 text-slate-700 text-sm font-bold py-2 rounded-lg hover:bg-slate-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowCreateGroup(true)}
+              className="w-full flex cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold transition-all hover:bg-blue-700"
+            >
+              <span className="material-symbols-outlined text-lg mr-2">add</span>
+              <span className="truncate">New Group</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -213,13 +269,15 @@ const Chat: React.FC = () => {
         {/* Chat Header */}
         <header className="h-16 border-b border-slate-200 flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold">#design-team</h3>
+            <h3 className="text-lg font-bold">
+              {chatGroups.find(g => g.id === selectedGroup)?.name || '#general'}
+            </h3>
             <div className="h-4 w-px bg-slate-300 mx-1"></div>
             <div className="flex items-center text-slate-500 text-sm gap-1 cursor-pointer hover:text-blue-600">
               <span className="material-symbols-outlined text-base">
                 person
               </span>
-              <span>12</span>
+              <span>{chatGroups.find(g => g.id === selectedGroup)?.memberCount || 0}</span>
             </div>
           </div>
           <div className="flex items-center gap-4 text-slate-500">
@@ -237,79 +295,55 @@ const Chat: React.FC = () => {
 
         {/* Message Feed */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex gap-4 ${msg.user.isCurrentUser ? "flex-row-reverse" : ""}`}
-            >
-              <div
-                className="size-10 rounded-lg bg-cover bg-center shrink-0"
-                style={{ backgroundImage: `url(${msg.user.avatar})` }}
-              />
-              <div
-                className={`flex flex-col ${msg.user.isCurrentUser ? "items-end" : ""}`}
-              >
+          {messagesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-slate-500">
+              No messages yet. Start the conversation!
+            </div>
+          ) : (
+            messages.map((msg) => {
+              const isCurrentUser = msg.user_id === user?.id;
+              return (
                 <div
-                  className={`flex items-baseline gap-2 mb-1 ${msg.user.isCurrentUser ? "flex-row-reverse" : ""}`}
+                  key={msg.id}
+                  className={`flex gap-4 ${isCurrentUser ? "flex-row-reverse" : ""}`}
                 >
-                  <span className="font-bold text-sm">{msg.user.name}</span>
-                  <span className="text-xs text-slate-500">
-                    {msg.timestamp}
-                  </span>
-                </div>
-                <div
-                  className={`p-3 text-sm leading-relaxed max-w-2xl ${
-                    msg.user.isCurrentUser
-                      ? "bg-blue-600 text-white rounded-tl-xl rounded-bl-xl rounded-br-xl shadow-sm"
-                      : "bg-slate-50 rounded-tr-xl rounded-br-xl rounded-bl-xl"
-                  }`}
-                >
-                  {msg.content.includes("@") ? (
-                    <>
-                      {msg.content.split("@").map((part, index) => {
-                        if (index === 0) return part;
-                        const [mention, ...rest] = part.split(" ");
-                        return (
-                          <span key={index}>
-                            <span
-                              className={`px-1 rounded ${
-                                msg.user.isCurrentUser
-                                  ? "bg-white/20"
-                                  : "bg-blue-100 text-blue-700"
-                              }`}
-                            >
-                              @{mention}
-                            </span>
-                            {rest.length > 0 && " " + rest.join(" ")}
-                          </span>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-                {msg.attachment && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden w-64 mt-2">
+                  <div className="size-10 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">
+                    {msg.user?.full_name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <div
+                    className={`flex flex-col ${isCurrentUser ? "items-end" : ""}`}
+                  >
                     <div
-                      className="h-32 bg-slate-200 bg-cover bg-center"
-                      style={{
-                        backgroundImage: `url(${msg.attachment.preview})`,
-                      }}
-                    />
-                    <div className="p-2 flex items-center justify-between bg-white">
-                      <span className="text-xs font-medium truncate">
-                        {msg.attachment.name}
+                      className={`flex items-baseline gap-2 mb-1 ${isCurrentUser ? "flex-row-reverse" : ""}`}
+                    >
+                      <span className="font-bold text-sm">
+                        {isCurrentUser ? "You" : (msg.user?.full_name || 'Unknown User')}
                       </span>
-                      <span className="material-symbols-outlined text-blue-600 text-sm cursor-pointer">
-                        download
+                      <span className="text-xs text-slate-500">
+                        {new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </span>
                     </div>
+                    <div
+                      className={`p-3 text-sm leading-relaxed max-w-2xl ${
+                        isCurrentUser
+                          ? "bg-blue-600 text-white rounded-tl-xl rounded-bl-xl rounded-br-xl shadow-sm"
+                          : "bg-slate-50 rounded-tr-xl rounded-br-xl rounded-bl-xl"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Rich-Text Input Area */}
@@ -317,7 +351,7 @@ const Chat: React.FC = () => {
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
             <textarea
               className="w-full bg-transparent border-none focus:ring-0 text-sm resize-none min-h-[60px] px-3 pt-2 placeholder:text-slate-500"
-              placeholder="Message #design-team..."
+              placeholder={`Message ${chatGroups.find(g => g.id === selectedGroup)?.name || '#general'}...`}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}

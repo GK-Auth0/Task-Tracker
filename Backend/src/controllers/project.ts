@@ -6,6 +6,7 @@ import {
   getProjectById,
 } from "../services/project";
 import { createAuditLog } from "../services/auditService";
+import { createProjectGroup } from "../services/chat";
 
 export const getProjects = async (req: Request, res: Response) => {
   try {
@@ -55,6 +56,14 @@ export const createNewProject = async (req: Request, res: Response) => {
     };
 
     const project = await createProject(projectData);
+    
+    // Create chat group for the project
+    try {
+      await createProjectGroup(project.id, userId, project.name);
+    } catch (chatError) {
+      console.error("Failed to create project chat group:", chatError);
+      // Don't fail project creation if chat group creation fails
+    }
     
     // Log project creation
     await createAuditLog({

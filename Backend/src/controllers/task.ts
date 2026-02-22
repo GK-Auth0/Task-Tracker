@@ -9,7 +9,7 @@ import {
   getTaskPullRequests,
   getTaskCommits,
 } from "../services/task";
-import { createAuditLog } from "../services/auditService";
+import { createAuditLog, getAuditLogs } from "../services/auditService";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -319,6 +319,39 @@ export const getTaskCommitHistory = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to get commits",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const getTaskActivityLogs = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    // Ensure requester has access to this task before exposing activity.
+    await getTaskById(taskId, userId);
+
+    const limit = parseInt(req.query.limit as string) || 50;
+    const logs = await getAuditLogs("task", taskId, limit);
+
+    return res.status(200).json({
+      success: true,
+      message: "Task activity retrieved successfully",
+      data: logs,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to get task activity logs",
       error: (error as any).message,
     });
   }

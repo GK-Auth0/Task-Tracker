@@ -89,6 +89,28 @@ export const dashboardAPI = {
   },
 };
 
+export const auditLogsAPI = {
+  getActivityLogs: async (params?: {
+    entity_type?: "task" | "project";
+    entity_id?: string;
+    limit?: number;
+  }): Promise<{
+    success: boolean;
+    data: ActivityLog[];
+  }> => {
+    const queryParams = new URLSearchParams();
+    if (params?.entity_type) queryParams.append("entity_type", params.entity_type);
+    if (params?.entity_id) queryParams.append("entity_id", params.entity_id);
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const response = await api.get(
+      `/api/audit-logs${queryString ? `?${queryString}` : ""}`,
+    );
+    return response.data;
+  },
+};
+
 export const usersAPI = {
   getUsers: async (params?: {
     page?: number;
