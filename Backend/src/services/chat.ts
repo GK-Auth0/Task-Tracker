@@ -23,25 +23,29 @@ export const createChatGroup = async (data: {
 };
 
 export const getChatGroups = async (userId: string) => {
-  const groups = await ChatGroup.findAll({
+  const memberGroups = await ChatGroupMember.findAll({
+    where: { user_id: userId },
     include: [
       {
-        model: ChatGroupMember,
-        where: { user_id: userId },
-        attributes: [],
-      },
-      {
-        model: Project,
-        attributes: ["id", "name"],
-        required: false,
+        model: ChatGroup,
+        as: "group",
+        include: [
+          {
+            model: Project,
+            as: "project",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
       },
     ],
-    order: [["created_at", "DESC"]],
   });
   
-  // Get member counts
+  // Get member counts and format response
   const groupsWithCounts = await Promise.all(
-    groups.map(async (group) => {
+    memberGroups.map(async (memberGroup) => {
+      const group = memberGroup.group;
+      if (!group) return null;
       const memberCount = await ChatGroupMember.count({
         where: { group_id: group.id },
       });
@@ -50,10 +54,14 @@ export const getChatGroups = async (userId: string) => {
         ...group.toJSON(),
         memberCount,
       };
-    })
+    }),
   );
   
-  return groupsWithCounts;
+  return (groupsWithCounts.filter(Boolean) as NonNullable<typeof groupsWithCounts[number]>[])
+    .sort(
+    (a: any, b: any) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
 };
 
 export const getChatMessages = async (groupId: string, limit = 50) => {
@@ -62,6 +70,7 @@ export const getChatMessages = async (groupId: string, limit = 50) => {
     include: [
       {
         model: User,
+        as: "user",
         attributes: ["id", "full_name", "email"],
       },
     ],
@@ -79,7 +88,20 @@ export const createChatMessage = async (data: {
   attachment_url?: string;
   attachment_name?: string;
 }) => {
-  return await ChatMessage.create(data);
+  const message = await ChatMessage.create(data);
+  
+  // Fetch the message with user data
+  const messageWithUser = await ChatMessage.findByPk(message.id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["id", "full_name", "email"],
+      },
+    ],
+  });
+  
+  return messageWithUser;
 };
 
 export const createProjectGroup = async (projectId: string, createdBy: string, projectName: string) => {

@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
 import { createChatGroup, getChatGroups, getChatMessages, createChatMessage } from "../services/chat";
+import ChatGroupMember from "../models/chatGroupMember";
+
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 
 export const getGroups = async (req: Request, res: Response) => {
   try {
@@ -67,18 +73,36 @@ export const createGroup = async (req: Request, res: Response) => {
 
 export const getMessages = async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user?.id;
     const { groupId } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
-    
-    if (!groupId || typeof groupId !== 'string') {
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+      });
+    }
+
+    if (!groupId || typeof groupId !== "string" || !isUuid(groupId)) {
       return res.status(400).json({
         success: false,
         message: "Valid group ID is required",
       });
     }
-    
+
+    const membershipCount = await ChatGroupMember.count({
+      where: { group_id: groupId, user_id: userId },
+    });
+    if (membershipCount === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied to this chat group",
+      });
+    }
+
     const messages = await getChatMessages(groupId, limit);
-    
+
     return res.status(200).json({
       success: true,
       data: messages,
@@ -97,21 +121,31 @@ export const sendMessage = async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     const { groupId } = req.params;
     const { content, attachment_url, attachment_name } = req.body;
-    
+
     if (!userId) {
       return res.status(401).json({
         success: false,
         message: "User ID required",
       });
     }
-    
-    if (!groupId || typeof groupId !== 'string') {
+
+    if (!groupId || typeof groupId !== "string" || !isUuid(groupId)) {
       return res.status(400).json({
         success: false,
         message: "Valid group ID is required",
       });
     }
-    
+
+    const membershipCount = await ChatGroupMember.count({
+      where: { group_id: groupId, user_id: userId },
+    });
+    if (membershipCount === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied to this chat group",
+      });
+    }
+
     if (!content) {
       return res.status(400).json({
         success: false,

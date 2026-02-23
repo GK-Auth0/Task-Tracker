@@ -21,7 +21,7 @@ interface Message {
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"direct" | "groups">("groups");
-  const [selectedGroup, setSelectedGroup] = useState<string>("general");
+  const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
@@ -47,7 +47,7 @@ const Chat: React.FC = () => {
       const response = await chatAPI.getGroups();
       if (response.success) {
         setChatGroups(response.data);
-        if (response.data.length > 0 && !selectedGroup) {
+        if (response.data.length > 0) {
           setSelectedGroup(response.data[0].id);
         }
       }
