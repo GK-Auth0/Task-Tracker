@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { handleValidationErrors } from "../utils/validation";
+import { handleValidationErrors } from "../helpers/validation";
 import {
   getAllProjects,
   createProject,

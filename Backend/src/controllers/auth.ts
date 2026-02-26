@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { handleValidationErrors } from "../utils/validation";
+import { handleValidationErrors } from "../helpers/validation";
 import { registerUser, loginUser, getCurrentUser } from "../services/auth";
 
 export const register = async (req: Request, res: Response) => {

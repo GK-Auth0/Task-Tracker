@@ -1,24 +1,11 @@
 import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { User, UserMetadata } from "../models";
+import type { LoginDto, RegisterDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
-
-interface RegisterDto {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  ip?: string;
-  userAgent?: string;
-}
-
-interface LoginDto {
-  email: string;
-  password: string;
-}
 
 export async function registerUser(dto: RegisterDto) {
   const existingUser = await User.findOne({ where: { email: dto.email } });

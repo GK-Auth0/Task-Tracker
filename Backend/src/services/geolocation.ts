@@ -1,23 +1,5 @@
 import axios from 'axios';
-
-interface IPInfoResponse {
-  ip: string;
-  country: string;
-  region: string;
-  city: string;
-  timezone: string;
-  loc: string; // "lat,lng" format
-}
-
-interface GeolocationData {
-  ip_address: string;
-  country?: string;
-  region?: string;
-  city?: string;
-  timezone?: string;
-  lat?: number;
-  lng?: number;
-}
+import type { GeolocationData, IPInfoResponse } from '../types/geolocation';
 
 export const getIPGeolocation = async (ip: string): Promise<GeolocationData> => {
   try {

@@ -1,11 +1,6 @@
 import { Project, Task } from "../models";
 import { Op } from "sequelize";
-
-interface CreateProjectDto {
-  name: string;
-  description?: string;
-  owner_id: string;
-}
+import type { CreateProjectDto } from "../types/project";
 
 export async function getAllProjects(userId: string) {
   const projects = await Project.findAll({

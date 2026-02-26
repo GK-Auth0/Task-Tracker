@@ -1,12 +1,6 @@
 import { User, Task } from "../models";
 import { Op } from "sequelize";
-
-interface GetUsersOptions {
-  page: number;
-  limit: number;
-  search?: string;
-  role?: string;
-}
+import type { GetUsersOptions } from "../types/user";
 
 export async function getAllUsers(options: GetUsersOptions) {
   const { page, limit, search, role } = options;
