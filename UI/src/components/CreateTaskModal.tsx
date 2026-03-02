@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
+import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 
 interface User {
   id: string;
@@ -35,6 +36,10 @@ export default function CreateTaskModal({
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
+  const aiSuggestion = useMemo(
+    () => getTaskAiSuggestion(title, description),
+    [title, description],
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -338,6 +343,57 @@ export default function CreateTaskModal({
                 >
                   <span className="size-2 rounded-full bg-rose-500"></span>
                   High
+                </button>
+              </div>
+            </div>
+
+            {/* AI Assistant */}
+            <div className="rounded-lg border border-cyan-200 bg-cyan-50/60 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-cyan-700 text-lg">
+                    auto_awesome
+                  </span>
+                  <p className="text-sm font-semibold text-cyan-900">
+                    Smart Task Assist
+                  </p>
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-700">
+                  Automatic
+                </span>
+              </div>
+
+              <p className="text-xs text-cyan-900/80">{aiSuggestion.reason}</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
+                  onClick={() => setPriority(aiSuggestion.priority)}
+                >
+                  Apply Priority: {aiSuggestion.priority}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
+                  onClick={() => aiSuggestion.dueDate && setDueDate(aiSuggestion.dueDate)}
+                >
+                  Apply Due Date
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
+                  onClick={() => {
+                    const checklistText = aiSuggestion.checklist
+                      .map((item) => `- ${item}`)
+                      .join("\n");
+                    const next = description.trim()
+                      ? `${description.trim()}\n\nChecklist:\n${checklistText}`
+                      : `Checklist:\n${checklistText}`;
+                    setDescription(next);
+                  }}
+                >
+                  Insert Checklist
                 </button>
               </div>
             </div>
