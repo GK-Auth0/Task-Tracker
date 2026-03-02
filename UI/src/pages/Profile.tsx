@@ -32,9 +32,7 @@ const Profile: React.FC = () => {
         status: "Done",
       });
 
-      const projectsResponse = await projectService.getProjects({
-        ownerId: user.id,
-      });
+      const projectsResponse = await projectService.getProjects();
 
       const allTasksResponse = await taskService.getTasks({
         assigneeId: user.id,
@@ -42,9 +40,8 @@ const Profile: React.FC = () => {
 
       setStats({
         tasksCompleted: tasksResponse.success ? tasksResponse.data.length : 0,
-        projectsLead: projectsResponse.success
-          ? projectsResponse.data.length
-          : 0,
+        projectsLead: projectsResponse.data.filter((p) => p.ownerId === user.id)
+          .length,
         teamContributions: allTasksResponse.success
           ? allTasksResponse.data.length
           : 0,
@@ -118,9 +115,7 @@ const Profile: React.FC = () => {
                   </p>
                   <p className="text-sm text-slate-500">
                     Member since{" "}
-                    {new Date(
-                      user?.created_at || Date.now(),
-                    ).toLocaleDateString("en-US", {
+                    {new Date(Date.now()).toLocaleDateString("en-US", {
                       month: "long",
                       year: "numeric",
                     })}

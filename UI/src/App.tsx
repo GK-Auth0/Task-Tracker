@@ -15,6 +15,9 @@ import ActivityLog from "./pages/ActivityLog";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AuthCallback from "./pages/AuthCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import TaskDetails from "./components/TaskDetails";
 import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
@@ -77,6 +80,23 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPassword />
+          </PublicRoute>
+        }
+      />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route
         path="/"
         element={

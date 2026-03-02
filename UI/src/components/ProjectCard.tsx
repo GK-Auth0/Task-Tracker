@@ -102,17 +102,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
           {project.owner && (
             <div
               className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
-              title={project.owner.full_name}
+              title={project.owner.name}
             >
-              {project.owner.avatar_url ? (
+              {project.owner.avatar ? (
                 <img
-                  src={project.owner.avatar_url}
-                  alt={project.owner.full_name}
+                  src={project.owner.avatar}
+                  alt={project.owner.name}
                   className="w-full h-full rounded-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                  {project.owner.full_name.charAt(0).toUpperCase()}
+                  {project.owner.name.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
@@ -121,17 +121,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
             <div
               key={member.id}
               className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
-              title={member.user.full_name}
+              title={member.user.name}
             >
-              {member.user.avatar_url ? (
+              {member.user.avatar ? (
                 <img
-                  src={member.user.avatar_url}
-                  alt={member.user.full_name}
+                  src={member.user.avatar}
+                  alt={member.user.name}
                   className="w-full h-full rounded-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full rounded-full bg-slate-400 flex items-center justify-center text-white text-xs font-bold">
-                  {member.user.full_name.charAt(0).toUpperCase()}
+                  {member.user.name.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>

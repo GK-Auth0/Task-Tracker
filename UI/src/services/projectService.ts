@@ -1,6 +1,5 @@
 import axios from "axios";
 import {
-  Project,
   CreateProjectRequest,
   UpdateProjectRequest,
   ProjectsResponse,

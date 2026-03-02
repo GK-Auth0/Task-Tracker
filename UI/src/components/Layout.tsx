@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "./Sidebar";
+import AppBackgroundArt from "./layout/AppBackgroundArt";
 
 export default function Layout() {
   const { user } = useAuth();
@@ -121,8 +122,13 @@ export default function Layout() {
           </header>
 
           {/* Page Content */}
-          <div className="flex-1 overflow-hidden">
-            <Outlet />
+          <div className="relative isolate flex-1 overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 z-0">
+              <AppBackgroundArt />
+            </div>
+            <div className="relative z-10 h-full">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>

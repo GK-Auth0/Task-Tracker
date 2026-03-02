@@ -79,7 +79,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       return;
     }
 
-    const projectData = {
+    const projectData: CreateProjectRequest = {
       name: formData.name,
       description: formData.description,
       status: formData.status,
@@ -237,7 +237,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 Project Category Color
               </h3>
               <div className="flex flex-wrap gap-4">
-                {projectColors.map((color, index) => (
+                {projectColors.map((color) => (
                   <label
                     key={color}
                     className={`size-8 rounded-full border cursor-pointer transition-all ${

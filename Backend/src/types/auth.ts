@@ -11,3 +11,21 @@ export interface LoginDto {
   email: string;
   password: string;
 }
+
+export interface VerifyOtpDto {
+  otpSessionId: string;
+  otp: string;
+}
+
+export interface ResendOtpDto {
+  otpSessionId: string;
+}
+
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  token: string;
+  newPassword: string;
+}

@@ -4,6 +4,7 @@ import { API_BASE_URL } from "../config/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -44,14 +45,70 @@ export interface AuthResponse {
   };
 }
 
+export interface OtpChallenge {
+  requiresOtp: true;
+  otpSessionId: string;
+  email: string;
+  expiresAt: string;
+  otp?: string;
+}
+
+export interface OtpChallengeResponse {
+  success: boolean;
+  message: string;
+  data: OtpChallenge;
+}
+
+export interface BasicResponse {
+  success: boolean;
+  message: string;
+}
+
 export const authAPI = {
   login: async (data: LoginData): Promise<AuthResponse> => {
     const response = await api.post("/api/auth/login", data);
     return response.data;
   },
 
-  register: async (data: RegisterData): Promise<AuthResponse> => {
+  register: async (data: RegisterData): Promise<OtpChallengeResponse> => {
     const response = await api.post("/api/auth/register", data);
+    return response.data;
+  },
+
+  loginWithAuth0: async (accessToken: string): Promise<AuthResponse> => {
+    const response = await api.post("/api/auth/auth0", { accessToken });
+    return response.data;
+  },
+
+  verifyOtp: async (
+    otpSessionId: string,
+    otp: string,
+  ): Promise<AuthResponse> => {
+    const response = await api.post("/api/auth/verify-otp", {
+      otpSessionId,
+      otp,
+    });
+    return response.data;
+  },
+
+  resendOtp: async (otpSessionId: string): Promise<OtpChallengeResponse> => {
+    const response = await api.post("/api/auth/resend-otp", { otpSessionId });
+    return response.data;
+  },
+
+  forgotPassword: async (email: string): Promise<BasicResponse> => {
+    const response = await api.post("/api/auth/forgot-password", { email });
+    return response.data;
+  },
+
+  resetPassword: async (
+    token: string,
+    newPassword: string,
+  ): Promise<BasicResponse> => {
+    const response = await api.post("/api/auth/reset-password", {
+      token,
+      newPassword,
+    });
     return response.data;
   },
 

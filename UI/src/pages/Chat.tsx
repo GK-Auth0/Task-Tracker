@@ -2,22 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { chatAPI, ChatGroup, ChatMessage } from "../services/chatService";
 
-interface Message {
-  id: string;
-  user: {
-    name: string;
-    avatar: string;
-    isCurrentUser?: boolean;
-  };
-  content: string;
-  timestamp: string;
-  attachment?: {
-    name: string;
-    url: string;
-    preview?: string;
-  };
-}
-
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"direct" | "groups">("groups");

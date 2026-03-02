@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import { usersAPI } from "../services/dashboard";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,7 +20,6 @@ interface TeamMember {
 }
 
 export default function TeamManagement() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);

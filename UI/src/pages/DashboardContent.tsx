@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import {
   dashboardAPI,
   tasksAPI,
@@ -9,7 +8,6 @@ import {
 import CreateTaskModal from "../components/CreateTaskModal";
 
 export default function DashboardContent() {
-  const { user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);

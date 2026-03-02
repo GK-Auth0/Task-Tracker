@@ -1,0 +1,226 @@
+import axios from "axios";
+import nodemailer from "nodemailer";
+import { appConfig } from "../config/app";
+
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "no-reply@tasktracker.local";
+const OTP_EMAIL_WEBHOOK_URL = process.env.OTP_EMAIL_WEBHOOK_URL;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+const SMTP_TIMEOUT_MS = parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10);
+
+const buildOtpHtml = (otp: string, purpose: string) => {
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      <h2 style="margin: 0 0 12px;">TaskTracker Verification Code</h2>
+      <p style="margin: 0 0 12px;">Use the OTP below to complete your ${purpose} verification:</p>
+      <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 14px 0; color: #2563eb;">
+        ${otp}
+      </div>
+      <p style="margin: 0 0 6px;">This OTP expires in ${process.env.OTP_EXPIRES_MINUTES || "10"} minutes.</p>
+      <p style="margin: 0; color: #64748b;">If you did not request this code, please ignore this email.</p>
+    </div>
+  `;
+};
+
+const buildResetPasswordHtml = (resetLink: string) => {
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      <h2 style="margin: 0 0 12px;">TaskTracker Password Reset</h2>
+      <p style="margin: 0 0 12px;">Click the button below to reset your password.</p>
+      <a href="${resetLink}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600;">
+        Reset Password
+      </a>
+      <p style="margin: 16px 0 6px;">If the button does not work, use this link:</p>
+      <p style="margin: 0; word-break: break-all; color: #334155;">${resetLink}</p>
+      <p style="margin: 16px 0 0; color: #64748b;">If you did not request this, please ignore this email.</p>
+    </div>
+  `;
+};
+
+export const sendOtpEmail = async (
+  to: string,
+  otp: string,
+  purpose: "login" | "register" | "auth0",
+) => {
+  if (EMAIL_PROVIDER === "smtp") {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+    }
+
+    await sendSmtpEmail({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      username: EMAIL_USER,
+      password: EMAIL_PASS,
+      from: OTP_FROM_EMAIL,
+      to,
+      subject: "Your TaskTracker OTP Code",
+      html: buildOtpHtml(otp, purpose),
+    });
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "resend") {
+    if (!RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is missing for OTP email delivery");
+    }
+
+    await axios.post(
+      "https://api.resend.com/emails",
+      {
+        from: OTP_FROM_EMAIL,
+        to: [to],
+        subject: "Your TaskTracker OTP Code",
+        html: buildOtpHtml(otp, purpose),
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "webhook") {
+    if (!OTP_EMAIL_WEBHOOK_URL) {
+      throw new Error("OTP_EMAIL_WEBHOOK_URL is missing for webhook email delivery");
+    }
+
+    await axios.post(
+      OTP_EMAIL_WEBHOOK_URL,
+      {
+        to,
+        subject: "Your TaskTracker OTP Code",
+        html: buildOtpHtml(otp, purpose),
+        otp,
+        purpose,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return;
+  }
+
+  if (appConfig.env !== "production") {
+    console.warn(
+      `OTP email provider '${EMAIL_PROVIDER}' not configured. No email sent to ${to}.`,
+    );
+    return;
+  }
+
+  throw new Error(`Unsupported EMAIL_PROVIDER '${EMAIL_PROVIDER}'`);
+};
+
+export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
+  if (EMAIL_PROVIDER === "smtp") {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+    }
+
+    await sendSmtpEmail({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      username: EMAIL_USER,
+      password: EMAIL_PASS,
+      from: OTP_FROM_EMAIL,
+      to,
+      subject: "Reset your TaskTracker password",
+      html: buildResetPasswordHtml(resetLink),
+    });
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "resend") {
+    if (!RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is missing for email delivery");
+    }
+
+    await axios.post(
+      "https://api.resend.com/emails",
+      {
+        from: OTP_FROM_EMAIL,
+        to: [to],
+        subject: "Reset your TaskTracker password",
+        html: buildResetPasswordHtml(resetLink),
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "webhook") {
+    if (!OTP_EMAIL_WEBHOOK_URL) {
+      throw new Error("OTP_EMAIL_WEBHOOK_URL is missing for webhook email delivery");
+    }
+
+    await axios.post(
+      OTP_EMAIL_WEBHOOK_URL,
+      {
+        to,
+        subject: "Reset your TaskTracker password",
+        html: buildResetPasswordHtml(resetLink),
+        resetLink,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return;
+  }
+
+  if (appConfig.env !== "production") {
+    console.warn(
+      `Email provider '${EMAIL_PROVIDER}' not configured. No reset email sent to ${to}.`,
+    );
+    return;
+  }
+
+  throw new Error(`Unsupported EMAIL_PROVIDER '${EMAIL_PROVIDER}'`);
+};
+
+const sendSmtpEmail = async (options: {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+}) => {
+  const transporter = nodemailer.createTransport({
+    host: options.host,
+    port: options.port,
+    secure: options.port === 465,
+    auth: {
+      user: options.username,
+      pass: options.password,
+    },
+    connectionTimeout: SMTP_TIMEOUT_MS,
+    greetingTimeout: SMTP_TIMEOUT_MS,
+    socketTimeout: SMTP_TIMEOUT_MS,
+  });
+
+  await transporter.sendMail({
+    from: options.from,
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+  });
+};
