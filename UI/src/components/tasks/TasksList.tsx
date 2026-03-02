@@ -57,10 +57,10 @@ const TasksList: React.FC<TasksListProps> = ({
         return (
           <div
             key={task.id}
-            className="group flex items-center gap-4 bg-white px-6 py-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            className="group flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-white px-4 sm:px-6 py-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => onTaskClick(task.id)}
           >
-            <div className="flex size-6 items-center justify-center">
+            <div className="flex size-6 items-center justify-center shrink-0">
               <input
                 className="h-5 w-5 rounded border-slate-300 bg-transparent text-blue-600 focus:ring-blue-600 focus:ring-offset-0 focus:outline-none cursor-pointer"
                 type="checkbox"
@@ -69,16 +69,16 @@ const TasksList: React.FC<TasksListProps> = ({
                 onChange={(e) => onTaskToggle(task.id, e.target.checked)}
               />
             </div>
-            <div className="flex-1 flex items-center justify-between">
-              <div className="flex flex-col">
+            <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+              <div className="flex flex-col min-w-0">
                 <p
-                  className={`text-gray-900 text-base font-semibold leading-normal group-hover:text-blue-600 transition-colors ${
+                  className={`text-gray-900 text-sm sm:text-base font-semibold leading-normal group-hover:text-blue-600 transition-colors truncate ${
                     isCompleted ? "line-through opacity-60" : ""
                   }`}
                 >
                   {task.title}
                 </p>
-                <div className="flex items-center gap-4 mt-1">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-1">
                   {dateInfo && (
                     <div className="flex items-center gap-1.5 text-xs text-slate-500">
                       <span
@@ -113,7 +113,7 @@ const TasksList: React.FC<TasksListProps> = ({
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6">
                 {task.assignee ? (
                   <div className="size-8 rounded-full border-2 border-white bg-blue-600/20 flex items-center justify-center text-[10px] font-bold text-blue-600">
                     {task.assignee.full_name
@@ -131,7 +131,10 @@ const TasksList: React.FC<TasksListProps> = ({
                 >
                   {task.priority}
                 </div>
-                <button className="p-1 text-slate-300 hover:text-slate-500 transition-colors">
+                <button
+                  className="p-1 text-slate-300 hover:text-slate-500 transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <span className="material-symbols-outlined">more_vert</span>
                 </button>
               </div>

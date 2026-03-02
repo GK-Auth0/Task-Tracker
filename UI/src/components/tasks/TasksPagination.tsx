@@ -19,21 +19,21 @@ const TasksPagination: React.FC<TasksPaginationProps> = ({
   }
 
   return (
-    <div className="mt-8 flex items-center justify-between">
-      <p className="text-sm text-slate-600">
+    <div className="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <p className="text-xs sm:text-sm text-slate-600">
         Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
         {Math.min(currentPage * itemsPerPage, pagination.total)} of{" "}
         {pagination.total} tasks
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
-          className="px-3 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-2 text-xs sm:text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={!pagination.hasPrev}
         >
           Previous
         </button>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full">
           {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
             const pageNum = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
             if (pageNum > pagination.totalPages) return null;
@@ -41,7 +41,7 @@ const TasksPagination: React.FC<TasksPaginationProps> = ({
             return (
               <button
                 key={pageNum}
-                className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg ${
                   pageNum === currentPage
                     ? "bg-blue-600 text-white"
                     : "text-slate-500 bg-white border border-slate-300 hover:bg-slate-50"
@@ -54,7 +54,7 @@ const TasksPagination: React.FC<TasksPaginationProps> = ({
           })}
         </div>
         <button
-          className="px-3 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-2 text-xs sm:text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={!pagination.hasNext}
         >
