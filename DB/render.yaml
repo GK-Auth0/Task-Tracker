@@ -23,7 +23,7 @@ services:
   - type: job
     name: task-tracker-migrations
     env: docker
-    startCommand: flyway migrate -outOfOrder=true
+    startCommand: flyway -outOfOrder=true migrate
     envVars:
       - key: FLYWAY_URL
         value: jdbc:postgresql://ep-divine-cell-a1gyosjn-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
