@@ -13,6 +13,10 @@ const JWT_EXPIRES_IN = appConfig.jwt.expiresIn || "7d";
 const OTP_EXPIRES_MINUTES = parseInt(process.env.OTP_EXPIRES_MINUTES || "10", 10);
 const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || "5", 10);
 const OTP_HASH_SECRET = process.env.OTP_HASH_SECRET || JWT_SECRET;
+const OTP_SEND_ASYNC_ON_REGISTER =
+  (process.env.OTP_SEND_ASYNC_ON_REGISTER || "true").trim().toLowerCase() === "true";
+const OTP_FAIL_OPEN_ON_REGISTER =
+  (process.env.OTP_FAIL_OPEN_ON_REGISTER || "true").trim().toLowerCase() === "true";
 const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
   process.env.RESET_TOKEN_EXPIRES_MINUTES || "30",
   10,
@@ -179,6 +183,13 @@ const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpo
   await sendOtpEmail(email, otp, purpose);
 };
 
+const logOtpSendFailure = (email: string, purpose: OtpPurpose, error: unknown) => {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  console.error(
+    `[auth] OTP email delivery failed (purpose=${purpose}, email=${email}): ${message}`,
+  );
+};
+
 const buildAuthSuccessResult = (user: User): AuthSuccessResult => {
   return {
     user: getUserWithoutPassword(user),
@@ -216,7 +227,21 @@ const createOtpChallengeForUser = async (
     is_verified: false,
   });
 
-  await sendOtpNotification(user.email, otp, purpose);
+  if (purpose === "register" && OTP_SEND_ASYNC_ON_REGISTER) {
+    void sendOtpNotification(user.email, otp, purpose).catch((error) => {
+      logOtpSendFailure(user.email, purpose, error);
+    });
+  } else {
+    try {
+      await sendOtpNotification(user.email, otp, purpose);
+    } catch (error) {
+      if (purpose === "register" && OTP_FAIL_OPEN_ON_REGISTER) {
+        logOtpSendFailure(user.email, purpose, error);
+      } else {
+        throw error;
+      }
+    }
+  }
 
   return {
     requiresOtp: true,
