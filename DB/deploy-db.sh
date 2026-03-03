@@ -13,8 +13,8 @@ fi
 
 echo "📦 Running database migrations..."
 
-# Run Flyway migrations
-flyway -url="$DATABASE_URL" -locations=filesystem:./migrations migrate
+# Run Flyway migrations (allow out-of-order for environments with older applied versions)
+flyway -url="$DATABASE_URL" -locations=filesystem:./migrations -outOfOrder=true migrate
 
 if [ $? -eq 0 ]; then
     echo "✅ Database migrations completed successfully!"
