@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "./Sidebar";
 import AppBackgroundArt from "./layout/AppBackgroundArt";
 import AiAssistantWidget from "./ai/AiAssistantWidget";
+import NotificationBell from "./layout/NotificationBell";
 
 export default function Layout() {
   const { user } = useAuth();
@@ -102,10 +103,7 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative">
-                <span className="material-symbols-outlined">notifications</span>
-                <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
+              <NotificationBell />
               <button className="hidden sm:block p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
                 <span className="material-symbols-outlined">help_outline</span>
               </button>

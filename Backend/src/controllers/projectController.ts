@@ -5,6 +5,7 @@ import User from '../models/user';
 import Task from '../models/task';
 import { Op } from 'sequelize';
 import { processInvites } from "../services/invitation";
+import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -238,6 +239,7 @@ export class ProjectController {
         memberIds = [],
         invitees = [],
       } = req.body;
+      const safeMemberIds = Array.isArray(memberIds) ? memberIds : [];
 
       console.log('Received project data:', { name, description, status, priority, startDate, endDate, memberIds });
 
@@ -268,8 +270,8 @@ export class ProjectController {
       });
 
       // Add additional members if provided (excluding the owner)
-      if (memberIds.length > 0) {
-        const uniqueMemberIds = memberIds.filter((memberId: string) => memberId !== userId);
+      if (safeMemberIds.length > 0) {
+        const uniqueMemberIds = safeMemberIds.filter((memberId: string) => memberId !== userId);
         if (uniqueMemberIds.length > 0) {
           const memberPromises = uniqueMemberIds.map((memberId: string) =>
             ProjectMember.create({
@@ -289,6 +291,16 @@ export class ProjectController {
         invitees: Array.isArray(invitees) ? invitees : [],
       });
 
+      const projectGroup = await createProjectGroup(project.id, userId, name);
+      const memberIdsForChat = [
+        userId,
+        ...safeMemberIds.filter((memberId: string) => memberId && memberId !== userId),
+        ...((inviteSummary.existingUsers || [])
+          .filter((entry: any) => entry && entry.id)
+          .map((entry: any) => entry.id)),
+      ];
+      await addUsersToChatGroup(projectGroup.id, memberIdsForChat);
+
       // Fetch the created project with associations
       const createdProject = await Project.findByPk(project.id as string, {
         include: [
@@ -306,6 +318,7 @@ export class ProjectController {
           ...createdProject?.toJSON(),
           progress: 0,
           invite_summary: inviteSummary,
+          chat_group_id: projectGroup.id,
         },
         message: 'Project created successfully'
       });

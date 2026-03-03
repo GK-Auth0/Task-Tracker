@@ -7,7 +7,10 @@ export const appConfig = {
   env: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "3000"),
   database: {
-    host: process.env.DATABASE_HOST || "localhost",
+    host:
+      (process.env.DATABASE_HOST || "localhost") === "localhost"
+        ? "127.0.0.1"
+        : (process.env.DATABASE_HOST as string),
     port: parseInt(process.env.DATABASE_PORT || "5432"),
     name: process.env.DATABASE_NAME || "task_tracker",
     user: process.env.DATABASE_USER || "postgres",

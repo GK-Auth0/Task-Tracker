@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { IncomingMessage } from "http";
 import net from "net";
 import jwt from "jsonwebtoken";
+import { Duplex } from "stream";
 import { URL } from "url";
 import ChatGroupMember from "../models/chatGroupMember";
 
@@ -166,7 +167,7 @@ const authenticateRequest = (request: IncomingMessage): string | null => {
   }
 };
 
-export const handleChatUpgrade = (request: IncomingMessage, socket: net.Socket) => {
+export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
   if (!request.url?.startsWith("/ws/chat")) {
     socket.destroy();
     return;
@@ -196,7 +197,7 @@ export const handleChatUpgrade = (request: IncomingMessage, socket: net.Socket) 
   );
 
   const client: WebSocketClient = {
-    socket,
+    socket: socket as net.Socket,
     userId,
     subscribedGroups: new Set<string>(),
   };
