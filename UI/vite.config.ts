@@ -19,6 +19,16 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_BASE_URL || "http://localhost:3000",
           changeOrigin: true,
         },
+        "/ws": {
+          target: env.VITE_WS_BASE_URL || env.VITE_API_BASE_URL || "ws://localhost:3000",
+          ws: true,
+          changeOrigin: true,
+        },
+        "/ai-assistant": {
+          target: env.VITE_AI_ASSISTANT_URL || "http://127.0.0.1:8787",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/ai-assistant/, ""),
+        },
       },
     },
   };

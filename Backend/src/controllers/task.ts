@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { handleValidationErrors } from "../utils/validation";
+import { handleValidationErrors } from "../helpers/validation";
 import {
   getAllTasks,
   createTask,
@@ -9,7 +9,9 @@ import {
   getTaskPullRequests,
   getTaskCommits,
 } from "../services/task";
-import { createAuditLog } from "../services/auditService";
+import { createAuditLog, getAuditLogs } from "../services/auditService";
+import { processInvites } from "../services/invitation";
+import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -27,10 +29,14 @@ export const getTasks = async (req: Request, res: Response) => {
       status: req.query.status as string,
       priority: req.query.priority as string,
       project_id: req.query.project_id as string,
+      due_from: parseIsoDate(req.query.due_from),
+      due_to: parseIsoDate(req.query.due_to),
+      created_from: parseIsoDate(req.query.created_from),
+      created_to: parseIsoDate(req.query.created_to),
     };
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 5;
+    const page = parseBoundedInt(req.query.page, 1, 1, 100000);
+    const limit = parseBoundedInt(req.query.limit, 5, 1, 100);
 
     const result = await getAllTasks(userId, filters, page, limit);
     return res.status(200).json({
@@ -84,6 +90,13 @@ export const createNewTask = async (req: Request, res: Response) => {
     };
 
     const task = await createTask(taskData);
+    const inviteSummary = await processInvites({
+      contextType: "task",
+      projectId: task.project?.id || task.project_id,
+      taskId: task.id,
+      invitedBy: userId,
+      invitees: Array.isArray(req.body.invitees) ? req.body.invitees : [],
+    });
     
     // Log task creation
     await createAuditLog({
@@ -101,7 +114,10 @@ export const createNewTask = async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       message: "Task created successfully",
-      data: task,
+      data: {
+        ...task,
+        invite_summary: inviteSummary,
+      },
     });
   } catch (error) {
     return res.status(400).json({
@@ -322,6 +338,39 @@ export const getTaskCommitHistory = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to get commits",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const getTaskActivityLogs = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    // Ensure requester has access to this task before exposing activity.
+    await getTaskById(taskId, userId);
+
+    const limit = parseBoundedInt(req.query.limit, 50, 1, 200);
+    const logs = await getAuditLogs("task", taskId, limit);
+
+    return res.status(200).json({
+      success: true,
+      message: "Task activity retrieved successfully",
+      data: logs,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to get task activity logs",
       error: (error as any).message,
     });
   }

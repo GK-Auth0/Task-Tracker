@@ -1,31 +1,6 @@
 import { Task, Project, User, Subtask, Comment, PullRequest, Commit } from "../models";
 import { Op } from "sequelize";
-
-interface TaskFilters {
-  status?: string;
-  priority?: string;
-  project_id?: string;
-}
-
-interface CreateTaskDto {
-  title: string;
-  description?: string;
-  status: string;
-  priority: string;
-  project_id: string;
-  assignee_id?: string;
-  creator_id: string;
-  due_date?: string;
-}
-
-interface UpdateTaskDto {
-  title?: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  assignee_id?: string;
-  due_date?: string;
-}
+import type { CreateTaskDto, TaskFilters, UpdateTaskDto } from "../types/task";
 
 export async function getAllTasks(
   userId: string,
@@ -50,6 +25,20 @@ export async function getAllTasks(
   } else {
     // If not filtering by project, only show user's tasks
     whereClause[Op.or] = [{ creator_id: userId }, { assignee_id: userId }];
+  }
+
+  if (filters.due_from || filters.due_to) {
+    whereClause.due_date = {
+      ...(filters.due_from ? { [Op.gte]: filters.due_from } : {}),
+      ...(filters.due_to ? { [Op.lte]: filters.due_to } : {}),
+    };
+  }
+
+  if (filters.created_from || filters.created_to) {
+    whereClause.created_at = {
+      ...(filters.created_from ? { [Op.gte]: filters.created_from } : {}),
+      ...(filters.created_to ? { [Op.lte]: filters.created_to } : {}),
+    };
   }
 
   const offset = (page - 1) * limit;

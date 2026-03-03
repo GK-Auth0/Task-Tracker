@@ -6,6 +6,7 @@ import {
   ReactNode,
 } from "react";
 import { authAPI } from "../services/auth";
+import type { OtpChallenge } from "../services/auth";
 
 interface User {
   id: string;
@@ -18,24 +19,45 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithAuth0: (accessToken: string) => Promise<void>;
   register: (
     email: string,
     password: string,
     firstName: string,
     lastName: string,
-  ) => Promise<void>;
+  ) => Promise<OtpChallenge>;
+  verifyOtp: (otpSessionId: string, otp: string) => Promise<void>;
+  resendOtp: (otpSessionId: string) => Promise<OtpChallenge>;
   logout: () => void;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const defaultAuthContext: AuthContextType = {
+  user: null,
+  token: null,
+  login: async () => {
+    throw new Error("AuthProvider is not ready yet");
+  },
+  loginWithAuth0: async () => {
+    throw new Error("AuthProvider is not ready yet");
+  },
+  register: async () => {
+    throw new Error("AuthProvider is not ready yet");
+  },
+  verifyOtp: async () => {
+    throw new Error("AuthProvider is not ready yet");
+  },
+  resendOtp: async () => {
+    throw new Error("AuthProvider is not ready yet");
+  },
+  logout: () => {},
+  loading: true,
+};
+
+const AuthContext = createContext<AuthContextType>(defaultAuthContext);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  return useContext(AuthContext);
 };
 
 interface AuthProviderProps {
@@ -66,10 +88,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     initAuth();
   }, [token]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<void> => {
     const response = await authAPI.login({ email, password });
     const { user, token } = response.data;
+    localStorage.setItem("token", token);
+    setToken(token);
+    setUser(user);
+  };
 
+  const loginWithAuth0 = async (accessToken: string): Promise<void> => {
+    const response = await authAPI.loginWithAuth0(accessToken);
+    const { user, token } = response.data;
     localStorage.setItem("token", token);
     setToken(token);
     setUser(user);
@@ -80,18 +109,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     password: string,
     firstName: string,
     lastName: string,
-  ) => {
+  ): Promise<OtpChallenge> => {
     const response = await authAPI.register({
       email,
       password,
       firstName,
       lastName,
     });
+    return response.data;
+  };
+
+  const verifyOtp = async (otpSessionId: string, otp: string) => {
+    const response = await authAPI.verifyOtp(otpSessionId, otp);
     const { user, token } = response.data;
 
     localStorage.setItem("token", token);
     setToken(token);
     setUser(user);
+  };
+
+  const resendOtp = async (otpSessionId: string): Promise<OtpChallenge> => {
+    const response = await authAPI.resendOtp(otpSessionId);
+    return response.data;
   };
 
   const logout = () => {
@@ -104,7 +143,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user,
     token,
     login,
+    loginWithAuth0,
     register,
+    verifyOtp,
+    resendOtp,
     logout,
     loading,
   };

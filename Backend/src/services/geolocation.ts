@@ -1,27 +1,12 @@
 import axios from 'axios';
-
-interface IPInfoResponse {
-  ip: string;
-  country: string;
-  region: string;
-  city: string;
-  timezone: string;
-  loc: string; // "lat,lng" format
-}
-
-interface GeolocationData {
-  ip_address: string;
-  country?: string;
-  region?: string;
-  city?: string;
-  timezone?: string;
-  lat?: number;
-  lng?: number;
-}
+import type { GeolocationData, IPInfoResponse } from '../types/geolocation';
 
 export const getIPGeolocation = async (ip: string): Promise<GeolocationData> => {
   try {
-    const token = process.env.IPINFO_TOKEN || '2fcbfaa89132ad';
+    const token = process.env.IPINFO_TOKEN;
+    if (!token) {
+      return { ip_address: ip };
+    }
     const response = await axios.get<IPInfoResponse>(
       `https://ipinfo.io/${ip}?token=${token}`,
       { timeout: 5000 }

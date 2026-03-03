@@ -54,6 +54,10 @@ export interface CreateProjectRequest {
   startDate?: string;
   endDate?: string;
   memberIds?: string[];
+  invitees?: Array<{
+    full_name: string;
+    email: string;
+  }>;
 }
 
 export interface UpdateProjectRequest {

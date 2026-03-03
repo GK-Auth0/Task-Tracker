@@ -1,14 +1,6 @@
 import { AuditLog } from "../models";
-
-interface AuditLogData {
-  entity_type: "task" | "project";
-  entity_id: string;
-  action: "created" | "updated" | "deleted" | "status_changed" | "assigned" | "unassigned";
-  user_id: string;
-  old_values?: object;
-  new_values?: object;
-  changes?: object;
-}
+import type { AuditLogData } from "../types/audit";
+import { Op } from "sequelize";
 
 export const createAuditLog = async (data: AuditLogData): Promise<void> => {
   try {
@@ -21,11 +13,19 @@ export const createAuditLog = async (data: AuditLogData): Promise<void> => {
 export const getAuditLogs = async (
   entity_type?: "task" | "project",
   entity_id?: string,
-  limit: number = 50
+  limit: number = 50,
+  from?: Date,
+  to?: Date,
 ) => {
   const where: any = {};
   if (entity_type) where.entity_type = entity_type;
   if (entity_id) where.entity_id = entity_id;
+  if (from || to) {
+    where.created_at = {
+      ...(from ? { [Op.gte]: from } : {}),
+      ...(to ? { [Op.lte]: to } : {}),
+    };
+  }
 
   return await AuditLog.findAll({
     where,

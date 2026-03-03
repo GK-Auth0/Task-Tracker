@@ -171,19 +171,6 @@ const ProjectDetail: React.FC = () => {
     return tasks.filter((task) => task.status === status);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "To Do":
-        return "text-slate-500";
-      case "In Progress":
-        return "text-blue-600";
-      case "Done":
-        return "text-emerald-500";
-      default:
-        return "text-slate-500";
-    }
-  };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
@@ -336,6 +323,7 @@ const ProjectDetail: React.FC = () => {
                   <select
                     value={project.status}
                     onChange={(e) => handleStatusUpdate(e.target.value)}
+                    aria-label="Project status"
                     className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-600 text-[10px] font-bold uppercase tracking-wide border-none cursor-pointer hover:bg-emerald-200 transition-colors"
                   >
                     <option value="planning">Planning</option>
@@ -350,12 +338,12 @@ const ProjectDetail: React.FC = () => {
                       className="flex -space-x-2 cursor-pointer"
                       onClick={() => setShowMembersTooltip(!showMembersTooltip)}
                     >
-                      {project.members?.slice(0, 4).map((member, index) => (
+                      {project.members?.slice(0, 4).map((member) => (
                         <div
                           key={member.id}
                           className="size-8 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white text-xs font-bold hover:z-10 transition-all"
                         >
-                          {(member.user?.full_name || "U")
+                          {(member.user?.name || "U")
                             .charAt(0)
                             .toUpperCase()}
                         </div>
@@ -384,13 +372,13 @@ const ProjectDetail: React.FC = () => {
                               className="flex items-center gap-3"
                             >
                               <div className="size-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                                {(member.user?.full_name || "U")
+                                {(member.user?.name || "U")
                                   .charAt(0)
                                   .toUpperCase()}
                               </div>
                               <div>
                                 <div className="text-sm font-medium text-slate-700">
-                                  {member.user?.full_name || "Unknown"}
+                                  {member.user?.name || "Unknown"}
                                 </div>
                                 <div className="text-xs text-slate-500">
                                   {member.role}
@@ -799,7 +787,7 @@ const ProjectDetail: React.FC = () => {
                   </span>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {filteredTasks.map((task, index) => (
+                  {filteredTasks.map((task) => (
                     <div
                       key={task.id}
                       className="h-12 flex items-center px-4 group hover:bg-slate-50 transition-colors cursor-pointer"

@@ -1,10 +1,11 @@
 import { Request, Response } from "express";
 import { getAllUsers, getUserById } from "../services/user";
+import { parseBoundedInt } from "../helpers/query";
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    const page = parseBoundedInt(req.query.page, 1, 1, 100000);
+    const limit = parseBoundedInt(req.query.limit, 10, 1, 100);
     const search = req.query.search as string || "";
     const role = req.query.role as string || "";
     

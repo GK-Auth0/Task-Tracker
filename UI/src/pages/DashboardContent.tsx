@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   dashboardAPI,
   tasksAPI,
@@ -9,7 +9,7 @@ import {
 import CreateTaskModal from "../components/CreateTaskModal";
 
 export default function DashboardContent() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -299,7 +299,7 @@ export default function DashboardContent() {
             <div
               key={task.id}
               className="group flex items-center gap-4 bg-white px-6 py-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => (window.location.href = `/task/${task.id}`)}
+              onClick={() => navigate(`/task/${task.id}`)}
             >
               <div className="flex size-6 items-center justify-center">
                 <input

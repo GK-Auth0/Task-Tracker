@@ -15,10 +15,14 @@ import ActivityLog from "./pages/ActivityLog";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AuthCallback from "./pages/AuthCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import TaskDetails from "./components/TaskDetails";
 import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
 import Layout from "./components/Layout";
+import AiMonitoring from "./pages/AiMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +82,23 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPassword />
+          </PublicRoute>
+        }
+      />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route
         path="/"
         element={
           <ProtectedRoute>
@@ -91,6 +112,7 @@ function AppRoutes() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="activity" element={<ActivityLog />} />
         <Route path="chat" element={<Chat />} />
+        <Route path="ai-monitoring" element={<AiMonitoring />} />
         <Route path="profile" element={<Profile />} />
         <Route path="coming-soon" element={<ComingSoon />} />
         <Route path="team" element={<TeamManagement />} />
@@ -111,7 +133,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <div className="min-h-screen bg-gray-50">
             <AppRoutes />
           </div>

@@ -49,6 +49,25 @@ export const createTaskSchema = {
       errorMessage: "Due date must be a valid ISO 8601 date",
     },
   },
+  invitees: {
+    optional: true,
+    isArray: {
+      errorMessage: "Invitees must be an array",
+    },
+  },
+  "invitees.*.full_name": {
+    optional: true,
+    isLength: {
+      options: { min: 1, max: 255 },
+      errorMessage: "Invitee full name must be 1 to 255 characters",
+    },
+  },
+  "invitees.*.email": {
+    optional: true,
+    isEmail: {
+      errorMessage: "Invitee email must be valid",
+    },
+  },
 };
 
 export const updateTaskSchema = {

@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   tasksAPI,
   PullRequest,
   Commit,
   ActivityLog,
 } from "../services/dashboard";
+import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 
 interface TaskDetails {
   id: string;
@@ -32,26 +33,35 @@ interface TaskDetails {
   updated_at: string;
 }
 
+type TaskTab = "overview" | "prs" | "activity" | "attachments";
+
+const isTaskTab = (value: string | null): value is TaskTab =>
+  value === "overview" ||
+  value === "prs" ||
+  value === "activity" ||
+  value === "attachments";
+
 export default function TaskDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [taskError, setTaskError] = useState("");
   const [comment, setComment] = useState("");
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "prs" | "activity" | "attachments"
-  >("overview");
+  const [activeTab, setActiveTab] = useState<TaskTab>("overview");
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [prLoading, setPrLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [prioritySaving, setPrioritySaving] = useState(false);
   const [showLinkPRModal, setShowLinkPRModal] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
-  // Debug log for modal state
-  useEffect(() => {
-    console.log("showLinkPRModal state changed:", showLinkPRModal);
-  }, [showLinkPRModal]);
   const [prForm, setPrForm] = useState({
     title: "",
     repository: "",
@@ -63,10 +73,31 @@ export default function TaskDetails() {
   });
 
   useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    if (isTaskTab(urlTab)) {
+      setActiveTab(urlTab);
+    }
+  }, []);
+
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", activeTab);
+      return next;
+    }, { replace: true });
+  }, [activeTab, setSearchParams]);
+
+  useEffect(() => {
     if (id) {
       fetchTask();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (task) {
+      fetchAiSuggestion(task.title, task.description || "");
+    }
+  }, [task?.id]);
 
   useEffect(() => {
     if (id && activeTab === "prs") {
@@ -78,14 +109,30 @@ export default function TaskDetails() {
 
   const fetchTask = async () => {
     try {
+      setTaskError("");
       const response = await tasksAPI.getTask(id!);
       if (response.success) {
         setTask(response.data);
       }
     } catch (error) {
       console.error("Failed to fetch task:", error);
+      setTaskError("Failed to load this task. Please refresh and try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAiSuggestion = async (title: string, description: string) => {
+    try {
+      setAiLoading(true);
+      setAiError("");
+      const suggestion = await aiAssistantAPI.suggestTask(title, description);
+      setAiSuggestion(suggestion);
+    } catch (error) {
+      setAiError("AI assistant unavailable right now.");
+      setAiSuggestion(null);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -131,6 +178,7 @@ export default function TaskDetails() {
   ) => {
     if (!task) return;
     try {
+      setStatusSaving(true);
       const response = await tasksAPI.updateTask(task.id, {
         status: newStatus,
       });
@@ -143,6 +191,28 @@ export default function TaskDetails() {
       }
     } catch (error) {
       console.error("Failed to update task status:", error);
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  const handlePriorityUpdate = async (newPriority: "Low" | "Medium" | "High") => {
+    if (!task) return;
+    try {
+      setPrioritySaving(true);
+      const response = await tasksAPI.updateTask(task.id, {
+        priority: newPriority,
+      });
+      if (response.success) {
+        setTask({ ...task, priority: newPriority });
+        if (activeTab === "activity") {
+          fetchActivityLogs();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update task priority:", error);
+    } finally {
+      setPrioritySaving(false);
     }
   };
 
@@ -216,13 +286,26 @@ export default function TaskDetails() {
 
   if (!task) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Task not found
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+        <p>{taskError || "Task not found"}</p>
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Back to Tasks
+        </button>
       </div>
     );
   }
 
   const priorityColors = getPriorityColor(task.priority);
+  const taskTabs: Array<{ id: TaskTab; label: string; icon: string; count?: number }> = [
+    { id: "overview", label: "Overview", icon: "description" },
+    { id: "prs", label: "PRs & Code", icon: "code", count: pullRequests.length || undefined },
+    { id: "activity", label: "Activity", icon: "history", count: activityLogs.length || undefined },
+    { id: "attachments", label: "Attachments", icon: "attach_file" },
+  ];
 
   return (
     <>
@@ -236,19 +319,21 @@ export default function TaskDetails() {
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <div className="flex items-center gap-4">
               <div className="flex flex-wrap gap-2 text-sm">
-                <a
+                <button
+                  type="button"
+                  onClick={() => navigate("/projects")}
                   className="text-slate-500 font-medium hover:text-blue-600"
-                  href="#"
                 >
                   Projects
-                </a>
+                </button>
                 <span className="text-slate-500 font-medium">/</span>
-                <a
+                <button
+                  type="button"
+                  onClick={() => navigate(`/projects/${task.project.id}`)}
                   className="text-slate-500 font-medium hover:text-blue-600"
-                  href="#"
                 >
                   {task.project.name}
-                </a>
+                </button>
                 <span className="text-slate-500 font-medium">/</span>
                 <span className="text-slate-900 font-medium">
                   TASK-{task.id.slice(-3)}
@@ -263,8 +348,15 @@ export default function TaskDetails() {
                 <span className="material-symbols-outlined">more_horiz</span>
               </button>
               <button
+                type="button"
                 className="p-2 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-500 transition-colors ml-2"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                    return;
+                  }
+                  navigate("/dashboard");
+                }}
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -275,6 +367,12 @@ export default function TaskDetails() {
           <div className="flex-1 overflow-y-auto flex flex-col md:flex-row">
             {/* Left Column */}
             <div className="flex-1 p-8 space-y-8 border-r border-slate-200">
+              {taskError && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {taskError}
+                </div>
+              )}
+
               {/* Title & Status */}
               <div className="space-y-4">
                 <div className="flex flex-wrap justify-between items-start gap-4">
@@ -289,6 +387,8 @@ export default function TaskDetails() {
                           e.target.value as "To Do" | "In Progress" | "Done",
                         )
                       }
+                      disabled={statusSaving}
+                      aria-label="Task status"
                       className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium bg-white hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     >
                       <option value="To Do">To Do</option>
@@ -298,7 +398,7 @@ export default function TaskDetails() {
                     <button
                       className="flex min-w-[140px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-11 px-6 bg-blue-600 text-white text-sm font-bold leading-normal tracking-wide hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleStatusUpdate("Done")}
-                      disabled={task.status === "Done"}
+                      disabled={task.status === "Done" || statusSaving}
                     >
                       <span className="material-symbols-outlined mr-2 text-lg">
                         check_circle
@@ -306,6 +406,8 @@ export default function TaskDetails() {
                       <span className="truncate">
                         {task.status === "Done"
                           ? "Completed"
+                          : statusSaving
+                            ? "Updating..."
                           : "Mark as Complete"}
                       </span>
                     </button>
@@ -326,64 +428,41 @@ export default function TaskDetails() {
 
               {/* Tabs */}
               <div className="border-b border-slate-200">
-                <div className="flex gap-8 overflow-x-auto scrollbar-hide">
-                  <button
-                    className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === "overview"
-                        ? "border-b-blue-600 text-blue-600"
-                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
-                    }`}
-                    onClick={() => setActiveTab("overview")}
+                <div className="pb-3 pt-4 sm:hidden">
+                  <select
+                    aria-label="Task detail tabs"
+                    value={activeTab}
+                    onChange={(e) => setActiveTab(e.target.value as TaskTab)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   >
-                    <span className="material-symbols-outlined text-lg">
-                      description
-                    </span>
-                    <span>Overview</span>
-                  </button>
-                  <button
-                    className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === "prs"
-                        ? "border-b-blue-600 text-blue-600"
-                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
-                    }`}
-                    onClick={() => setActiveTab("prs")}
-                  >
-                    <span className="material-symbols-outlined text-lg">
-                      code
-                    </span>
-                    <span>PRs & Code</span>
-                    {pullRequests.length > 0 && (
-                      <span className="px-1.5 py-0.5 bg-blue-600/10 text-blue-600 text-[10px] rounded-full">
-                        {pullRequests.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === "activity"
-                        ? "border-b-blue-600 text-blue-600"
-                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
-                    }`}
-                    onClick={() => setActiveTab("activity")}
-                  >
-                    <span className="material-symbols-outlined text-lg">
-                      history
-                    </span>
-                    <span>Activity</span>
-                  </button>
-                  <button
-                    className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
-                      activeTab === "attachments"
-                        ? "border-b-blue-600 text-blue-600"
-                        : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
-                    }`}
-                    onClick={() => setActiveTab("attachments")}
-                  >
-                    <span className="material-symbols-outlined text-lg">
-                      attach_file
-                    </span>
-                    <span>Attachments</span>
-                  </button>
+                    {taskTabs.map((tab) => (
+                      <option key={tab.id} value={tab.id}>
+                        {tab.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="hidden gap-8 overflow-x-auto scrollbar-hide sm:flex">
+                  {taskTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
+                        activeTab === tab.id
+                          ? "border-b-blue-600 text-blue-600"
+                          : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
+                      }`}
+                      onClick={() => setActiveTab(tab.id)}
+                    >
+                      <span className="material-symbols-outlined text-lg">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                      {tab.count ? (
+                        <span className="rounded-full bg-blue-600/10 px-1.5 py-0.5 text-[10px] text-blue-600">
+                          {tab.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -406,6 +485,86 @@ export default function TaskDetails() {
                     <div className="prose max-w-none text-slate-600 leading-relaxed">
                       <p>{task.description || "No description provided."}</p>
                     </div>
+                  </div>
+
+                  {/* AI Assistant */}
+                  <div className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-cyan-900 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">
+                          auto_awesome
+                        </span>
+                        AI Task Assistant
+                      </h3>
+                      <button
+                        className="h-8 px-3 rounded-md bg-cyan-700 text-white text-xs font-semibold hover:bg-cyan-800 disabled:opacity-50"
+                        onClick={() =>
+                          fetchAiSuggestion(task.title, task.description || "")
+                        }
+                        disabled={aiLoading}
+                      >
+                        {aiLoading ? "Analyzing..." : "Refresh"}
+                      </button>
+                    </div>
+
+                    {aiError && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        {aiError}
+                      </p>
+                    )}
+
+                    {aiSuggestion && (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Suggested Priority
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-800">
+                            {aiSuggestion.priority}
+                          </p>
+                          <button
+                            className="mt-2 text-xs font-semibold text-cyan-700 hover:text-cyan-900"
+                            onClick={() =>
+                              handlePriorityUpdate(aiSuggestion.priority)
+                            }
+                            disabled={prioritySaving}
+                          >
+                            {prioritySaving ? "Applying..." : "Apply priority"}
+                          </button>
+                        </div>
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Suggested Due Date
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-800">
+                            {new Date(aiSuggestion.due_date).toLocaleDateString()}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-600">
+                            Est. {aiSuggestion.estimated_hours}h effort
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Why
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {aiSuggestion.reason}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3 lg:col-span-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Suggested Checklist
+                          </p>
+                          <ul className="mt-2 space-y-1">
+                            {aiSuggestion.checklist.map((item) => (
+                              <li key={item} className="text-sm text-slate-700">
+                                • {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Activity Log */}
@@ -661,6 +820,8 @@ export default function TaskDetails() {
                   ) : activityLogs.length > 0 ? (
                     <div className="space-y-4">
                       {activityLogs.map((log) => {
+                        const actorName = log.user?.full_name || "System";
+
                         const getActionIcon = (action: string) => {
                           switch (action) {
                             case "created":
@@ -729,7 +890,7 @@ export default function TaskDetails() {
                           >
                             <div className="flex-shrink-0">
                               <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
-                                {log.user.full_name
+                                {actorName
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
@@ -743,7 +904,7 @@ export default function TaskDetails() {
                                   {actionIcon.icon}
                                 </span>
                                 <span className="font-semibold text-slate-900">
-                                  {log.user.full_name}
+                                  {actorName}
                                 </span>
                                 <span className="text-slate-600">
                                   {getActionText(log)}
@@ -994,6 +1155,7 @@ export default function TaskDetails() {
                         status: e.target.value as "open" | "merged" | "closed",
                       }))
                     }
+                    aria-label="Pull request status"
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   >
                     <option value="open">Open</option>

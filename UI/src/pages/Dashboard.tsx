@@ -1,33 +1,22 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { dashboardAPI, tasksAPI } from "../services/dashboard";
+import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
+import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
+import AiMonitoringPanel from "../components/ai/AiMonitoringPanel";
 import CreateTaskModal from "../components/CreateTaskModal";
-
-interface DashboardSummary {
-  total_tasks: number;
-  completed_tasks: number;
-  in_progress_tasks: number;
-  overdue_tasks: number;
-}
-
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  status: "To Do" | "In Progress" | "Done";
-  priority: "Low" | "Medium" | "High";
-  due_date?: string;
-  assignee?: {
-    id: string;
-    full_name: string;
-    email: string;
-  };
-}
+import TasksHeader from "../components/tasks/TasksHeader";
+import TasksFiltersBar from "../components/tasks/TasksFiltersBar";
+import TasksList from "../components/tasks/TasksList";
+import TasksPagination from "../components/tasks/TasksPagination";
+import TasksEmptyState from "../components/tasks/TasksEmptyState";
+import SavedViewsBar from "../components/preferences/SavedViewsBar";
+import { DashboardSummary, TaskItem, TasksPagination as TasksPageData } from "../components/tasks/types";
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -35,13 +24,28 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState<any>(null);
+  const [pagination, setPagination] = useState<TasksPageData | null>(null);
+  const [dayPlan, setDayPlan] = useState<AiDayPlan | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [planError, setPlanError] = useState("");
+  const [pinnedTaskIds, setPinnedTaskIds] = useState<Set<string>>(new Set());
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [selectedViewId, setSelectedViewId] = useState("");
+  const [newViewName, setNewViewName] = useState("");
+  const [savingView, setSavingView] = useState(false);
   const itemsPerPage = 5;
 
   useEffect(() => {
     fetchData();
   }, [filter, priorityFilter, statusFilter, currentPage]);
+
+  useEffect(() => {
+    fetchPinnedTasks();
+    fetchSavedViews();
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -60,7 +64,7 @@ export default function Dashboard() {
       ]);
       setSummary(summaryRes.data);
       setTasks(tasksRes.data);
-      setPagination(tasksRes.pagination);
+      setPagination(tasksRes.pagination || null);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
@@ -70,6 +74,24 @@ export default function Dashboard() {
 
   const handleTaskCreated = () => {
     fetchData();
+  };
+
+  const fetchPinnedTasks = async () => {
+    try {
+      const pins = await preferencesAPI.getPins("task");
+      setPinnedTaskIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
+    } catch (error) {
+      console.error("Failed to load pinned tasks:", error);
+    }
+  };
+
+  const fetchSavedViews = async () => {
+    try {
+      const views = await preferencesAPI.getSavedViews("tasks");
+      setSavedViews(views);
+    } catch (error) {
+      console.error("Failed to load saved views:", error);
+    }
   };
 
   const handleTaskToggle = async (taskId: string, completed: boolean) => {
@@ -83,41 +105,100 @@ export default function Dashboard() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "bg-red-100 text-red-600";
-      case "Medium":
-        return "bg-orange-100 text-orange-600";
-      case "Low":
-        return "bg-blue-100 text-blue-600";
-      default:
-        return "bg-slate-100 text-slate-500";
+  const visibleTasks = tasks
+    .filter((task) =>
+      task.title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
+    )
+    .filter((task) => !showPinnedOnly || pinnedTaskIds.has(task.id));
+
+  const handleToggleTaskPin = async (taskId: string, shouldPin: boolean) => {
+    try {
+      if (shouldPin) {
+        await preferencesAPI.addPin("task", taskId);
+      } else {
+        await preferencesAPI.removePin("task", taskId);
+      }
+
+      setPinnedTaskIds((prev) => {
+        const next = new Set(prev);
+        if (shouldPin) {
+          next.add(taskId);
+        } else {
+          next.delete(taskId);
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to update task pin:", error);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-    );
+  const applySavedView = () => {
+    if (!selectedViewId) return;
+    const view = savedViews.find((item) => item.id === selectedViewId);
+    if (!view) return;
+    const filters = view.filters;
+    setFilter(String(filters.filter ?? ""));
+    setPriorityFilter(String(filters.priorityFilter ?? ""));
+    setStatusFilter(String(filters.statusFilter ?? ""));
+    setSearchTerm(String(filters.searchTerm ?? ""));
+    setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
+    setCurrentPage(1);
+  };
 
-    if (taskDate < today) {
-      return {
-        text: `Overdue - ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
-        isOverdue: true,
-      };
-    } else if (taskDate.getTime() === today.getTime()) {
-      return { text: "Today", isToday: true };
-    } else {
-      return {
-        text: `Due ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
-        isOverdue: false,
-      };
+  const saveCurrentView = async () => {
+    if (!newViewName.trim()) return;
+    try {
+      setSavingView(true);
+      await preferencesAPI.createSavedView({
+        page: "tasks",
+        name: newViewName.trim(),
+        filters: {
+          filter,
+          priorityFilter,
+          statusFilter,
+          searchTerm,
+          showPinnedOnly,
+        },
+      });
+      setNewViewName("");
+      await fetchSavedViews();
+    } catch (error) {
+      console.error("Failed to save current view:", error);
+    } finally {
+      setSavingView(false);
+    }
+  };
+
+  const deleteSelectedView = async () => {
+    if (!selectedViewId) return;
+    try {
+      await preferencesAPI.deleteSavedView(selectedViewId);
+      setSelectedViewId("");
+      await fetchSavedViews();
+    } catch (error) {
+      console.error("Failed to delete saved view:", error);
+    }
+  };
+
+  const buildDailyPlan = async () => {
+    try {
+      setPlanning(true);
+      setPlanError("");
+      const payload = visibleTasks.map((task) => ({
+        title: task.title,
+        priority: task.priority,
+        due_date: task.due_date,
+        status: task.status,
+        estimated_hours:
+          task.priority === "High" ? 3 : task.priority === "Medium" ? 2 : 1.25,
+      }));
+      const result = await aiAssistantAPI.planDay(payload, 6);
+      setDayPlan(result);
+    } catch (error) {
+      setPlanError("AI planner unavailable right now.");
+    } finally {
+      setPlanning(false);
     }
   };
 
@@ -130,325 +211,163 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-gray-900 text-3xl font-black tracking-tight">
-            My Tasks
-          </h2>
-          <p className="text-gray-600 mt-1">
-            You have {summary?.total_tasks || 0} tasks,{" "}
-            {summary?.overdue_tasks || 0} overdue.
-          </p>
-        </div>
-        <button
-          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
-          onClick={() => setShowCreateModal(true)}
-        >
-          <span className="material-symbols-outlined text-lg">add</span>
-          <span>Create Task</span>
-        </button>
-      </div>
+    <div className="h-full overflow-y-auto bg-gray-50">
+      <div className="min-h-full p-4 sm:p-6 lg:p-8">
+        <TasksHeader
+          summary={summary}
+          onCreate={() => setShowCreateModal(true)}
+        />
 
-      <div className="flex flex-wrap gap-3 mb-6 items-center">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">
-          Filter by:
-        </span>
+        <SavedViewsBar
+          title="Task Saved Views"
+          views={savedViews.map((view) => ({ id: view.id, name: view.name }))}
+          selectedId={selectedViewId}
+          viewName={newViewName}
+          onSelectedIdChange={setSelectedViewId}
+          onViewNameChange={setNewViewName}
+          onApply={applySavedView}
+          onSave={saveCurrentView}
+          onDelete={deleteSelectedView}
+          saving={savingView}
+        />
 
-        <div className="relative">
-          <button
-            className="flex h-9 items-center gap-x-2 rounded-lg bg-white border border-slate-200 px-4 hover:border-blue-600/50 transition-colors"
-            onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-          >
-            <p className="text-slate-700 text-sm font-medium">
-              {priorityFilter || "Priority"}
-            </p>
-            <span className="material-symbols-outlined text-slate-400 text-lg">
-              expand_more
-            </span>
-          </button>
-          {showPriorityDropdown && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]">
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 first:rounded-t-lg"
-                onClick={() => {
-                  setPriorityFilter("");
-                  setShowPriorityDropdown(false);
-                }}
-              >
-                All Priorities
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50"
-                onClick={() => {
-                  setPriorityFilter("High");
-                  setShowPriorityDropdown(false);
-                }}
-              >
-                High
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50"
-                onClick={() => {
-                  setPriorityFilter("Medium");
-                  setShowPriorityDropdown(false);
-                }}
-              >
-                Medium
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 last:rounded-b-lg"
-                onClick={() => {
-                  setPriorityFilter("Low");
-                  setShowPriorityDropdown(false);
-                }}
-              >
-                Low
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="relative">
-          <button
-            className="flex h-9 items-center gap-x-2 rounded-lg bg-white border border-slate-200 px-4 hover:border-blue-600/50 transition-colors"
-            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-          >
-            <p className="text-slate-700 text-sm font-medium">
-              {statusFilter || "Status"}
-            </p>
-            <span className="material-symbols-outlined text-slate-400 text-lg">
-              expand_more
-            </span>
-          </button>
-          {showStatusDropdown && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]">
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 first:rounded-t-lg"
-                onClick={() => {
-                  setStatusFilter("");
-                  setShowStatusDropdown(false);
-                }}
-              >
-                All Status
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50"
-                onClick={() => {
-                  setStatusFilter("To Do");
-                  setShowStatusDropdown(false);
-                }}
-              >
-                To Do
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50"
-                onClick={() => {
-                  setStatusFilter("In Progress");
-                  setShowStatusDropdown(false);
-                }}
-              >
-                In Progress
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 last:rounded-b-lg"
-                onClick={() => {
-                  setStatusFilter("Done");
-                  setShowStatusDropdown(false);
-                }}
-              >
-                Done
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="h-6 w-px bg-slate-200 mx-1"></div>
-        <button
-          className={`px-4 py-1.5 rounded-full text-xs font-bold ${
-            filter === "In Progress"
-              ? "bg-blue-600/10 text-blue-600"
-              : "bg-slate-100 text-slate-500"
-          }`}
-          onClick={() => setFilter("In Progress")}
-        >
-          In Progress
-        </button>
-        <button
-          className={`px-4 py-1.5 rounded-full text-xs font-bold ${
-            filter === "High Priority"
-              ? "bg-blue-600/10 text-blue-600"
-              : "bg-slate-100 text-slate-500"
-          }`}
-          onClick={() => setFilter("High Priority")}
-        >
-          High Priority
-        </button>
-        <button
-          className="text-blue-600 text-xs font-bold ml-auto hover:underline"
-          onClick={() => {
-            setFilter("");
-            setPriorityFilter("");
-            setStatusFilter("");
-          }}
-        >
-          Clear all filters
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {tasks.map((task) => {
-          const dateInfo = task.due_date ? formatDate(task.due_date) : null;
-          const isCompleted = task.status === "Done";
-
-          return (
-            <div
-              key={task.id}
-              className="group flex items-center gap-4 bg-white px-6 py-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => (window.location.href = `/task/${task.id}`)}
-            >
-              <div className="flex size-6 items-center justify-center">
-                <input
-                  className="h-5 w-5 rounded border-slate-300 bg-transparent text-blue-600 focus:ring-blue-600 focus:ring-offset-0 focus:outline-none cursor-pointer"
-                  type="checkbox"
-                  checked={isCompleted}
-                  onChange={(e) => handleTaskToggle(task.id, e.target.checked)}
-                />
-              </div>
-              <div className="flex-1 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <p
-                    className={`text-gray-900 text-base font-semibold leading-normal group-hover:text-blue-600 transition-colors ${
-                      isCompleted ? "line-through opacity-60" : ""
-                    }`}
-                  >
-                    {task.title}
-                  </p>
-                  <div className="flex items-center gap-4 mt-1">
-                    {dateInfo && (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <span
-                          className={`material-symbols-outlined text-sm ${
-                            dateInfo.isOverdue
-                              ? "text-red-500"
-                              : dateInfo.isToday
-                                ? "text-blue-600"
-                                : ""
-                          }`}
-                        >
-                          calendar_today
-                        </span>
-                        <span
-                          className={
-                            dateInfo.isOverdue
-                              ? "text-red-500 font-medium"
-                              : dateInfo.isToday
-                                ? "text-blue-600 font-medium"
-                                : ""
-                          }
-                        >
-                          {dateInfo.text}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <span className="material-symbols-outlined text-sm">
-                        chat_bubble
-                      </span>
-                      <span>0 comments</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  {task.assignee ? (
-                    <div className="size-8 rounded-full border-2 border-white bg-blue-600/20 flex items-center justify-center text-[10px] font-bold text-blue-600">
-                      {task.assignee.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </div>
-                  ) : (
-                    <div className="size-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                      ??
-                    </div>
-                  )}
-                  <div
-                    className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${getPriorityColor(task.priority)}`}
-                  >
-                    {task.priority}
-                  </div>
-                  <button className="p-1 text-slate-300 hover:text-slate-500 transition-colors">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {pagination && pagination.total > 0 && (
-        <div className="mt-8 flex items-center justify-between">
-          <p className="text-sm text-slate-600">
-            Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-            {Math.min(currentPage * itemsPerPage, pagination.total)} of{" "}
-            {pagination.total} tasks
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              className="px-3 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={!pagination.hasPrev}
-            >
-              Previous
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from(
-                { length: Math.min(5, pagination.totalPages) },
-                (_, i) => {
-                  const pageNum =
-                    currentPage <= 3 ? i + 1 : currentPage - 2 + i;
-                  if (pageNum > pagination.totalPages) return null;
-                  return (
-                    <button
-                      key={pageNum}
-                      className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                        pageNum === currentPage
-                          ? "bg-blue-600 text-white"
-                          : "text-slate-500 bg-white border border-slate-300 hover:bg-slate-50"
-                      }`}
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                },
-              )}
-            </div>
-            <button
-              className="px-3 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={!pagination.hasNext}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-8 flex justify-center">
-        <button
-          className="text-slate-500 text-sm font-semibold hover:text-blue-600 transition-colors flex items-center gap-2"
-          onClick={() => {
-            setFilter("");
-            setPriorityFilter("");
-            setStatusFilter("");
+        <TasksFiltersBar
+          filter={filter}
+          priorityFilter={priorityFilter}
+          statusFilter={statusFilter}
+          showPriorityDropdown={showPriorityDropdown}
+          showStatusDropdown={showStatusDropdown}
+          searchTerm={searchTerm}
+          onFilterChange={setFilter}
+          onPriorityFilterChange={(value) => {
+            setPriorityFilter(value);
+            setShowPriorityDropdown(false);
             setCurrentPage(1);
           }}
-        >
-          View all tasks
-          <span className="material-symbols-outlined">arrow_forward</span>
-        </button>
+          onStatusFilterChange={(value) => {
+            setStatusFilter(value);
+            setShowStatusDropdown(false);
+            setCurrentPage(1);
+          }}
+          onTogglePriorityDropdown={() =>
+            setShowPriorityDropdown(!showPriorityDropdown)
+          }
+          onToggleStatusDropdown={() => setShowStatusDropdown(!showStatusDropdown)}
+          onSearchChange={setSearchTerm}
+          onClearAll={() => {
+            setFilter("");
+            setPriorityFilter("");
+            setStatusFilter("");
+            setSearchTerm("");
+            setCurrentPage(1);
+          }}
+        />
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            className={`h-9 rounded-lg border px-3 text-sm font-semibold ${
+              showPinnedOnly
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "border-slate-300 bg-white text-slate-700"
+            }`}
+            onClick={() => setShowPinnedOnly((previous) => !previous)}
+          >
+            {showPinnedOnly ? "Showing Pinned Tasks" : "Show Pinned Tasks Only"}
+          </button>
+        </div>
+
+        <section className="mb-6 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-cyan-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">
+                  auto_awesome
+                </span>
+                AI Day Planner
+              </p>
+              <p className="text-xs text-cyan-900/80 mt-1">
+                Generate a focused execution plan from your current task list.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={buildDailyPlan}
+              disabled={planning || visibleTasks.length === 0}
+              className="h-9 px-4 rounded-lg bg-cyan-700 text-white text-sm font-semibold hover:bg-cyan-800 disabled:opacity-50"
+            >
+              {planning ? "Planning..." : "Generate Plan"}
+            </button>
+          </div>
+
+          {planError && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              {planError}
+            </p>
+          )}
+
+          {dayPlan && (
+            <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Today Plan ({dayPlan.planned_hours}h)
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {dayPlan.today_plan.slice(0, 4).map((task) => (
+                    <li key={task.title} className="text-sm text-slate-700">
+                      • {task.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  AI Tip
+                </p>
+                <p className="mt-2 text-sm text-slate-700">{dayPlan.tip}</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Backlog tasks: {dayPlan.backlog.length}
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <AiMonitoringPanel />
+
+        {visibleTasks.length > 0 ? (
+          <TasksList
+            tasks={visibleTasks}
+            onTaskToggle={handleTaskToggle}
+            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
+            pinnedTaskIds={pinnedTaskIds}
+            onTaskPinToggle={handleToggleTaskPin}
+          />
+        ) : (
+          <TasksEmptyState onCreateTask={() => setShowCreateModal(true)} />
+        )}
+
+        <TasksPagination
+          pagination={pagination}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+
+        <div className="mt-8 flex justify-center">
+          <button
+            className="text-slate-500 text-sm font-semibold hover:text-blue-600 transition-colors flex items-center gap-2"
+            onClick={() => {
+              setFilter("");
+              setPriorityFilter("");
+              setStatusFilter("");
+              setSearchTerm("");
+              setCurrentPage(1);
+            }}
+          >
+            View all tasks
+            <span className="material-symbols-outlined">arrow_forward</span>
+          </button>
+        </div>
       </div>
 
       <CreateTaskModal

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: task-tracker-ai
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python assistant_server.py
+    envVars:
+      - key: AI_ENV
+        value: production
+      - key: AI_ALLOWED_ORIGINS
+        value: https://task-tracker-frontend.onrender.com

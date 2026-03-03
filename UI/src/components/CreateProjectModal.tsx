@@ -35,6 +35,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
 
   // Fetch users when search term changes
   useEffect(() => {
@@ -79,12 +82,13 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       return;
     }
 
-    const projectData = {
+    const projectData: CreateProjectRequest = {
       name: formData.name,
       description: formData.description,
       status: formData.status,
       priority: formData.priority,
       memberIds: selectedMembers.map((m) => m.id),
+      invitees,
     };
 
     // Only add dates if they have values
@@ -135,6 +139,27 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const filteredMembers = availableUsers.filter(
     (member) => !selectedMembers.find((m) => m.id === member.id),
   );
+
+  const addInvitee = () => {
+    const full_name = inviteName.trim();
+    const email = inviteEmail.trim().toLowerCase();
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!full_name || !emailValid) return;
+
+    const existsInSelected = selectedMembers.some(
+      (member) => member.email.toLowerCase() === email,
+    );
+    const existsInInvitees = invitees.some((item) => item.email === email);
+    if (existsInSelected || existsInInvitees) return;
+
+    setInvitees((prev) => [...prev, { full_name, email }]);
+    setInviteName("");
+    setInviteEmail("");
+  };
+
+  const removeInvitee = (email: string) => {
+    setInvitees((prev) => prev.filter((item) => item.email !== email));
+  };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -237,7 +262,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 Project Category Color
               </h3>
               <div className="flex flex-wrap gap-4">
-                {projectColors.map((color, index) => (
+                {projectColors.map((color) => (
                   <label
                     key={color}
                     className={`size-8 rounded-full border cursor-pointer transition-all ${
@@ -354,6 +379,53 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[#0d151b] text-sm font-semibold leading-normal pb-1">
+                Invite New Member by Email
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto] gap-2">
+                <input
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  className="h-11 rounded-lg border border-[#cfdce7] bg-white px-3 text-sm"
+                  placeholder="Full name"
+                />
+                <input
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="h-11 rounded-lg border border-[#cfdce7] bg-white px-3 text-sm"
+                  placeholder="Email address"
+                />
+                <button
+                  type="button"
+                  onClick={addInvitee}
+                  className="h-11 px-4 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+                >
+                  Add Invite
+                </button>
+              </div>
+              {invitees.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {invitees.map((item) => (
+                    <div
+                      key={item.email}
+                      className="flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold"
+                    >
+                      <span>{item.full_name}</span>
+                      <span className="text-slate-500">{item.email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeInvitee(item.email)}
+                        className="material-symbols-outlined text-[14px]"
+                      >
+                        close
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </form>
         </div>

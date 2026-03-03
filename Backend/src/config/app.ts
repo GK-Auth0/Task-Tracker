@@ -3,28 +3,62 @@ import path from "path";
 
 dotenv.config({ path: path.join(__dirname, "../../config/env/.env") });
 
+const getEnv = (...keys: string[]) => {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const parseNumber = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parseBoolean = (value: string | undefined, fallback: boolean) => {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "0") return false;
+  return fallback;
+};
+
+const env = getEnv("NODE_ENV") || "development";
+const configuredOrigins = (getEnv("ALLOWED_ORIGINS") || "")
+  .split(",")
+  .map((item) => item.trim())
+  .filter(Boolean);
+
 export const appConfig = {
-  env: process.env.NODE_ENV || "development",
-  port: parseInt(process.env.PORT || "3000"),
+  env,
+  isProduction: env === "production",
+  port: parseNumber(getEnv("PORT"), 3000),
   database: {
-    host: process.env.DATABASE_HOST || "localhost",
-    port: parseInt(process.env.DATABASE_PORT || "5432"),
-    name: process.env.DATABASE_NAME || "task_tracker",
-    user: process.env.DATABASE_USER || "postgres",
-    password: process.env.DATABASE_PASSWORD || "password",
-    url:
-      process.env.DATABASE_URL ||
-      "postgresql://postgres:password@localhost:5432/task_tracker",
+    host:
+      (getEnv("DATABASE_HOST", "DB_HOST") || "localhost") === "localhost"
+        ? "127.0.0.1"
+        : (getEnv("DATABASE_HOST", "DB_HOST") as string),
+    port: parseNumber(getEnv("DATABASE_PORT", "DB_PORT"), 5432),
+    name: getEnv("DATABASE_NAME", "DB_NAME") || "task_tracker",
+    user: getEnv("DATABASE_USER", "DB_USER") || "postgres",
+    password: getEnv("DATABASE_PASSWORD", "DB_PASSWORD") || "password",
+    url: getEnv("DATABASE_URL"),
+    ssl: parseBoolean(getEnv("DATABASE_SSL"), env === "production"),
   },
   jwt: {
-    secret: process.env.JWT_SECRET || "your-super-secret-jwt-key",
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    secret: getEnv("JWT_SECRET") || "",
+    expiresIn: getEnv("JWT_EXPIRES_IN") || "7d",
   },
   cors: {
-    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",").map(origin => origin.trim()) || [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://task-tracker-2im2zy279-giridharans-projects.vercel.app",
-    ],
+    allowedOrigins:
+      configuredOrigins.length > 0
+        ? configuredOrigins
+        : ["http://localhost:3000", "http://localhost:3001"],
+  },
+  security: {
+    trustProxy: getEnv("TRUST_PROXY") || "loopback",
   },
 };

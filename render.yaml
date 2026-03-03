@@ -14,26 +14,44 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
-      - key: DB_HOST
+      - key: DATABASE_HOST
         fromDatabase:
           name: task-tracker-db
           property: host
-      - key: DB_PORT
+      - key: DATABASE_PORT
         fromDatabase:
           name: task-tracker-db
           property: port
-      - key: DB_NAME
+      - key: DATABASE_NAME
         fromDatabase:
           name: task-tracker-db
           property: database
-      - key: DB_USER
+      - key: DATABASE_USER
         fromDatabase:
           name: task-tracker-db
           property: user
-      - key: DB_PASSWORD
+      - key: DATABASE_PASSWORD
         fromDatabase:
           name: task-tracker-db
           property: password
+      - key: DATABASE_SSL
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: ALLOWED_ORIGINS
+        value: https://task-tracker-frontend.onrender.com
+
+  # AI Assistant Service
+  - type: web
+    name: task-tracker-ai
+    env: python
+    buildCommand: cd AI && pip install -r requirements.txt
+    startCommand: cd AI && python assistant_server.py
+    envVars:
+      - key: AI_ENV
+        value: production
+      - key: AI_ALLOWED_ORIGINS
+        value: https://task-tracker-frontend.onrender.com
 
   # Frontend Service
   - type: web
@@ -44,6 +62,8 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://task-tracker-api.onrender.com
+      - key: VITE_AI_ASSISTANT_URL
+        value: https://task-tracker-ai.onrender.com
 
 databases:
   - name: task-tracker-db
