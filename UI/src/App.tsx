@@ -22,6 +22,7 @@ import TaskDetails from "./components/TaskDetails";
 import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
 import Layout from "./components/Layout";
+import AiMonitoring from "./pages/AiMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ function AppRoutes() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="activity" element={<ActivityLog />} />
         <Route path="chat" element={<Chat />} />
+        <Route path="ai-monitoring" element={<AiMonitoring />} />
         <Route path="profile" element={<Profile />} />
         <Route path="coming-soon" element={<ComingSoon />} />
         <Route path="team" element={<TeamManagement />} />

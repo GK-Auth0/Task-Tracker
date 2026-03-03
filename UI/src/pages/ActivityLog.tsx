@@ -60,12 +60,19 @@ const DEFAULT_FILTERS: FiltersState = {
 
 const PAGE_SIZE = 30;
 
+function asValidDate(input?: string | Date | null): Date | null {
+  if (!input) return null;
+  const date = input instanceof Date ? input : new Date(input);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 const ActivityLog: React.FC = () => {
   const [logs, setLogs] = useState<AuditActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   useEffect(() => {
     fetchActivities();
@@ -88,8 +95,12 @@ const ActivityLog: React.FC = () => {
       } else {
         setLogs([]);
       }
-    } catch {
-      setError("Failed to load activity logs. Please try again.");
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load activity logs. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -117,8 +128,8 @@ const ActivityLog: React.FC = () => {
     const searchTerm = filters.search.trim().toLowerCase();
 
     const result = activityItems.filter((item) => {
-      const createdAt = new Date(item.createdAt);
-      if (Number.isNaN(createdAt.getTime())) return false;
+      const createdAt = asValidDate(item.createdAt);
+      if (!createdAt) return false;
 
       if (filters.teamMember !== "all" && item.user.name !== filters.teamMember) {
         return false;
@@ -167,7 +178,9 @@ const ActivityLog: React.FC = () => {
     });
 
     const sorted = [...result].sort((a, b) => {
-      const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const diff =
+        (asValidDate(b.createdAt)?.getTime() || 0) -
+        (asValidDate(a.createdAt)?.getTime() || 0);
       return filters.sortBy === "newest" ? diff : -diff;
     });
 
@@ -196,7 +209,7 @@ const ActivityLog: React.FC = () => {
 
     return visibleActivities.reduce(
       (acc, activity) => {
-        const day = new Date(activity.createdAt).toDateString();
+        const day = (asValidDate(activity.createdAt) || new Date(0)).toDateString();
         if (day === today) {
           acc.today.push(activity);
         } else if (day === yesterday) {
@@ -221,6 +234,17 @@ const ActivityLog: React.FC = () => {
           <div className="mb-8">
             <h2 className="text-3xl font-black tracking-tight mb-2">Activity Log</h2>
             <p className="text-slate-500">Live timeline of project and task events from your workspace.</p>
+          </div>
+
+          <div className="mb-4 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <span className="material-symbols-outlined text-base">tune</span>
+              Filters
+            </button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -311,114 +335,45 @@ const ActivityLog: React.FC = () => {
         </div>
       </div>
 
-      <aside className="w-80 border-l border-slate-200 bg-slate-50 flex flex-col p-6 overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h4 className="font-bold text-sm uppercase tracking-wider text-slate-500">Filters</h4>
+      <ActivityFiltersPanel
+        className="hidden w-80 border-l border-slate-200 bg-slate-50 lg:flex"
+        filters={filters}
+        teamMembers={teamMembers}
+        onFilterChange={handleFilterChange}
+        onReset={() => setFilters(DEFAULT_FILTERS)}
+      />
+
+      {showMobileFilters && (
+        <div className="fixed inset-0 z-40 lg:hidden">
           <button
-            onClick={() => setFilters(DEFAULT_FILTERS)}
-            className="text-xs font-semibold text-blue-600 hover:underline"
-          >
-            Reset
-          </button>
+            type="button"
+            onClick={() => setShowMobileFilters(false)}
+            className="absolute inset-0 bg-slate-900/35"
+            aria-label="Close filters"
+          />
+          <ActivityFiltersPanel
+            className="absolute right-0 top-0 h-full w-[min(22rem,90vw)] border-l border-slate-200 bg-slate-50 shadow-2xl"
+            filters={filters}
+            teamMembers={teamMembers}
+            onFilterChange={handleFilterChange}
+            onReset={() => setFilters(DEFAULT_FILTERS)}
+            onClose={() => setShowMobileFilters(false)}
+          />
         </div>
-
-        <div className="mb-8">
-          <p className="text-xs font-bold text-slate-400 mb-4 uppercase">Event Type</p>
-          <div className="space-y-3">
-            <CheckboxRow
-              label="Comments"
-              checked={filters.comments}
-              onChange={(value) => handleFilterChange("comments", value)}
-            />
-            <CheckboxRow
-              label="Status Changes"
-              checked={filters.statusChanges}
-              onChange={(value) => handleFilterChange("statusChanges", value)}
-            />
-            <CheckboxRow
-              label="Assignments"
-              checked={filters.assignments}
-              onChange={(value) => handleFilterChange("assignments", value)}
-            />
-            <CheckboxRow
-              label="Priority Changes"
-              checked={filters.priorityChanges}
-              onChange={(value) => handleFilterChange("priorityChanges", value)}
-            />
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <p className="text-xs font-bold text-slate-400 mb-4 uppercase">Scope</p>
-          <div className="space-y-3">
-            <CheckboxRow
-              label="Task Events"
-              checked={filters.taskEvents}
-              onChange={(value) => handleFilterChange("taskEvents", value)}
-            />
-            <CheckboxRow
-              label="Project Events"
-              checked={filters.projectEvents}
-              onChange={(value) => handleFilterChange("projectEvents", value)}
-            />
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <p className="text-xs font-bold text-slate-400 mb-4 uppercase">Team Member</p>
-          <div className="space-y-3">
-            <RadioRow
-              label="All Members"
-              value="all"
-              selected={filters.teamMember}
-              onChange={(value) => handleFilterChange("teamMember", value)}
-            />
-            {teamMembers.map((member) => (
-              <RadioRow
-                key={member}
-                label={member}
-                value={member}
-                selected={filters.teamMember}
-                onChange={(value) => handleFilterChange("teamMember", value)}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-bold text-slate-400 mb-4 uppercase">Date Period</p>
-          <select
-            value={filters.dateRange}
-            onChange={(e) =>
-              handleFilterChange(
-                "dateRange",
-                e.target.value as FiltersState["dateRange"],
-              )
-            }
-            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-blue-600 focus:border-blue-600"
-          >
-            <option value="last7days">Last 7 days</option>
-            <option value="last30days">Last 30 days</option>
-            <option value="thismonth">This month</option>
-            <option value="all">All time</option>
-          </select>
-        </div>
-      </aside>
+      )}
     </div>
   );
 };
 
 function getLogDate(log: AuditActivityLog): Date {
-  const iso = log.created_at || new Date().toISOString();
-  return new Date(iso);
+  return asValidDate(log.created_at) || new Date();
 }
 
 function isCommentLike(log: AuditActivityLog): boolean {
   return !!(
     log.changes?.comment ||
     log.new_values?.comment ||
-    log.old_values?.comment ||
-    log.changes?.description
+    log.old_values?.comment
   );
 }
 
@@ -438,8 +393,20 @@ function formatAction(log: AuditActivityLog): ActivityItem {
   const entityType = log.entity_type;
 
   const labelPrefix = entityType === "task" ? "Task" : "Project";
-  const target = `${labelPrefix} #${log.entity_id.slice(-4)}`;
-  const targetUrl = entityType === "project" ? `/projects/${log.entity_id}` : `/task/${log.entity_id}`;
+  const rawEntityId = String(log.entity_id || "");
+  const fallbackLabel = rawEntityId ? `#${rawEntityId.slice(-4)}` : "record";
+  const entityLabel =
+    (log.new_values?.title as string | undefined) ||
+    (log.old_values?.title as string | undefined) ||
+    (log.new_values?.name as string | undefined) ||
+    (log.old_values?.name as string | undefined) ||
+    fallbackLabel;
+  const target = `${labelPrefix} ${entityLabel}`;
+  const targetUrl = rawEntityId
+    ? entityType === "project"
+      ? `/projects/${rawEntityId}`
+      : `/task/${rawEntityId}`
+    : undefined;
 
   const statusFrom =
     (log.changes?.status?.from as string | undefined) ||
@@ -534,15 +501,20 @@ function formatAction(log: AuditActivityLog): ActivityItem {
     id: log.id,
     type: "update",
     user: { name: userName, initials: getInitials(userName) },
-    action: log.action === "created" ? "created" : "updated",
+    action:
+      log.action === "created"
+        ? "created"
+        : log.action === "deleted"
+          ? "deleted"
+          : "updated",
     target,
     targetUrl,
     timestamp,
     createdAt,
     entityType,
     badge: {
-      type: log.action === "created" ? "success" : "info",
-      icon: log.action === "created" ? "add_circle" : "edit",
+      type: log.action === "created" ? "success" : log.action === "deleted" ? "warning" : "info",
+      icon: log.action === "created" ? "add_circle" : log.action === "deleted" ? "delete" : "edit",
     },
   };
 }
@@ -666,6 +638,130 @@ function RadioRow({
         className="border-slate-300 text-blue-600 focus:ring-blue-600 h-3 w-3"
       />
     </label>
+  );
+}
+
+function ActivityFiltersPanel({
+  className,
+  filters,
+  teamMembers,
+  onFilterChange,
+  onReset,
+  onClose,
+}: {
+  className?: string;
+  filters: FiltersState;
+  teamMembers: string[];
+  onFilterChange: <K extends keyof FiltersState>(key: K, value: FiltersState[K]) => void;
+  onReset: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <aside className={`flex flex-col overflow-y-auto p-6 ${className || ""}`}>
+      <div className="mb-6 flex items-center justify-between">
+        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">Filters</h4>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onReset}
+            className="text-xs font-semibold text-blue-600 hover:underline"
+          >
+            Reset
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-200"
+              aria-label="Close filters panel"
+            >
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <p className="mb-4 text-xs font-bold uppercase text-slate-400">Event Type</p>
+        <div className="space-y-3">
+          <CheckboxRow
+            label="Comments"
+            checked={filters.comments}
+            onChange={(value) => onFilterChange("comments", value)}
+          />
+          <CheckboxRow
+            label="Status Changes"
+            checked={filters.statusChanges}
+            onChange={(value) => onFilterChange("statusChanges", value)}
+          />
+          <CheckboxRow
+            label="Assignments"
+            checked={filters.assignments}
+            onChange={(value) => onFilterChange("assignments", value)}
+          />
+          <CheckboxRow
+            label="Priority Changes"
+            checked={filters.priorityChanges}
+            onChange={(value) => onFilterChange("priorityChanges", value)}
+          />
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <p className="mb-4 text-xs font-bold uppercase text-slate-400">Scope</p>
+        <div className="space-y-3">
+          <CheckboxRow
+            label="Task Events"
+            checked={filters.taskEvents}
+            onChange={(value) => onFilterChange("taskEvents", value)}
+          />
+          <CheckboxRow
+            label="Project Events"
+            checked={filters.projectEvents}
+            onChange={(value) => onFilterChange("projectEvents", value)}
+          />
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <p className="mb-4 text-xs font-bold uppercase text-slate-400">Team Member</p>
+        <div className="space-y-3">
+          <RadioRow
+            label="All Members"
+            value="all"
+            selected={filters.teamMember}
+            onChange={(value) => onFilterChange("teamMember", value)}
+          />
+          {teamMembers.map((member) => (
+            <RadioRow
+              key={member}
+              label={member}
+              value={member}
+              selected={filters.teamMember}
+              onChange={(value) => onFilterChange("teamMember", value)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-4 text-xs font-bold uppercase text-slate-400">Date Period</p>
+        <select
+          value={filters.dateRange}
+          onChange={(e) =>
+            onFilterChange(
+              "dateRange",
+              e.target.value as FiltersState["dateRange"],
+            )
+          }
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:ring-blue-600"
+        >
+          <option value="last7days">Last 7 days</option>
+          <option value="last30days">Last 30 days</option>
+          <option value="thismonth">This month</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+    </aside>
   );
 }
 

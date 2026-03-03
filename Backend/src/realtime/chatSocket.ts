@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { Duplex } from "stream";
 import { URL } from "url";
 import ChatGroupMember from "../models/chatGroupMember";
+import { appConfig } from "../config";
 
 type WebSocketClient = {
   socket: net.Socket;
@@ -13,7 +14,7 @@ type WebSocketClient = {
 };
 
 const clients = new Set<WebSocketClient>();
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
+const JWT_SECRET = appConfig.jwt.secret;
 
 const parseFrame = (buffer: Buffer): { payload: string; bytesUsed: number } | null => {
   if (buffer.length < 2) return null;

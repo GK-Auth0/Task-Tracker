@@ -2,6 +2,10 @@ export interface TaskFilters {
   status?: string;
   priority?: string;
   project_id?: string;
+  due_from?: Date;
+  due_to?: Date;
+  created_from?: Date;
+  created_to?: Date;
 }
 
 export interface CreateTaskDto {

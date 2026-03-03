@@ -3,7 +3,10 @@ import type { GeolocationData, IPInfoResponse } from '../types/geolocation';
 
 export const getIPGeolocation = async (ip: string): Promise<GeolocationData> => {
   try {
-    const token = process.env.IPINFO_TOKEN || '2fcbfaa89132ad';
+    const token = process.env.IPINFO_TOKEN;
+    if (!token) {
+      return { ip_address: ip };
+    }
     const response = await axios.get<IPInfoResponse>(
       `https://ipinfo.io/${ip}?token=${token}`,
       { timeout: 5000 }

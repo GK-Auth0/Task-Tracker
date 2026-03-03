@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usersAPI } from "../services/dashboard";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,6 +23,7 @@ export default function TeamManagement() {
   const navigate = useNavigate();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
     pageSize: 10,
@@ -36,6 +37,7 @@ export default function TeamManagement() {
   const fetchMembers = async () => {
     try {
       setLoading(true);
+      setError("");
       const response = await usersAPI.getUsers({
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
@@ -46,10 +48,20 @@ export default function TeamManagement() {
       }
     } catch (error) {
       console.error("Failed to fetch team members:", error);
+      setError("Unable to load team members right now.");
     } finally {
       setLoading(false);
     }
   };
+
+  const roleCounts = useMemo(
+    () => ({
+      admins: members.filter((m) => m.role === "Admin").length,
+      members: members.filter((m) => m.role === "Member").length,
+      viewers: members.filter((m) => m.role === "Viewer").length,
+    }),
+    [members],
+  );
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -85,6 +97,8 @@ export default function TeamManagement() {
       // Fetch all users for export
       const response = await usersAPI.getUsers({ limit: 1000 });
       if (response.success) {
+        if (!response.data.length) return;
+
         const csvData = response.data.map((member) => ({
           Name: member.full_name,
           Email: member.email,
@@ -92,9 +106,14 @@ export default function TeamManagement() {
           Status: "Active",
         }));
 
+        const headers = Object.keys(csvData[0]);
+        const escapeCell = (value: string) =>
+          `"${String(value).replace(/"/g, '""')}"`;
         const csvContent = [
-          Object.keys(csvData[0]).join(","),
-          ...csvData.map((row) => Object.values(row).join(",")),
+          headers.join(","),
+          ...csvData.map((row) =>
+            headers.map((key) => escapeCell((row as any)[key])).join(","),
+          ),
         ].join("\n");
 
         const blob = new Blob([csvContent], { type: "text/csv" });
@@ -221,12 +240,12 @@ export default function TeamManagement() {
   ];
 
   return (
-    <div className="w-full h-full bg-gray-50 p-8 overflow-y-auto">
-      <div className="w-full max-w-[1200px] mx-auto flex flex-col gap-8">
+    <div className="h-full w-full overflow-y-auto bg-gray-50">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-4 pb-24 sm:gap-8 sm:p-6 sm:pb-24 lg:p-8 lg:pb-10">
         {/* Page Heading */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-2">
-            <nav className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-widest">
+            <nav className="hidden items-center gap-2 text-xs font-medium uppercase tracking-widest text-slate-500 sm:flex">
               <button
                 onClick={() => navigate("/coming-soon")}
                 className="hover:text-blue-600 transition-colors"
@@ -238,17 +257,17 @@ export default function TeamManagement() {
               </span>
               <span className="text-blue-600">Team Management</span>
             </nav>
-            <h1 className="text-slate-900 text-4xl font-black leading-tight tracking-tight">
+            <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl">
               Team Management
             </h1>
-            <p className="text-slate-500 text-base max-w-xl">
+            <p className="max-w-xl text-sm text-slate-500 sm:text-base">
               Control access, assign roles, and manage invitations for your
               entire workspace from one centralized dashboard.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-900 hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-900 transition-colors hover:bg-slate-50"
               onClick={exportToCSV}
             >
               <span className="material-symbols-outlined text-lg">
@@ -257,7 +276,7 @@ export default function TeamManagement() {
               Export CSV
             </button>
             <button
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700"
               onClick={() => navigate("/coming-soon")}
             >
               <span className="material-symbols-outlined text-lg">
@@ -267,6 +286,21 @@ export default function TeamManagement() {
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="flex items-center justify-between gap-2">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={fetchMembers}
+                className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -297,7 +331,7 @@ export default function TeamManagement() {
               </span>
             </div>
             <p className="text-slate-900 text-3xl font-bold">
-              {members.filter((m) => m.role === "Admin").length}
+              {roleCounts.admins}
             </p>
             <p className="text-slate-500 text-xs font-medium">Full access</p>
           </div>
@@ -311,7 +345,7 @@ export default function TeamManagement() {
               </span>
             </div>
             <p className="text-slate-900 text-3xl font-bold">
-              {members.filter((m) => m.role === "Member").length}
+              {roleCounts.members}
             </p>
             <p className="text-slate-500 text-xs font-medium">
               Standard access
@@ -327,7 +361,7 @@ export default function TeamManagement() {
               </span>
             </div>
             <p className="text-slate-900 text-3xl font-bold">
-              {members.filter((m) => m.role === "Viewer").length}
+              {roleCounts.viewers}
             </p>
             <p className="text-slate-500 text-xs font-medium">
               Read-only access
@@ -336,7 +370,7 @@ export default function TeamManagement() {
         </div>
 
         {/* Members DataGrid */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
           <DataGrid
             rows={members}
             columns={columns}
@@ -349,6 +383,7 @@ export default function TeamManagement() {
             disableRowSelectionOnClick
             sx={{
               border: 0,
+              minHeight: 420,
               "& .MuiDataGrid-columnHeaders": {
                 backgroundColor: "rgb(248, 250, 252)",
                 color: "rgb(15, 23, 42)",
@@ -382,6 +417,57 @@ export default function TeamManagement() {
               },
             }}
           />
+        </div>
+
+        <div className="space-y-3 md:hidden">
+          {loading ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+              Loading team members...
+            </div>
+          ) : members.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+              No team members found.
+            </div>
+          ) : (
+            members.map((member) => (
+              <div
+                key={member.id}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    src={member.avatar_url}
+                    alt={member.full_name}
+                    sx={{
+                      bgcolor: "rgba(37, 99, 235, 0.1)",
+                      color: "rgb(37, 99, 235)",
+                      fontWeight: 700,
+                      width: 40,
+                      height: 40,
+                    }}
+                  >
+                    {getInitials(member.full_name)}
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-slate-900">
+                      {member.full_name}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">{member.email}</p>
+                  </div>
+                  <Chip
+                    label={member.role}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      fontWeight: 700,
+                      borderWidth: 1,
+                      ...getRoleColor(member.role),
+                    }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

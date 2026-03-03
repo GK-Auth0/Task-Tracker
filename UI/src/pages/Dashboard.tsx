@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { dashboardAPI, tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
 import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
@@ -13,6 +14,7 @@ import SavedViewsBar from "../components/preferences/SavedViewsBar";
 import { DashboardSummary, TaskItem, TasksPagination as TasksPageData } from "../components/tasks/types";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -336,9 +338,7 @@ export default function Dashboard() {
           <TasksList
             tasks={visibleTasks}
             onTaskToggle={handleTaskToggle}
-            onTaskClick={(taskId) => {
-              window.location.href = `/task/${taskId}`;
-            }}
+            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
             pinnedTaskIds={pinnedTaskIds}
             onTaskPinToggle={handleToggleTaskPin}
           />

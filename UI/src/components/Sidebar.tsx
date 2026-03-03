@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: "/calendar", title: "Calendar", icon: "calendar_month" },
   { path: "/activity", title: "Activity Log", icon: "list_alt" },
   { path: "/chat", title: "Chat", icon: "chat_bubble" },
+  { path: "/ai-monitoring", title: "AI Monitoring", icon: "monitoring" },
   { path: "/team", title: "Team", icon: "group" },
   { path: "/coming-soon", title: "Settings", icon: "settings" },
 ];

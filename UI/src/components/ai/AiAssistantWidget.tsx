@@ -79,6 +79,9 @@ export default function AiAssistantWidget() {
     if (pathname.startsWith("/chat")) {
       return "Give top 3 collaboration tips based on my current workload context.";
     }
+    if (pathname.startsWith("/ai-monitoring")) {
+      return "Give top 3 operational AI insights and one recommendation to improve delivery confidence this week.";
+    }
     return "Give top 3 useful project-management insights from my current data.";
   };
 

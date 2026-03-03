@@ -31,8 +31,13 @@ Default URL: `http://127.0.0.1:8787`
 
 Optional env vars:
 
-- `AI_ASSISTANT_HOST` (default `127.0.0.1`)
-- `AI_ASSISTANT_PORT` (default `8787`)
+- `AI_ASSISTANT_HOST` (default `127.0.0.1` in dev, `0.0.0.0` in production)
+- `AI_ASSISTANT_PORT` (fallback when `PORT` is not set)
+- `PORT` (Render sets this automatically)
+- `AI_ENV` / `NODE_ENV` (`production` for deployed environments)
+- `AI_MAX_BODY_BYTES` (default `1048576`)
+- `AI_ALLOWED_ORIGINS` (comma-separated origins, use `*` for open CORS)
+- `AI_API_KEY` (optional; if set, POST endpoints require `X-API-Key`)
 
 ## Endpoints
 
@@ -40,6 +45,12 @@ Optional env vars:
 
 ```bash
 curl http://127.0.0.1:8787/health
+```
+
+### 1a) Readiness check
+
+```bash
+curl http://127.0.0.1:8787/ready
 ```
 
 ### 1b) Metrics
@@ -144,3 +155,23 @@ curl -X POST http://127.0.0.1:8787/chat-context \
 - You can connect UI/Backend to this service later via HTTP calls.
 - Existing endpoints are preserved, so current behavior is not broken.
 - `/metrics` uses in-memory counters and resets when the AI service restarts.
+
+## Render deployment
+
+1. Create a Python web service for `AI/`.
+2. Build command:
+
+```bash
+cd AI && pip install -r requirements.txt
+```
+
+3. Start command:
+
+```bash
+cd AI && python assistant_server.py
+```
+
+4. Set env vars:
+- `AI_ENV=production`
+- `AI_ALLOWED_ORIGINS=https://your-frontend-domain`
+- `AI_API_KEY=<optional shared secret>`

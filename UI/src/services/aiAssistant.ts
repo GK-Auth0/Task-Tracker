@@ -1,7 +1,5 @@
 import axios from "axios";
-
-const AI_BASE_URL =
-  import.meta.env.VITE_AI_ASSISTANT_URL || "http://127.0.0.1:8787";
+import { AI_BASE_URL } from "../config/api";
 
 const aiApi = axios.create({
   baseURL: AI_BASE_URL,

@@ -4,7 +4,27 @@ const AUTH0_REDIRECT_PATH = "/auth/callback";
 
 type Auth0ScreenHint = "signup" | "login";
 
+const isTruthy = (value?: string) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+};
+
+const AUTH0_HIDDEN = isTruthy(import.meta.env.VITE_HIDE_AUTH0);
+
+const hasAuth0Config = () => {
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN as string | undefined;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID as string | undefined;
+  const audience = import.meta.env.VITE_AUTH0_AUDIENCE as string | undefined;
+  return !!(domain && clientId && audience);
+};
+
+export const isAuth0Visible = () => !AUTH0_HIDDEN && hasAuth0Config();
+
 const getAuth0Config = () => {
+  if (AUTH0_HIDDEN) {
+    throw new Error("Auth0 is disabled by configuration.");
+  }
+
   const domain = import.meta.env.VITE_AUTH0_DOMAIN as string | undefined;
   const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID as string | undefined;
   const audience = import.meta.env.VITE_AUTH0_AUDIENCE as string | undefined;
@@ -72,6 +92,10 @@ export const startAuth0Login = async (screenHint: Auth0ScreenHint = "login") => 
 };
 
 export const exchangeAuth0CodeForAccessToken = async () => {
+  if (AUTH0_HIDDEN) {
+    throw new Error("Auth0 is disabled by configuration.");
+  }
+
   const { domain, clientId, audience, redirectUri } = getAuth0Config();
   const url = new URL(window.location.href);
   const code = url.searchParams.get("code");

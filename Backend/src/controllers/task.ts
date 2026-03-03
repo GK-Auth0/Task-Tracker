@@ -11,6 +11,7 @@ import {
 } from "../services/task";
 import { createAuditLog, getAuditLogs } from "../services/auditService";
 import { processInvites } from "../services/invitation";
+import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -28,10 +29,14 @@ export const getTasks = async (req: Request, res: Response) => {
       status: req.query.status as string,
       priority: req.query.priority as string,
       project_id: req.query.project_id as string,
+      due_from: parseIsoDate(req.query.due_from),
+      due_to: parseIsoDate(req.query.due_to),
+      created_from: parseIsoDate(req.query.created_from),
+      created_to: parseIsoDate(req.query.created_to),
     };
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 5;
+    const page = parseBoundedInt(req.query.page, 1, 1, 100000);
+    const limit = parseBoundedInt(req.query.limit, 5, 1, 100);
 
     const result = await getAllTasks(userId, filters, page, limit);
     return res.status(200).json({
@@ -351,7 +356,7 @@ export const getTaskActivityLogs = async (req: Request, res: Response) => {
     // Ensure requester has access to this task before exposing activity.
     await getTaskById(taskId, userId);
 
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseBoundedInt(req.query.limit, 50, 1, 200);
     const logs = await getAuditLogs("task", taskId, limit);
 
     return res.status(200).json({

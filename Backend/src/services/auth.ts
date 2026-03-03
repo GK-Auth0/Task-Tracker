@@ -8,8 +8,8 @@ import type { LoginDto, RegisterDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
 import { sendOtpEmail, sendPasswordResetEmail } from "./email";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const JWT_SECRET = appConfig.jwt.secret;
+const JWT_EXPIRES_IN = appConfig.jwt.expiresIn || "7d";
 const OTP_EXPIRES_MINUTES = parseInt(process.env.OTP_EXPIRES_MINUTES || "10", 10);
 const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || "5", 10);
 const OTP_HASH_SECRET = process.env.OTP_HASH_SECRET || JWT_SECRET;

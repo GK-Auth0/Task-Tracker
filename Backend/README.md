@@ -62,6 +62,10 @@ yarn dev
 
 The API will be available at `http://localhost:3000`
 
+Health endpoints:
+- `GET /health` - liveness
+- `GET /ready` - readiness (checks database connectivity)
+
 ## Available Scripts
 
 - `yarn dev` - Start development server with hot reload
@@ -221,7 +225,7 @@ docker-compose up migrator
 yarn build
 ```
 
-2. Set production environment variables
+2. Set production environment variables (start from `config/env/.env.example`)
 3. Run database migrations
 4. Start the server:
 

@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { appConfig } from "../config";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
+const JWT_SECRET = appConfig.jwt.secret;
 
 export const authenticateToken = (
   req: Request,

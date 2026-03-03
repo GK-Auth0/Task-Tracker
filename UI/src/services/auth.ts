@@ -19,6 +19,30 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+      const isAuthRoute =
+        currentPath.startsWith("/login") ||
+        currentPath.startsWith("/register") ||
+        currentPath.startsWith("/forgot-password") ||
+        currentPath.startsWith("/reset-password") ||
+        currentPath.startsWith("/auth/callback");
+
+      if (!isAuthRoute) {
+        localStorage.removeItem("token");
+        if (typeof window !== "undefined") {
+          window.location.assign("/login");
+        }
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
 export interface LoginData {
   email: string;
   password: string;

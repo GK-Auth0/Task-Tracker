@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import AuthNavbar from "../components/AuthNavbar";
-import { startAuth0Login } from "../config/auth0";
+import { isAuth0Visible, startAuth0Login } from "../config/auth0";
 import AuthShowcase from "../components/auth/AuthShowcase";
 import AuthBackground from "../components/auth/AuthBackground";
 
@@ -16,6 +16,7 @@ export default function Login() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const showAuth0 = isAuth0Visible();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,22 +147,26 @@ export default function Login() {
                 </button>
           </form>
 
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200"></div>
-            <span className="text-xs text-slate-400 font-semibold uppercase">
-              or
-            </span>
-            <div className="h-px flex-1 bg-slate-200"></div>
-          </div>
+          {showAuth0 && (
+            <>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200"></div>
+                <span className="text-xs text-slate-400 font-semibold uppercase">
+                  or
+                </span>
+                <div className="h-px flex-1 bg-slate-200"></div>
+              </div>
 
-          <button
-            type="button"
-            onClick={handleAuth0Signin}
-            disabled={loading || auth0Loading}
-            className="w-full h-12 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
-          >
-            {auth0Loading ? "Redirecting..." : "Continue with Auth0"}
-          </button>
+              <button
+                type="button"
+                onClick={handleAuth0Signin}
+                disabled={loading || auth0Loading}
+                className="w-full h-12 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+              >
+                {auth0Loading ? "Redirecting..." : "Continue with Auth0"}
+              </button>
+            </>
+          )}
 
           {/* Footer Link */}
           <div className="mt-8 text-center">

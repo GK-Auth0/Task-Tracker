@@ -12,6 +12,7 @@ import {
 import ChatGroupMember from "../models/chatGroupMember";
 import { broadcastChatMessage } from "../realtime/chatSocket";
 import cloudinary from "../config/cloudinary";
+import { parseBoundedInt } from "../helpers/query";
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -92,7 +93,7 @@ export const getMessages = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const { groupId } = req.params;
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseBoundedInt(req.query.limit, 50, 1, 100);
     const before =
       typeof req.query.before === "string" ? req.query.before : undefined;
 
@@ -139,7 +140,7 @@ export const searchUsers = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const query = String(req.query.q || "");
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = parseBoundedInt(req.query.limit, 20, 1, 50);
 
     if (!userId) {
       return res.status(401).json({
@@ -295,6 +296,17 @@ export const uploadAttachment = async (req: Request, res: Response) => {
       return res.status(403).json({
         success: false,
         message: "Access denied to this chat group",
+      });
+    }
+
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
+      return res.status(503).json({
+        success: false,
+        message: "Attachment service is not configured",
       });
     }
 

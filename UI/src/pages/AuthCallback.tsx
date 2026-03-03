@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { exchangeAuth0CodeForAccessToken } from "../config/auth0";
+import { exchangeAuth0CodeForAccessToken, isAuth0Visible } from "../config/auth0";
 
 export default function AuthCallback() {
   const { loginWithAuth0 } = useAuth();
@@ -12,6 +12,9 @@ export default function AuthCallback() {
   useEffect(() => {
     const completeLogin = async () => {
       try {
+        if (!isAuth0Visible()) {
+          throw new Error("Auth0 sign-in is disabled.");
+        }
         const { accessToken } = await exchangeAuth0CodeForAccessToken();
         await loginWithAuth0(accessToken);
         navigate("/dashboard", { replace: true });

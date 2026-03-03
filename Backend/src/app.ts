@@ -7,18 +7,29 @@ import { errorHandler404 } from "./middleware/errorHandler404";
 import { errorHandler } from "./middleware/errorHandler";
 import { responseHandler } from "./middleware/responseHandler";
 import { setupSwagger } from "./swagger";
+import { globalRateLimiter } from "./middleware/rateLimit";
+import { requestTimeoutGuard } from "./middleware/requestGuard";
+import { database, appConfig } from "./config";
 
 const app = express();
 
 // Global middlewares
 app.use(cors(corsOptionsDelegate));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(responseHandler as express.RequestHandler);
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    hsts: appConfig.isProduction,
+  }),
+);
+app.use(requestTimeoutGuard);
+app.use(globalRateLimiter);
 
 // Trust proxy for accurate IP addresses
-app.set('trust proxy', true);
+app.set("trust proxy", appConfig.security.trustProxy as any);
 
 // Swagger documentation
 setupSwagger(app);
@@ -43,6 +54,15 @@ setupSwagger(app);
  */
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok" });
+});
+
+app.get("/ready", async (_req: Request, res: Response) => {
+  try {
+    await database.query("SELECT 1");
+    return res.status(200).json({ status: "ready" });
+  } catch (error) {
+    return res.status(503).json({ status: "not_ready" });
+  }
 });
 
 // Main router

@@ -27,6 +27,20 @@ export async function getAllTasks(
     whereClause[Op.or] = [{ creator_id: userId }, { assignee_id: userId }];
   }
 
+  if (filters.due_from || filters.due_to) {
+    whereClause.due_date = {
+      ...(filters.due_from ? { [Op.gte]: filters.due_from } : {}),
+      ...(filters.due_to ? { [Op.lte]: filters.due_to } : {}),
+    };
+  }
+
+  if (filters.created_from || filters.created_to) {
+    whereClause.created_at = {
+      ...(filters.created_from ? { [Op.gte]: filters.created_from } : {}),
+      ...(filters.created_to ? { [Op.lte]: filters.created_to } : {}),
+    };
+  }
+
   const offset = (page - 1) * limit;
 
   const { count, rows } = await Task.findAndCountAll({

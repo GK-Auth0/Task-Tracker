@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auditLogsAPI, tasksAPI } from "../../services/dashboard";
 import { chatAPI } from "../../services/chatService";
+import { useAuth } from "../../contexts/AuthContext";
 
 type NotificationType = "chat" | "task" | "project" | "system";
 
@@ -51,6 +52,7 @@ const saveReadIds = (readIds: Set<string>) => {
 };
 
 export default function NotificationBell() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -137,16 +139,23 @@ export default function NotificationBell() {
           const latest = result.value.data[0];
           if (!latest) return;
           const group = groups[index];
-          const from =
-            latest.user_id === latest.user?.id ? latest.user?.full_name : latest.user?.full_name;
+          if (latest.user_id === user?.id) return;
+          const from = latest.user?.full_name || "User";
+          const preview = latest.content?.trim()
+            ? latest.content.slice(0, 72)
+            : latest.attachment_name
+              ? `sent: ${latest.attachment_name}`
+              : "sent an attachment";
+          const tab = group.is_direct ? "direct" : "groups";
+          const route = `/chat?tab=${encodeURIComponent(tab)}&group=${encodeURIComponent(group.id)}`;
 
           nextItems.push({
             id: `chat-${group.id}-${latest.id}`,
             type: "chat",
             title: `New in ${group.name}`,
-            subtitle: `${from || "User"}: ${latest.content.slice(0, 72)}`,
+            subtitle: `${from}: ${preview}`,
             createdAt: normalizeDate(latest.created_at),
-            route: "/chat",
+            route,
           });
         });
       }

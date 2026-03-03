@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { getAuditLogs } from "../services/auditService";
+import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 
 export const getEntityAuditLogs = async (req: Request, res: Response) => {
   try {
@@ -15,9 +16,11 @@ export const getEntityAuditLogs = async (req: Request, res: Response) => {
 
     const entity_type = req.query.entity_type as "task" | "project" | undefined;
     const entity_id = (req.query.entity_id as string) || (req.params.id as string);
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseBoundedInt(req.query.limit, 50, 1, 200);
+    const from = parseIsoDate(req.query.from);
+    const to = parseIsoDate(req.query.to);
 
-    const logs = await getAuditLogs(entity_type, entity_id, limit);
+    const logs = await getAuditLogs(entity_type, entity_id, limit, from, to);
 
     return res.status(200).json({
       success: true,

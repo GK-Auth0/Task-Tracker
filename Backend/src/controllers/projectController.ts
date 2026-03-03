@@ -3,9 +3,10 @@ import Project from '../models/project';
 import ProjectMember from '../models/ProjectMember';
 import User from '../models/user';
 import Task from '../models/task';
-import { Op } from 'sequelize';
+import { Op, fn, col, literal } from 'sequelize';
 import { processInvites } from "../services/invitation";
 import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
+import { parseBoundedInt } from "../helpers/query";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -27,7 +28,9 @@ export class ProjectController {
         ownerId
       } = req.query;
 
-      const offset = (Number(page) - 1) * Number(limit);
+      const safePage = parseBoundedInt(page, 1, 1, 100000);
+      const safeLimit = parseBoundedInt(limit, 10, 1, 100);
+      const offset = (safePage - 1) * safeLimit;
       const whereClause: any = {};
       const userId = req.user?.id;
 
@@ -63,8 +66,8 @@ export class ProjectController {
           success: true,
           data: [],
           pagination: {
-            page: Number(page),
-            limit: Number(limit),
+            page: safePage,
+            limit: safeLimit,
             total: 0,
             totalPages: 0
           }
@@ -97,38 +100,58 @@ export class ProjectController {
             attributes: ['id', 'full_name', 'email', 'avatar_url']
           }
         ],
-        limit: Number(limit),
+        limit: safeLimit,
         offset,
         order: [['updated_at', 'DESC']]
       });
 
-      // Calculate progress for each project
-      const projectsWithProgress = await Promise.all(
-        projects.map(async (project: any) => {
-          const tasks = await Task.findAll({
-            where: { project_id: project.id },
-            attributes: ['status']
-          });
+      const projectIds = projects.map((project: any) => project.id);
+      const taskStats =
+        projectIds.length > 0
+          ? await Task.findAll({
+              where: { project_id: { [Op.in]: projectIds } },
+              attributes: [
+                "project_id",
+                [fn("COUNT", col("id")), "total_tasks"],
+                [
+                  fn(
+                    "SUM",
+                    literal(`CASE WHEN status = 'Done' THEN 1 ELSE 0 END`),
+                  ),
+                  "completed_tasks",
+                ],
+              ],
+              group: ["project_id"],
+              raw: true,
+            })
+          : [];
 
-          const totalTasks = tasks.length;
-          const completedTasks = tasks.filter((task: any) => task.status === 'Done').length;
-          const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      const taskStatsByProject = new Map<string, { total: number; completed: number }>();
+      taskStats.forEach((row: any) => {
+        taskStatsByProject.set(String(row.project_id), {
+          total: Number(row.total_tasks || 0),
+          completed: Number(row.completed_tasks || 0),
+        });
+      });
 
-          return {
-            ...project.toJSON(),
-            progress
-          };
-        })
-      );
+      const projectsWithProgress = projects.map((project: any) => {
+        const stats = taskStatsByProject.get(project.id) || { total: 0, completed: 0 };
+        const progress =
+          stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+        return {
+          ...project.toJSON(),
+          progress,
+        };
+      });
 
       res.json({
         success: true,
         data: projectsWithProgress,
         pagination: {
-          page: Number(page),
-          limit: Number(limit),
+          page: safePage,
+          limit: safeLimit,
           total: count,
-          totalPages: Math.ceil(count / Number(limit))
+          totalPages: Math.ceil(count / safeLimit)
         }
       });
     } catch (error) {
@@ -198,15 +221,10 @@ export class ProjectController {
         });
       }
 
-      // Get tasks separately
-      const tasks = await Task.findAll({
-        where: { project_id: id },
-        attributes: ['status']
-      });
-
-      // Calculate progress
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter((task: any) => task.status === 'Done').length;
+      const [totalTasks, completedTasks] = await Promise.all([
+        Task.count({ where: { project_id: id } }),
+        Task.count({ where: { project_id: id, status: "Done" } }),
+      ]);
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
       res.json({

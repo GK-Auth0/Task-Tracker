@@ -29,6 +29,8 @@ Update `.env` with your configuration:
 
 ```env
 VITE_API_BASE_URL=http://localhost:3000
+VITE_WS_BASE_URL=ws://localhost:3000
+VITE_AI_ASSISTANT_URL=http://127.0.0.1:8787
 ```
 
 ### 3. Start Development Server
@@ -266,9 +268,19 @@ yarn preview
 
 3. Deploy the `dist/` folder to your hosting service
 
+### Production Checklist
+
+1. Set `VITE_API_BASE_URL` to your API domain, or leave empty if your host reverse-proxies `/api` to backend.
+2. Set `VITE_WS_BASE_URL` to your websocket endpoint (`wss://...`) if not same-origin.
+3. Set `VITE_AI_ASSISTANT_URL` or configure reverse-proxy for `/ai-assistant`.
+4. Verify frontend domain is listed in backend `ALLOWED_ORIGINS`.
+
 ## Environment Variables
 
-- `VITE_API_BASE_URL` - Backend API URL (default: http://localhost:3000)
+- `VITE_API_BASE_URL` - Backend API URL. If omitted in production, frontend uses same-origin `/api/*`.
+- `VITE_WS_BASE_URL` - Chat websocket base URL (example: `wss://api.example.com`). Optional; auto-derived when omitted.
+- `VITE_AI_ASSISTANT_URL` - AI assistant service URL for monitoring and suggestions (default: `http://127.0.0.1:8787`).
+- `VITE_HIDE_AUTH0` - Set `true`/`yes`/`1` to hide Auth0 options on login/signup flows.
 
 ## Browser Support
 
