@@ -11,6 +11,7 @@ const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
 const SMTP_TIMEOUT_MS = parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10);
+const SMTP_IP_FAMILY = parseInt(process.env.SMTP_IP_FAMILY || "4", 10);
 
 const buildOtpHtml = (otp: string, purpose: string) => {
   return `
@@ -294,6 +295,7 @@ const sendSmtpEmail = async (options: {
     host: options.host,
     port: options.port,
     secure: options.port === 465,
+    family: SMTP_IP_FAMILY === 6 ? 6 : 4,
     auth: {
       user: options.username,
       pass: options.password,
