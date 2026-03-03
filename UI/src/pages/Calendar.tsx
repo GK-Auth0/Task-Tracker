@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { tasksAPI, usersAPI } from "../services/dashboard";
+import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
 import CalendarHeader from "../components/calendar/CalendarHeader";
 import CalendarMonthGrid from "../components/calendar/CalendarMonthGrid";
 import CalendarTeamLegend from "../components/calendar/CalendarTeamLegend";
@@ -17,6 +18,9 @@ const Calendar: React.FC = () => {
     "personal",
   );
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [aiInsights, setAiInsights] = useState<AiProjectInsights | null>(null);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [aiInsightsError, setAiInsightsError] = useState("");
 
   useEffect(() => {
     fetchTasks();
@@ -24,6 +28,15 @@ const Calendar: React.FC = () => {
       fetchTeamMembers();
     }
   }, [user, calendarType]);
+
+  useEffect(() => {
+    if (tasks.length > 0) {
+      fetchCalendarInsights();
+    } else {
+      setAiInsights(null);
+      setAiInsightsError("");
+    }
+  }, [tasks]);
 
   const fetchTeamMembers = async () => {
     try {
@@ -63,6 +76,26 @@ const Calendar: React.FC = () => {
       console.error("Error fetching tasks:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCalendarInsights = async () => {
+    try {
+      setAiInsightsLoading(true);
+      setAiInsightsError("");
+      const payload = tasks.map((task) => ({
+        title: task.title,
+        priority: task.priority as "Low" | "Medium" | "High",
+        status: task.status,
+        due_date: task.due_date,
+      }));
+      const result = await aiAssistantAPI.projectInsights(payload);
+      setAiInsights(result);
+    } catch (error) {
+      setAiInsightsError("AI calendar insights unavailable right now.");
+      setAiInsights(null);
+    } finally {
+      setAiInsightsLoading(false);
     }
   };
 
@@ -176,6 +209,63 @@ const Calendar: React.FC = () => {
           onNavigateMonth={navigateMonth}
           onGoToToday={goToToday}
         />
+
+        <section className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-indigo-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">
+                  auto_awesome
+                </span>
+                AI Calendar Insights
+              </p>
+              {aiInsights && (
+                <p className="text-xs text-indigo-900/80 mt-1">
+                  {aiInsights.summary}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={fetchCalendarInsights}
+              disabled={aiInsightsLoading || tasks.length === 0}
+              className="h-9 px-4 rounded-lg bg-indigo-700 text-white text-sm font-semibold hover:bg-indigo-800 disabled:opacity-50"
+            >
+              {aiInsightsLoading ? "Analyzing..." : "Refresh AI"}
+            </button>
+          </div>
+
+          {aiInsightsError && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              {aiInsightsError}
+            </p>
+          )}
+
+          {aiInsights && (
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-indigo-200 bg-white p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Risk
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">
+                  {aiInsights.risk_level}
+                </p>
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-white p-3 md:col-span-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Signals
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {aiInsights.signals.slice(0, 3).map((signal) => (
+                    <li key={signal} className="text-sm text-slate-700">
+                      • {signal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </section>
 
         <CalendarMonthGrid
           days={days}

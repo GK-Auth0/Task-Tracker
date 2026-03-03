@@ -5,6 +5,8 @@ interface TasksListProps {
   tasks: TaskItem[];
   onTaskToggle: (taskId: string, completed: boolean) => void;
   onTaskClick: (taskId: string) => void;
+  pinnedTaskIds?: Set<string>;
+  onTaskPinToggle?: (taskId: string, shouldPin: boolean) => void;
 }
 
 const getPriorityColor = (priority: string) => {
@@ -47,12 +49,15 @@ const TasksList: React.FC<TasksListProps> = ({
   tasks,
   onTaskToggle,
   onTaskClick,
+  pinnedTaskIds,
+  onTaskPinToggle,
 }) => {
   return (
     <div className="flex flex-col gap-3">
       {tasks.map((task) => {
         const dateInfo = task.due_date ? formatDate(task.due_date) : null;
         const isCompleted = task.status === "Done";
+        const isPinned = Boolean(pinnedTaskIds?.has(task.id));
 
         return (
           <div
@@ -132,10 +137,21 @@ const TasksList: React.FC<TasksListProps> = ({
                   {task.priority}
                 </div>
                 <button
-                  className="p-1 text-slate-300 hover:text-slate-500 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
+                  className={`p-1 transition-colors ${
+                    isPinned
+                      ? "text-amber-500 hover:text-amber-600"
+                      : "text-slate-300 hover:text-slate-500"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onTaskPinToggle) {
+                      onTaskPinToggle(task.id, !isPinned);
+                    }
+                  }}
                 >
-                  <span className="material-symbols-outlined">more_vert</span>
+                  <span className="material-symbols-outlined">
+                    {isPinned ? "keep" : "keep_off"}
+                  </span>
                 </button>
               </div>
             </div>

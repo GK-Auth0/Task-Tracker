@@ -10,6 +10,7 @@ import {
   getTaskCommits,
 } from "../services/task";
 import { createAuditLog, getAuditLogs } from "../services/auditService";
+import { processInvites } from "../services/invitation";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -81,6 +82,13 @@ export const createNewTask = async (req: Request, res: Response) => {
     };
 
     const task = await createTask(taskData);
+    const inviteSummary = await processInvites({
+      contextType: "task",
+      projectId: task.project?.id || task.project_id,
+      taskId: task.id,
+      invitedBy: userId,
+      invitees: Array.isArray(req.body.invitees) ? req.body.invitees : [],
+    });
     
     // Log task creation
     await createAuditLog({
@@ -98,7 +106,10 @@ export const createNewTask = async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       message: "Task created successfully",
-      data: task,
+      data: {
+        ...task,
+        invite_summary: inviteSummary,
+      },
     });
   } catch (error) {
     return res.status(400).json({

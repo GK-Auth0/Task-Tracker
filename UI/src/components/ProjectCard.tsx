@@ -4,10 +4,27 @@ import { Project } from "../types/project";
 
 interface ProjectCardProps {
   project: Project;
+  isPinned?: boolean;
+  onTogglePin?: (projectId: string, shouldPin: boolean) => void;
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
+const ProjectCard: React.FC<ProjectCardProps> = ({
+  project,
+  isPinned = false,
+  onTogglePin,
+}) => {
   const navigate = useNavigate();
+  const safeStatus = String(project?.status || "planning").toLowerCase();
+  const safeName = String(project?.name || "Untitled Project");
+  const ownerName =
+    String((project as any)?.owner?.name || (project as any)?.owner?.full_name || "").trim() ||
+    "Owner";
+  const ownerAvatar =
+    String((project as any)?.owner?.avatar || (project as any)?.owner?.avatar_url || "").trim() ||
+    "";
+  const members = Array.isArray((project as any)?.members)
+    ? (project as any).members
+    : [];
 
   const handleClick = () => {
     navigate(`/projects/${project.id}`);
@@ -66,12 +83,12 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
       <div className="flex justify-between items-start">
         <div className="flex flex-col">
           <span
-            className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${getStatusColor(project.status)}`}
+            className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${getStatusColor(safeStatus)}`}
           >
-            {project.status.replace("_", " ")}
+            {safeStatus.replace("_", " ")}
           </span>
           <h3 className="text-lg font-bold group-hover:text-blue-600 transition-colors">
-            {project.name}
+            {safeName}
           </h3>
           {project.description && (
             <p className="text-sm text-slate-500 mt-1 line-clamp-2">
@@ -80,7 +97,19 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
           )}
         </div>
         <button className="text-slate-400 hover:text-slate-600">
-          <span className="material-symbols-outlined">more_horiz</span>
+          <span
+            className={`material-symbols-outlined ${
+              isPinned ? "text-amber-500" : ""
+            }`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (onTogglePin) {
+                onTogglePin(project.id, !isPinned);
+              }
+            }}
+          >
+            {isPinned ? "keep" : "keep_off"}
+          </span>
         </button>
       </div>
 
@@ -91,7 +120,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
         </div>
         <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
           <div
-            className={`h-full rounded-full ${getProgressColor(project.status)}`}
+            className={`h-full rounded-full ${getProgressColor(safeStatus)}`}
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -102,43 +131,51 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
           {project.owner && (
             <div
               className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
-              title={project.owner.name}
+              title={ownerName}
             >
-              {project.owner.avatar ? (
+              {ownerAvatar ? (
                 <img
-                  src={project.owner.avatar}
-                  alt={project.owner.name}
+                  src={ownerAvatar}
+                  alt={ownerName}
                   className="w-full h-full rounded-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                  {project.owner.name.charAt(0).toUpperCase()}
+                  {ownerName.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
           )}
-          {project.members?.slice(0, 3).map((member) => (
-            <div
-              key={member.id}
-              className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
-              title={member.user.name}
-            >
-              {member.user.avatar ? (
-                <img
-                  src={member.user.avatar}
-                  alt={member.user.name}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full rounded-full bg-slate-400 flex items-center justify-center text-white text-xs font-bold">
-                  {member.user.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-          ))}
-          {project.members && project.members.length > 3 && (
+          {members.slice(0, 3).map((member: any, index: number) => {
+            const memberName =
+              String(member?.user?.name || member?.user?.full_name || "").trim() ||
+              "Member";
+            const memberAvatar =
+              String(member?.user?.avatar || member?.user?.avatar_url || "").trim() ||
+              "";
+            return (
+              <div
+                key={member?.id || member?.user?.id || `${project.id}-member-${index}`}
+                className="size-8 rounded-full border-2 border-white bg-slate-200 bg-cover"
+                title={memberName}
+              >
+                {memberAvatar ? (
+                  <img
+                    src={memberAvatar}
+                    alt={memberName}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-slate-400 flex items-center justify-center text-white text-xs font-bold">
+                    {memberName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {members.length > 3 && (
             <div className="size-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-              +{project.members.length - 3}
+              +{members.length - 3}
             </div>
           )}
         </div>

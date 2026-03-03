@@ -4,6 +4,7 @@ import ProjectMember from '../models/ProjectMember';
 import User from '../models/user';
 import Task from '../models/task';
 import { Op } from 'sequelize';
+import { processInvites } from "../services/invitation";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -234,7 +235,8 @@ export class ProjectController {
         priority = 'medium',
         startDate,
         endDate,
-        memberIds = []
+        memberIds = [],
+        invitees = [],
       } = req.body;
 
       console.log('Received project data:', { name, description, status, priority, startDate, endDate, memberIds });
@@ -280,6 +282,13 @@ export class ProjectController {
         }
       }
 
+      const inviteSummary = await processInvites({
+        contextType: "project",
+        projectId: project.id,
+        invitedBy: userId,
+        invitees: Array.isArray(invitees) ? invitees : [],
+      });
+
       // Fetch the created project with associations
       const createdProject = await Project.findByPk(project.id as string, {
         include: [
@@ -295,7 +304,8 @@ export class ProjectController {
         success: true,
         data: {
           ...createdProject?.toJSON(),
-          progress: 0
+          progress: 0,
+          invite_summary: inviteSummary,
         },
         message: 'Project created successfully'
       });

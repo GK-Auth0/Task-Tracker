@@ -57,6 +57,20 @@ export const validateProject = [
       return true;
     }),
 
+  body("invitees")
+    .optional()
+    .isArray()
+    .withMessage("Invitees must be an array"),
+  body("invitees.*.full_name")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 255 })
+    .withMessage("Invitee full name must be 1 to 255 characters"),
+  body("invitees.*.email")
+    .optional()
+    .isEmail()
+    .withMessage("Invitee email must be valid"),
+
   // Middleware to handle validation errors
   (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);

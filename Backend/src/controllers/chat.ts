@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { createChatGroup, getChatGroups, getChatMessages, createChatMessage } from "../services/chat";
 import ChatGroupMember from "../models/chatGroupMember";
+import { broadcastChatMessage } from "../realtime/chatSocket";
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -160,6 +161,10 @@ export const sendMessage = async (req: Request, res: Response) => {
       attachment_url,
       attachment_name,
     });
+
+    if (message) {
+      broadcastChatMessage(groupId, (message as any).toJSON ? (message as any).toJSON() : message);
+    }
     
     return res.status(201).json({
       success: true,

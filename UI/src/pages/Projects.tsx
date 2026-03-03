@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { projectService } from "../services/projectService";
+import { tasksAPI } from "../services/dashboard";
+import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
+import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
 import { Project, CreateProjectRequest } from "../types/project";
 import CreateProjectModal from "../components/CreateProjectModal";
 import ProjectsHeader from "../components/projects/ProjectsHeader";
 import ProjectsFilters from "../components/projects/ProjectsFilters";
 import ProjectsGrid from "../components/projects/ProjectsGrid";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
+import SavedViewsBar from "../components/preferences/SavedViewsBar";
 
 type ProjectStatusFilter = "all" | Project["status"];
 
@@ -15,20 +19,76 @@ const Projects: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [insights, setInsights] = useState<AiProjectInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState("");
+  const [pinnedProjectIds, setPinnedProjectIds] = useState<Set<string>>(new Set());
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [selectedViewId, setSelectedViewId] = useState("");
+  const [newViewName, setNewViewName] = useState("");
+  const [savingView, setSavingView] = useState(false);
 
   useEffect(() => {
     fetchProjects();
+    fetchInsights();
+    fetchPinnedProjects();
+    fetchSavedViews();
   }, []);
 
   const fetchProjects = async () => {
     try {
       setLoading(true);
       const response = await projectService.getProjects();
-      setProjects(response.data);
+      const payload = Array.isArray((response as any)?.data)
+        ? (response as any).data
+        : Array.isArray((response as any)?.data?.data)
+          ? (response as any).data.data
+          : [];
+      setProjects(payload);
     } catch (error) {
       console.error("Error fetching projects:", error);
+      setProjects([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchInsights = async () => {
+    try {
+      setInsightsLoading(true);
+      setInsightsError("");
+      const tasksRes = await tasksAPI.getTasks({ limit: 200 });
+      const payload = tasksRes.data.map((task) => ({
+        title: task.title,
+        priority: task.priority,
+        status: task.status,
+        due_date: task.due_date,
+      }));
+      const result = await aiAssistantAPI.projectInsights(payload);
+      setInsights(result);
+    } catch (error) {
+      setInsightsError("AI insights currently unavailable.");
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+  const fetchPinnedProjects = async () => {
+    try {
+      const pins = await preferencesAPI.getPins("project");
+      setPinnedProjectIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
+    } catch (error) {
+      console.error("Failed to load pinned projects:", error);
+    }
+  };
+
+  const fetchSavedViews = async () => {
+    try {
+      const views = await preferencesAPI.getSavedViews("projects");
+      setSavedViews(views);
+    } catch (error) {
+      console.error("Failed to load saved views:", error);
     }
   };
 
@@ -51,14 +111,93 @@ const Projects: React.FC = () => {
   };
 
   const filteredProjects = projects.filter((project) => {
+    const projectName = String(project?.name ?? "");
+    const projectDescription = String(project?.description ?? "");
+    const projectStatus = String(project?.status ?? "").toLowerCase();
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const matchesSearch =
-      project.name.toLowerCase().includes(normalizedSearch) ||
-      (project.description ?? "").toLowerCase().includes(normalizedSearch);
+      projectName.toLowerCase().includes(normalizedSearch) ||
+      projectDescription.toLowerCase().includes(normalizedSearch);
     const matchesStatus =
-      statusFilter === "all" || project.status === statusFilter;
-    return matchesSearch && matchesStatus;
+      statusFilter === "all" || projectStatus === statusFilter;
+    const matchesPinned = !showPinnedOnly || pinnedProjectIds.has(project.id);
+    return matchesSearch && matchesStatus && matchesPinned;
   });
+
+  const handleToggleProjectPin = async (projectId: string, shouldPin: boolean) => {
+    try {
+      if (shouldPin) {
+        await preferencesAPI.addPin("project", projectId);
+      } else {
+        await preferencesAPI.removePin("project", projectId);
+      }
+
+      setPinnedProjectIds((prev) => {
+        const next = new Set(prev);
+        if (shouldPin) {
+          next.add(projectId);
+        } else {
+          next.delete(projectId);
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to update project pin:", error);
+    }
+  };
+
+  const applySavedView = () => {
+    if (!selectedViewId) return;
+    const view = savedViews.find((item) => item.id === selectedViewId);
+    if (!view) return;
+    const filters = view.filters;
+    setSearchTerm(String(filters.searchTerm ?? ""));
+    const status = String(filters.statusFilter ?? "all");
+    if (
+      status === "all" ||
+      status === "planning" ||
+      status === "active" ||
+      status === "on_hold" ||
+      status === "completed" ||
+      status === "cancelled"
+    ) {
+      setStatusFilter(status);
+    }
+    setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
+  };
+
+  const saveCurrentView = async () => {
+    if (!newViewName.trim()) return;
+    try {
+      setSavingView(true);
+      await preferencesAPI.createSavedView({
+        page: "projects",
+        name: newViewName.trim(),
+        filters: {
+          searchTerm,
+          statusFilter,
+          showPinnedOnly,
+        },
+      });
+      setNewViewName("");
+      await fetchSavedViews();
+    } catch (error) {
+      console.error("Failed to save current project view:", error);
+    } finally {
+      setSavingView(false);
+    }
+  };
+
+  const deleteSelectedView = async () => {
+    if (!selectedViewId) return;
+    try {
+      await preferencesAPI.deleteSavedView(selectedViewId);
+      setSelectedViewId("");
+      await fetchSavedViews();
+    } catch (error) {
+      console.error("Failed to delete saved project view:", error);
+    }
+  };
 
   if (loading) {
     return (
@@ -73,16 +212,113 @@ const Projects: React.FC = () => {
       <div className="min-h-full p-8">
         <ProjectsHeader onCreate={() => setShowCreateModal(true)} />
 
+        <SavedViewsBar
+          title="Project Saved Views"
+          views={savedViews.map((view) => ({ id: view.id, name: view.name }))}
+          selectedId={selectedViewId}
+          viewName={newViewName}
+          onSelectedIdChange={setSelectedViewId}
+          onViewNameChange={setNewViewName}
+          onApply={applySavedView}
+          onSave={saveCurrentView}
+          onDelete={deleteSelectedView}
+          saving={savingView}
+        />
+
         <ProjectsFilters
           searchTerm={searchTerm}
           statusFilter={statusFilter}
           onSearchChange={setSearchTerm}
           onStatusChange={setStatusFilter}
         />
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            className={`h-9 rounded-lg border px-3 text-sm font-semibold ${
+              showPinnedOnly
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "border-slate-300 bg-white text-slate-700"
+            }`}
+            onClick={() => setShowPinnedOnly((previous) => !previous)}
+          >
+            {showPinnedOnly
+              ? "Showing Pinned Projects"
+              : "Show Pinned Projects Only"}
+          </button>
+        </div>
+
+        <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">
+                  insights
+                </span>
+                AI Project Insights
+              </p>
+              {insights && (
+                <p className="text-xs text-blue-900/80 mt-1">{insights.summary}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={fetchInsights}
+              disabled={insightsLoading}
+              className="h-9 px-4 rounded-lg bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800 disabled:opacity-50"
+            >
+              {insightsLoading ? "Analyzing..." : "Refresh Insights"}
+            </button>
+          </div>
+
+          {insightsError && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              {insightsError}
+            </p>
+          )}
+
+          {insights && (
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-blue-200 bg-white p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Risk Level
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">
+                  {insights.risk_level}
+                </p>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-white p-3 md:col-span-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Key Signals
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {insights.signals.slice(0, 3).map((signal) => (
+                    <li key={signal} className="text-sm text-slate-700">
+                      • {signal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-white p-3 md:col-span-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Recommendations
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {insights.recommendations.slice(0, 3).map((item) => (
+                    <li key={item} className="text-sm text-slate-700">
+                      • {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </section>
 
         <ProjectsGrid
           projects={filteredProjects}
           onCreate={() => setShowCreateModal(true)}
+          pinnedProjectIds={pinnedProjectIds}
+          onProjectPinToggle={handleToggleProjectPin}
         />
 
         {filteredProjects.length === 0 && <ProjectsEmptyState />}

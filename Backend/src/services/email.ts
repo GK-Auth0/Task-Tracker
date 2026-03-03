@@ -41,6 +41,25 @@ const buildResetPasswordHtml = (resetLink: string) => {
   `;
 };
 
+const buildInviteHtml = (options: {
+  fullName: string;
+  contextType: "project" | "task";
+  inviteUrl: string;
+}) => `
+  <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+    <h2 style="margin: 0 0 12px;">You're Invited to TaskTracker</h2>
+    <p style="margin: 0 0 12px;">Hi ${options.fullName},</p>
+    <p style="margin: 0 0 12px;">
+      You were invited to collaborate on a ${options.contextType} in TaskTracker.
+    </p>
+    <a href="${options.inviteUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600;">
+      Accept Invitation
+    </a>
+    <p style="margin: 16px 0 6px;">If the button does not work, use this link:</p>
+    <p style="margin: 0; word-break: break-all; color: #334155;">${options.inviteUrl}</p>
+  </div>
+`;
+
 export const sendOtpEmail = async (
   to: string,
   otp: string,
@@ -188,6 +207,73 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
     console.warn(
       `Email provider '${EMAIL_PROVIDER}' not configured. No reset email sent to ${to}.`,
     );
+    return;
+  }
+
+  throw new Error(`Unsupported EMAIL_PROVIDER '${EMAIL_PROVIDER}'`);
+};
+
+export const sendWorkspaceInviteEmail = async (options: {
+  to: string;
+  fullName: string;
+  contextType: "project" | "task";
+  inviteToken: string;
+  projectId?: string;
+  taskId?: string;
+}) => {
+  const appUrl = process.env.UI_APP_URL || "http://localhost:3001";
+  const inviteUrl = `${appUrl}/signup?invite=${options.inviteToken}&type=${options.contextType}${
+    options.projectId ? `&project=${options.projectId}` : ""
+  }${options.taskId ? `&task=${options.taskId}` : ""}`;
+
+  const subject = `TaskTracker ${options.contextType === "project" ? "Project" : "Task"} Invitation`;
+  const html = buildInviteHtml({
+    fullName: options.fullName,
+    contextType: options.contextType,
+    inviteUrl,
+  });
+
+  if (EMAIL_PROVIDER === "smtp") {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+    }
+    await sendSmtpEmail({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      username: EMAIL_USER,
+      password: EMAIL_PASS,
+      from: OTP_FROM_EMAIL,
+      to: options.to,
+      subject,
+      html,
+    });
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "resend") {
+    if (!RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is missing for email delivery");
+    }
+    await axios.post(
+      "https://api.resend.com/emails",
+      {
+        from: OTP_FROM_EMAIL,
+        to: [options.to],
+        subject,
+        html,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return;
+  }
+
+  if (appConfig.env !== "production") {
+    console.warn(`Invite email provider '${EMAIL_PROVIDER}' not configured. No invite sent to ${options.to}.`);
     return;
   }
 

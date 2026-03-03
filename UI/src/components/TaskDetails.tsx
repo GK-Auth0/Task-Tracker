@@ -6,6 +6,7 @@ import {
   Commit,
   ActivityLog,
 } from "../services/dashboard";
+import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 
 interface TaskDetails {
   id: string;
@@ -47,6 +48,9 @@ export default function TaskDetails() {
   const [prLoading, setPrLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [showLinkPRModal, setShowLinkPRModal] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   // Debug log for modal state
   useEffect(() => {
@@ -69,6 +73,12 @@ export default function TaskDetails() {
   }, [id]);
 
   useEffect(() => {
+    if (task) {
+      fetchAiSuggestion(task.title, task.description || "");
+    }
+  }, [task?.id]);
+
+  useEffect(() => {
     if (id && activeTab === "prs") {
       fetchPRData();
     } else if (id && activeTab === "activity") {
@@ -86,6 +96,20 @@ export default function TaskDetails() {
       console.error("Failed to fetch task:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAiSuggestion = async (title: string, description: string) => {
+    try {
+      setAiLoading(true);
+      setAiError("");
+      const suggestion = await aiAssistantAPI.suggestTask(title, description);
+      setAiSuggestion(suggestion);
+    } catch (error) {
+      setAiError("AI assistant unavailable right now.");
+      setAiSuggestion(null);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -143,6 +167,23 @@ export default function TaskDetails() {
       }
     } catch (error) {
       console.error("Failed to update task status:", error);
+    }
+  };
+
+  const handlePriorityUpdate = async (newPriority: "Low" | "Medium" | "High") => {
+    if (!task) return;
+    try {
+      const response = await tasksAPI.updateTask(task.id, {
+        priority: newPriority,
+      });
+      if (response.success) {
+        setTask({ ...task, priority: newPriority });
+        if (activeTab === "activity") {
+          fetchActivityLogs();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update task priority:", error);
     }
   };
 
@@ -407,6 +448,85 @@ export default function TaskDetails() {
                     <div className="prose max-w-none text-slate-600 leading-relaxed">
                       <p>{task.description || "No description provided."}</p>
                     </div>
+                  </div>
+
+                  {/* AI Assistant */}
+                  <div className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-cyan-900 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">
+                          auto_awesome
+                        </span>
+                        AI Task Assistant
+                      </h3>
+                      <button
+                        className="h-8 px-3 rounded-md bg-cyan-700 text-white text-xs font-semibold hover:bg-cyan-800 disabled:opacity-50"
+                        onClick={() =>
+                          fetchAiSuggestion(task.title, task.description || "")
+                        }
+                        disabled={aiLoading}
+                      >
+                        {aiLoading ? "Analyzing..." : "Refresh"}
+                      </button>
+                    </div>
+
+                    {aiError && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        {aiError}
+                      </p>
+                    )}
+
+                    {aiSuggestion && (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Suggested Priority
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-800">
+                            {aiSuggestion.priority}
+                          </p>
+                          <button
+                            className="mt-2 text-xs font-semibold text-cyan-700 hover:text-cyan-900"
+                            onClick={() =>
+                              handlePriorityUpdate(aiSuggestion.priority)
+                            }
+                          >
+                            Apply priority
+                          </button>
+                        </div>
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Suggested Due Date
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-800">
+                            {new Date(aiSuggestion.due_date).toLocaleDateString()}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-600">
+                            Est. {aiSuggestion.estimated_hours}h effort
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Why
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {aiSuggestion.reason}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-cyan-200 bg-white p-3 lg:col-span-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Suggested Checklist
+                          </p>
+                          <ul className="mt-2 space-y-1">
+                            {aiSuggestion.checklist.map((item) => (
+                              <li key={item} className="text-sm text-slate-700">
+                                • {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Activity Log */}

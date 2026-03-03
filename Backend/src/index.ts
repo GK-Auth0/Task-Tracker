@@ -6,6 +6,8 @@ import userRoutes from "./routes/user";
 import dashboardRoutes from "./routes/dashboard";
 import auditLogRoutes from "./routes/auditLog";
 import chatRoutes from "./routes/chat";
+import aiRoutes from "./routes/ai";
+import preferencesRoutes from "./routes/preferences";
 
 const router = express.Router();
 
@@ -16,6 +18,8 @@ router.use("/api/users", userRoutes);
 router.use("/api/dashboard", dashboardRoutes);
 router.use("/api/audit-logs", auditLogRoutes);
 router.use("/api/chat", chatRoutes);
+router.use("/api/ai", aiRoutes);
+router.use("/api/preferences", preferencesRoutes);
 
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {

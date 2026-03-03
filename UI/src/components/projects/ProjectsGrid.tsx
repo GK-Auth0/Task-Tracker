@@ -5,13 +5,25 @@ import { Project } from "../../types/project";
 interface ProjectsGridProps {
   projects: Project[];
   onCreate: () => void;
+  pinnedProjectIds?: Set<string>;
+  onProjectPinToggle?: (projectId: string, shouldPin: boolean) => void;
 }
 
-const ProjectsGrid: React.FC<ProjectsGridProps> = ({ projects, onCreate }) => {
+const ProjectsGrid: React.FC<ProjectsGridProps> = ({
+  projects,
+  onCreate,
+  pinnedProjectIds,
+  onProjectPinToggle,
+}) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {projects.map((project) => (
-        <ProjectCard key={project.id} project={project} />
+        <ProjectCard
+          key={project.id}
+          project={project}
+          isPinned={Boolean(pinnedProjectIds?.has(project.id))}
+          onTogglePin={onProjectPinToggle}
+        />
       ))}
 
       <button

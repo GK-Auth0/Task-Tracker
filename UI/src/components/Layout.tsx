@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "./Sidebar";
 import AppBackgroundArt from "./layout/AppBackgroundArt";
+import AiAssistantWidget from "./ai/AiAssistantWidget";
 
 export default function Layout() {
   const { user } = useAuth();
@@ -129,6 +130,7 @@ export default function Layout() {
             <div className="relative z-10 h-full">
               <Outlet />
             </div>
+            <AiAssistantWidget />
           </div>
         </main>
       </div>

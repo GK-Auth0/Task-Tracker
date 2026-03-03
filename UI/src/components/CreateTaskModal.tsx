@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
+import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 
 interface User {
   id: string;
@@ -36,10 +37,21 @@ export default function CreateTaskModal({
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
-  const aiSuggestion = useMemo(
-    () => getTaskAiSuggestion(title, description),
-    [title, description],
-  );
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
+  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() => {
+    const local = getTaskAiSuggestion("", "");
+    return {
+      priority: local.priority,
+      due_date: local.dueDate || "",
+      estimated_hours: 1.5,
+      checklist: local.checklist,
+      reason: local.reason,
+    };
+  });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +59,54 @@ export default function CreateTaskModal({
       fetchUsersAndProjects();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !title.trim()) {
+      const local = getTaskAiSuggestion(title, description);
+      setAiSuggestion({
+        priority: local.priority,
+        due_date: local.dueDate || "",
+        estimated_hours: 1.5,
+        checklist: local.checklist,
+        reason: local.reason,
+      });
+      setAiError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setAiLoading(true);
+        setAiError("");
+        const remote = await aiAssistantAPI.suggestTask(title, description);
+        if (!cancelled) {
+          setAiSuggestion(remote);
+        }
+      } catch (error) {
+        const local = getTaskAiSuggestion(title, description);
+        if (!cancelled) {
+          setAiSuggestion({
+            priority: local.priority,
+            due_date: local.dueDate || "",
+            estimated_hours: 1.5,
+            checklist: local.checklist,
+            reason: local.reason,
+          });
+          setAiError("AI service unavailable. Using local smart suggestions.");
+        }
+      } finally {
+        if (!cancelled) {
+          setAiLoading(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, title, description]);
 
   const fetchUsersAndProjects = async () => {
     try {
@@ -105,6 +165,7 @@ export default function CreateTaskModal({
         assignee_id: assigneeId || undefined,
         due_date: dueDate || undefined,
         priority,
+        invitees,
       });
 
       // Reset form
@@ -114,6 +175,9 @@ export default function CreateTaskModal({
       setDueDate("");
       setPriority("Medium");
       setProjectId("");
+      setInvitees([]);
+      setInviteName("");
+      setInviteEmail("");
 
       onTaskCreated();
       onClose();
@@ -125,6 +189,25 @@ export default function CreateTaskModal({
   };
 
   if (!isOpen) return null;
+
+  const addInvitee = () => {
+    const full_name = inviteName.trim();
+    const email = inviteEmail.trim().toLowerCase();
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!full_name || !emailValid) return;
+
+    const existsInUsers = users.some((user) => user.email.toLowerCase() === email);
+    const existsInInvitees = invitees.some((item) => item.email === email);
+    if (existsInUsers || existsInInvitees) return;
+
+    setInvitees((prev) => [...prev, { full_name, email }]);
+    setInviteName("");
+    setInviteEmail("");
+  };
+
+  const removeInvitee = (email: string) => {
+    setInvitees((prev) => prev.filter((item) => item.email !== email));
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -302,6 +385,53 @@ export default function CreateTaskModal({
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-gray-900 text-sm font-semibold">
+                Invite Collaborator (Not in Workspace)
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto] gap-2">
+                <input
+                  className="h-11 rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 px-3 text-sm"
+                  placeholder="Full name"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                />
+                <input
+                  className="h-11 rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 px-3 text-sm"
+                  placeholder="Email address"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={addInvitee}
+                  className="h-11 rounded-lg bg-slate-900 text-white text-sm font-semibold px-4 hover:bg-slate-800"
+                >
+                  Add Invite
+                </button>
+              </div>
+              {invitees.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {invitees.map((item) => (
+                    <div
+                      key={item.email}
+                      className="flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold"
+                    >
+                      <span>{item.full_name}</span>
+                      <span className="text-slate-500">{item.email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeInvitee(item.email)}
+                        className="material-symbols-outlined text-[14px]"
+                      >
+                        close
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Priority Selector */}
             <div className="flex flex-col gap-2">
               <label className="text-gray-900 text-sm font-semibold">
@@ -359,11 +489,16 @@ export default function CreateTaskModal({
                   </p>
                 </div>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-700">
-                  Automatic
+                  {aiLoading ? "Analyzing..." : "Automatic"}
                 </span>
               </div>
 
               <p className="text-xs text-cyan-900/80">{aiSuggestion.reason}</p>
+              {aiError && (
+                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  {aiError}
+                </p>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button
@@ -376,7 +511,9 @@ export default function CreateTaskModal({
                 <button
                   type="button"
                   className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
-                  onClick={() => aiSuggestion.dueDate && setDueDate(aiSuggestion.dueDate)}
+                  onClick={() =>
+                    aiSuggestion.due_date && setDueDate(aiSuggestion.due_date)
+                  }
                 >
                   Apply Due Date
                 </button>

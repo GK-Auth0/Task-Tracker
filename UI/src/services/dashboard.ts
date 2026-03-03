@@ -211,6 +211,10 @@ export const tasksAPI = {
     assignee_id?: string;
     due_date?: string;
     priority: "Low" | "Medium" | "High";
+    invitees?: Array<{
+      full_name: string;
+      email: string;
+    }>;
   }): Promise<{ success: boolean; data: Task }> => {
     const response = await api.post("/api/tasks", data);
     return response.data;

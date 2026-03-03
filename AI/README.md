@@ -11,6 +11,14 @@ It runs separately from `Backend` and `UI`.
    - Creates a focused daily plan from your task list and available hours.
 3. `project-insights`
    - Gives risk level, warning signals, and actionable recommendations.
+4. `auto-insights`
+   - Returns page-aware insights, top priority tasks, and quick chat actions.
+5. `workload-forecast`
+   - Forecasts near-term workload pressure from due tasks and estimated effort.
+6. `chat-context`
+   - Context-aware chat response based on current page, tasks, and projects.
+7. `metrics`
+   - Lightweight runtime monitoring (uptime, request count, errors, endpoint latency).
 
 ## Run
 
@@ -32,6 +40,12 @@ Optional env vars:
 
 ```bash
 curl http://127.0.0.1:8787/health
+```
+
+### 1b) Metrics
+
+```bash
+curl http://127.0.0.1:8787/metrics
 ```
 
 ### 2) Suggest task fields
@@ -73,8 +87,60 @@ curl -X POST http://127.0.0.1:8787/project-insights \
   }'
 ```
 
+### 5) Auto insights for current page
+
+```bash
+curl -X POST http://127.0.0.1:8787/auto-insights \
+  -H "Content-Type: application/json" \
+  -d '{
+    "route_context": "/projects",
+    "tasks": [
+      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-03"},
+      {"title":"Write docs","priority":"Low","status":"Done","due_date":"2026-03-07"}
+    ],
+    "projects": [
+      {"name":"Task Tracker","status":"Active"}
+    ]
+  }'
+```
+
+### 6) Workload forecast
+
+```bash
+curl -X POST http://127.0.0.1:8787/workload-forecast \
+  -H "Content-Type: application/json" \
+  -d '{
+    "days": 7,
+    "tasks": [
+      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-03","estimated_hours":4},
+      {"title":"Write docs","priority":"Low","status":"To Do","due_date":"2026-03-06","estimated_hours":2}
+    ]
+  }'
+```
+
+### 7) Context-aware chat
+
+```bash
+curl -X POST http://127.0.0.1:8787/chat-context \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What should I focus on first?",
+    "route_context": "/dashboard",
+    "response_mode": "balanced",
+    "tasks": [
+      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-03","estimated_hours":4},
+      {"title":"Write docs","priority":"Low","status":"To Do","due_date":"2026-03-06","estimated_hours":2}
+    ],
+    "projects": [
+      {"name":"Task Tracker","status":"Active"}
+    ]
+  }'
+```
+
 ## Notes
 
 - No external AI/API key required.
 - Uses rule-based logic for speed and easy local use.
 - You can connect UI/Backend to this service later via HTTP calls.
+- Existing endpoints are preserved, so current behavior is not broken.
+- `/metrics` uses in-memory counters and resets when the AI service restarts.
