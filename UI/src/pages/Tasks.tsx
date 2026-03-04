@@ -7,11 +7,17 @@ import { useAuth } from "../contexts/AuthContext";
 import CreateTaskModal from "../components/CreateTaskModal";
 import TasksHeader from "../components/tasks/TasksHeader";
 import TasksFiltersBar from "../components/tasks/TasksFiltersBar";
-import TasksList from "../components/tasks/TasksList";
-import TasksPagination from "../components/tasks/TasksPagination";
-import TasksEmptyState from "../components/tasks/TasksEmptyState";
+import TasksBoardTab from "../components/tasks/TasksBoardTab";
+import TasksTimelineTab from "../components/tasks/TasksTimelineTab";
+import TasksAiTab from "../components/tasks/TasksAiTab";
+import TasksOverviewTab from "../components/tasks/TasksOverviewTab";
+import TasksTabs, { TasksTabKey } from "../components/tasks/TasksTabs";
 import SavedViewsBar from "../components/preferences/SavedViewsBar";
-import { DashboardSummary, TaskItem, TasksPagination as TasksPageData } from "../components/tasks/types";
+import {
+  DashboardSummary,
+  TaskItem,
+  TasksPagination as TasksPageData,
+} from "../components/tasks/types";
 import { canManageWorkspaceContent } from "../types/roles";
 
 export default function Tasks() {
@@ -39,7 +45,8 @@ export default function Tasks() {
   const [selectedViewId, setSelectedViewId] = useState("");
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
-  const itemsPerPage = 5;
+  const [activeTab, setActiveTab] = useState<TasksTabKey>("overview");
+  const itemsPerPage = 12;
   const canCreateTask = canManageWorkspaceContent(user?.role);
 
   useEffect(() => {
@@ -277,6 +284,7 @@ export default function Tasks() {
             setCurrentPage(1);
           }}
         />
+
         <div className="mb-4 flex justify-end">
           <button
             type="button"
@@ -291,84 +299,48 @@ export default function Tasks() {
           </button>
         </div>
 
-        <section className="mb-6 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-cyan-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">
-                  auto_awesome
-                </span>
-                AI Day Planner
-              </p>
-              <p className="text-xs text-cyan-900/80 mt-1">
-                Generate a focused execution plan from your current task list.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={buildDailyPlan}
-              disabled={!canCreateTask || planning || visibleTasks.length === 0}
-              className="h-9 px-4 rounded-lg bg-cyan-700 text-white text-sm font-semibold hover:bg-cyan-800 disabled:opacity-50"
-            >
-              {planning ? "Planning..." : "Generate Plan"}
-            </button>
-          </div>
+        <TasksTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {planError && (
-            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-              {planError}
-            </p>
-          )}
-
-          {dayPlan && (
-            <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <div className="rounded-lg border border-cyan-200 bg-white p-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Today Plan ({dayPlan.planned_hours}h)
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {dayPlan.today_plan.slice(0, 4).map((task) => (
-                    <li key={task.title} className="text-sm text-slate-700">
-                      • {task.title}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-lg border border-cyan-200 bg-white p-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  AI Tip
-                </p>
-                <p className="mt-2 text-sm text-slate-700">{dayPlan.tip}</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  Backlog tasks: {dayPlan.backlog.length}
-                </p>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {visibleTasks.length > 0 ? (
-          <TasksList
+        {activeTab === "overview" && (
+          <TasksOverviewTab
             tasks={visibleTasks}
+            canCreateTask={canCreateTask}
+            pinnedTaskIds={pinnedTaskIds}
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onCreateTask={() => setShowCreateModal(true)}
             onTaskToggle={handleTaskToggle}
             onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
-            pinnedTaskIds={pinnedTaskIds}
             onTaskPinToggle={handleToggleTaskPin}
-            canToggleStatus={canCreateTask}
-          />
-        ) : (
-          <TasksEmptyState
-            onCreateTask={() => setShowCreateModal(true)}
-            canCreate={canCreateTask}
+            onPageChange={setCurrentPage}
           />
         )}
 
-        <TasksPagination
-          pagination={pagination}
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          onPageChange={(page) => setCurrentPage(page)}
-        />
+        {activeTab === "board" && (
+          <TasksBoardTab
+            tasks={visibleTasks}
+            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
+          />
+        )}
+
+        {activeTab === "timeline" && (
+          <TasksTimelineTab
+            tasks={visibleTasks}
+            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
+          />
+        )}
+
+        {activeTab === "ai" && (
+          <TasksAiTab
+            canCreateTask={canCreateTask}
+            planning={planning}
+            planError={planError}
+            dayPlan={dayPlan}
+            visibleTasks={visibleTasks}
+            onBuildDailyPlan={buildDailyPlan}
+          />
+        )}
 
         <div className="mt-8 flex justify-center">
           <button

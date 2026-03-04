@@ -1,4 +1,4 @@
-import { Task, Project, User, Subtask, Comment, PullRequest, Commit } from "../models";
+import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit } from "../models";
 import { Op } from "sequelize";
 import type { CreateTaskDto, TaskFilters, UpdateTaskDto } from "../types/task";
 
@@ -19,8 +19,27 @@ export async function getAllTasks(
   }
 
   if (filters.project_id) {
-    // If filtering by project, show all tasks in that project
-    // (assuming user has access to the project)
+    const [ownedProject, membership] = await Promise.all([
+      Project.findOne({
+        where: {
+          id: filters.project_id,
+          owner_id: userId,
+        },
+        attributes: ["id"],
+      }),
+      ProjectMember.findOne({
+        where: {
+          project_id: filters.project_id,
+          user_id: userId,
+        },
+        attributes: ["id"],
+      }),
+    ]);
+
+    if (!ownedProject && !membership) {
+      throw new Error("Access denied to this project");
+    }
+
     whereClause.project_id = filters.project_id;
   } else {
     // If not filtering by project, only show user's tasks

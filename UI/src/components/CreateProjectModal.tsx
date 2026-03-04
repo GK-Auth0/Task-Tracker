@@ -105,7 +105,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       projectData.endDate = formData.endDate;
     }
 
-    console.log("Submitting project data:", projectData);
     onSubmit(projectData);
   };
 

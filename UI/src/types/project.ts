@@ -18,6 +18,14 @@ export interface Project {
   members?: ProjectMember[];
   tasks?: ProjectTask[];
   progress?: number;
+  member_count?: number;
+  confidential_access?: {
+    can_view: boolean;
+    role: string | null;
+    request_status: "none" | "pending" | "approved" | "rejected";
+    requested_at?: string | null;
+    decision_note?: string | null;
+  };
 }
 
 export interface ProjectMember {

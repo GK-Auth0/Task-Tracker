@@ -85,9 +85,9 @@ export const me = async (req: Request, res: Response) => {
       data: user,
     });
   } catch (error) {
-    return res.status(400).json({
+    return res.status(401).json({
       success: false,
-      message: "Failed to get user profile",
+      message: "Unauthorized",
       error: (error as any).message,
     });
   }

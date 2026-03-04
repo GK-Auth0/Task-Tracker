@@ -108,9 +108,10 @@ const Projects: React.FC = () => {
   const handleCreateProject = async (projectData: CreateProjectRequest) => {
     if (!canCreateProject) return;
     try {
-      console.log("Creating project with data:", projectData);
       const response = await projectService.createProject(projectData);
-      console.log("Project created successfully:", response);
+      if (!response.success) {
+        throw new Error("Project creation failed");
+      }
       setShowCreateModal(false);
       fetchProjects();
     } catch (error: any) {

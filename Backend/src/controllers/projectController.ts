@@ -3,11 +3,13 @@ import Project from '../models/project';
 import ProjectMember from '../models/ProjectMember';
 import User from '../models/user';
 import Task from '../models/task';
+import ProjectConfidentialAccessRequest from '../models/projectConfidentialAccessRequest';
 import { Op, fn, col, literal } from 'sequelize';
 import { processInvites } from "../services/invitation";
 import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
 import { parseBoundedInt } from "../helpers/query";
 import { isWorkspaceAdmin } from "../middleware/rbac";
+import { getAuditLogs } from "../services/auditService";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -16,7 +18,129 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+type AccessContext = {
+  canViewConfidential: boolean;
+  workspaceAdmin: boolean;
+  isOwner: boolean;
+  memberRole: string | null;
+  latestRequest: ProjectConfidentialAccessRequest | null;
+};
+
+const isMissingTableError = (error: unknown) => {
+  const code =
+    (error as any)?.original?.code ||
+    (error as any)?.parent?.code ||
+    (error as any)?.code;
+  return code === "42P01";
+};
+
+const isSchemaMismatchError = (error: unknown) => {
+  const code =
+    (error as any)?.original?.code ||
+    (error as any)?.parent?.code ||
+    (error as any)?.code;
+  return code === "42P01" || code === "42703" || code === "42883";
+};
+
 export class ProjectController {
+  constructor() {
+    this.getProjects = this.getProjects.bind(this);
+    this.getProject = this.getProject.bind(this);
+    this.createProject = this.createProject.bind(this);
+    this.updateProject = this.updateProject.bind(this);
+    this.deleteProject = this.deleteProject.bind(this);
+    this.getProjectStats = this.getProjectStats.bind(this);
+    this.getProjectRoadmap = this.getProjectRoadmap.bind(this);
+    this.getProjectFiles = this.getProjectFiles.bind(this);
+    this.uploadProjectFile = this.uploadProjectFile.bind(this);
+    this.getUsers = this.getUsers.bind(this);
+    this.addProjectMember = this.addProjectMember.bind(this);
+    this.updateProjectMemberRole = this.updateProjectMemberRole.bind(this);
+    this.removeProjectMember = this.removeProjectMember.bind(this);
+    this.getProjectActivity = this.getProjectActivity.bind(this);
+    this.requestConfidentialAccess = this.requestConfidentialAccess.bind(this);
+    this.getConfidentialAccessRequests =
+      this.getConfidentialAccessRequests.bind(this);
+    this.reviewConfidentialAccessRequest =
+      this.reviewConfidentialAccessRequest.bind(this);
+  }
+
+  private async getProjectAccessContext(
+    project: Project,
+    userId: string,
+    workspaceRole?: string,
+  ): Promise<AccessContext> {
+    const workspaceAdmin = isWorkspaceAdmin(workspaceRole);
+    const isOwner = project.owner_id === userId;
+
+    const member = await ProjectMember.findOne({
+      where: {
+        project_id: project.id,
+        user_id: userId,
+      },
+      attributes: ["role"],
+    });
+
+    const memberRole = member?.role || null;
+    let latestRequest: ProjectConfidentialAccessRequest | null = null;
+    try {
+      latestRequest = await ProjectConfidentialAccessRequest.findOne({
+        where: {
+          project_id: project.id,
+          requester_id: userId,
+        },
+        order: [["requested_at", "DESC"]],
+      });
+    } catch (error) {
+      if (!isSchemaMismatchError(error)) {
+        throw error;
+      }
+      // Feature table/schema not ready in DB; continue without request history.
+      console.warn(
+        "[project] Confidential access request lookup skipped due to schema mismatch:",
+        (error as any)?.message || error,
+      );
+      latestRequest = null;
+    }
+
+    const hasApprovedRequest = latestRequest?.status === "approved";
+    const canViewConfidential =
+      workspaceAdmin ||
+      isOwner ||
+      memberRole === "owner" ||
+      memberRole === "admin" ||
+      hasApprovedRequest;
+
+    return {
+      canViewConfidential,
+      workspaceAdmin,
+      isOwner,
+      memberRole,
+      latestRequest,
+    };
+  }
+
+  private async ensureProjectMemberOrOwner(projectId: string, userId: string) {
+    const [ownedProject, member] = await Promise.all([
+      Project.findOne({
+        where: {
+          id: projectId,
+          owner_id: userId,
+        },
+        attributes: ["id"],
+      }),
+      ProjectMember.findOne({
+        where: {
+          project_id: projectId,
+          user_id: userId,
+        },
+        attributes: ["id"],
+      }),
+    ]);
+
+    return Boolean(ownedProject || member);
+  }
+
   // Get all projects with pagination and filtering
   async getProjects(req: AuthenticatedRequest, res: Response) {
     try {
@@ -207,20 +331,19 @@ export class ProjectController {
       }
 
       // Check if user has access to this project (owner or member)
-      const isOwner = project.owner_id === userId;
-      const isMember = await ProjectMember.findOne({
-        where: {
-          project_id: id,
-          user_id: userId
-        }
-      });
-
-      if (!isOwner && !isMember && !isWorkspaceAdmin(req.user?.role)) {
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied to this project'
         });
       }
+
+      const accessContext = await this.getProjectAccessContext(
+        project,
+        userId,
+        req.user?.role,
+      );
 
       const [totalTasks, completedTasks] = await Promise.all([
         Task.count({ where: { project_id: id } }),
@@ -228,11 +351,27 @@ export class ProjectController {
       ]);
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+      const plainProject = project.toJSON() as any;
+      const memberCount = Array.isArray(plainProject.members) ? plainProject.members.length : 0;
+
+      if (!accessContext.canViewConfidential) {
+        plainProject.description = "Confidential project description. Request access to view.";
+        plainProject.members = [];
+      }
+
       res.json({
         success: true,
         data: {
-          ...project.toJSON(),
-          progress
+          ...plainProject,
+          progress,
+          member_count: memberCount,
+          confidential_access: {
+            can_view: accessContext.canViewConfidential,
+            role: accessContext.memberRole,
+            request_status: accessContext.latestRequest?.status || "none",
+            requested_at: accessContext.latestRequest?.requested_at || null,
+            decision_note: accessContext.latestRequest?.decision_note || null,
+          },
         }
       });
     } catch (error) {
@@ -259,8 +398,6 @@ export class ProjectController {
         invitees = [],
       } = req.body;
       const safeMemberIds = Array.isArray(memberIds) ? memberIds : [];
-
-      console.log('Received project data:', { name, description, status, priority, startDate, endDate, memberIds });
 
       const userId = req.user?.id;
       if (!userId) {
@@ -516,6 +653,42 @@ export class ProjectController {
   async getProjectRoadmap(req: AuthenticatedRequest, res: Response) {
     try {
       const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const accessContext = await this.getProjectAccessContext(
+        project,
+        userId,
+        req.user?.role,
+      );
+      if (!accessContext.canViewConfidential) {
+        return res.status(403).json({
+          success: false,
+          message: "Roadmap is confidential. Request access from project owner.",
+        });
+      }
       
       const tasks = await Task.findAll({
         where: { project_id: id },
@@ -541,6 +714,42 @@ export class ProjectController {
   async getProjectFiles(req: AuthenticatedRequest, res: Response) {
     try {
       const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const accessContext = await this.getProjectAccessContext(
+        project,
+        userId,
+        req.user?.role,
+      );
+      if (!accessContext.canViewConfidential) {
+        return res.status(403).json({
+          success: false,
+          message: "Files are confidential. Request access from project owner.",
+        });
+      }
       
       const { ProjectFile, User } = require('../models');
       
@@ -588,6 +797,34 @@ export class ProjectController {
         return res.status(401).json({
           success: false,
           message: 'User not authenticated'
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const accessContext = await this.getProjectAccessContext(
+        project,
+        userId,
+        req.user?.role,
+      );
+      if (!accessContext.canViewConfidential) {
+        return res.status(403).json({
+          success: false,
+          message: "File uploads are restricted. Request confidential access.",
         });
       }
 
@@ -666,6 +903,540 @@ export class ProjectController {
         success: false,
         message: 'Failed to fetch users',
         error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  async addProjectMember(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { userId, role = "member" } = req.body;
+      const actorId = req.user?.id;
+
+      if (!actorId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: "userId is required",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const managerMembership = await ProjectMember.findOne({
+        where: {
+          project_id: id as string,
+          user_id: actorId,
+          role: { [Op.in]: ["owner", "admin"] },
+        },
+      });
+
+      if (!managerMembership && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Only project owner/admin can add members",
+        });
+      }
+
+      const user = await User.findByPk(String(userId));
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      const existingMembership = await ProjectMember.findOne({
+        where: {
+          project_id: id as string,
+          user_id: String(userId),
+        },
+      });
+
+      if (existingMembership) {
+        return res.status(200).json({
+          success: true,
+          message: "User is already a project member",
+          data: existingMembership,
+        });
+      }
+
+      const normalizedRole =
+        ["owner", "admin", "member", "viewer"].includes(String(role))
+          ? String(role)
+          : "member";
+
+      const created = await ProjectMember.create({
+        project_id: id as string,
+        user_id: String(userId),
+        role: normalizedRole as "owner" | "admin" | "member" | "viewer",
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Member added successfully",
+        data: created,
+      });
+    } catch (error) {
+      console.error("Error adding project member:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to add project member",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async updateProjectMemberRole(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id, userId } = req.params;
+      const role = String(req.body?.role || "").trim().toLowerCase();
+      const actorId = req.user?.id;
+
+      if (!actorId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      if (!["owner", "admin", "member", "viewer"].includes(role)) {
+        return res.status(400).json({
+          success: false,
+          message: "role must be one of: owner, admin, member, viewer",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const managerMembership = await ProjectMember.findOne({
+        where: {
+          project_id: id as string,
+          user_id: actorId,
+          role: { [Op.in]: ["owner", "admin"] },
+        },
+      });
+
+      if (!managerMembership && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Only project owner/admin can update member role",
+        });
+      }
+
+      const membership = await ProjectMember.findOne({
+        where: {
+          project_id: id as string,
+          user_id: String(userId),
+        },
+      });
+
+      if (!membership) {
+        return res.status(404).json({
+          success: false,
+          message: "Project member not found",
+        });
+      }
+
+      if (membership.role === "owner" && role !== "owner") {
+        return res.status(400).json({
+          success: false,
+          message: "Project owner role cannot be changed",
+        });
+      }
+
+      membership.role = role as "owner" | "admin" | "member" | "viewer";
+      await membership.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Member role updated successfully",
+        data: membership,
+      });
+    } catch (error) {
+      console.error("Error updating project member role:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update project member role",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async removeProjectMember(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id, userId } = req.params;
+      const actorId = req.user?.id;
+
+      if (!actorId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const managerMembership = await ProjectMember.findOne({
+        where: {
+          project_id: id as string,
+          user_id: actorId,
+          role: { [Op.in]: ["owner", "admin"] },
+        },
+      });
+
+      if (!managerMembership && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Only project owner/admin can remove members",
+        });
+      }
+
+      const membership = await ProjectMember.findOne({
+        where: {
+          project_id: id as string,
+          user_id: String(userId),
+        },
+      });
+
+      if (!membership) {
+        return res.status(404).json({
+          success: false,
+          message: "Project member not found",
+        });
+      }
+
+      if (membership.role === "owner") {
+        return res.status(400).json({
+          success: false,
+          message: "Project owner cannot be removed",
+        });
+      }
+
+      await membership.destroy();
+      return res.status(200).json({
+        success: true,
+        message: "Member removed successfully",
+      });
+    } catch (error) {
+      console.error("Error removing project member:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to remove project member",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async getProjectActivity(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const limit = parseBoundedInt(req.query.limit, 50, 1, 200);
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const accessContext = await this.getProjectAccessContext(
+        project,
+        userId,
+        req.user?.role,
+      );
+
+      if (!accessContext.canViewConfidential) {
+        return res.status(403).json({
+          success: false,
+          message: "Activity logs are confidential. Request access from owner/admin.",
+        });
+      }
+
+      const logs = await getAuditLogs("project", id as string, limit);
+      return res.status(200).json({
+        success: true,
+        message: "Project activity logs retrieved successfully",
+        data: logs,
+      });
+    } catch (error) {
+      console.error("Error fetching project activity:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch project activity",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async requestConfidentialAccess(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const reason = String(req.body?.reason || "").trim();
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const accessContext = await this.getProjectAccessContext(
+        project,
+        userId,
+        req.user?.role,
+      );
+      if (accessContext.canViewConfidential) {
+        return res.status(200).json({
+          success: true,
+          message: "You already have confidential access",
+          data: { status: "approved" },
+        });
+      }
+
+      const pending = await ProjectConfidentialAccessRequest.findOne({
+        where: {
+          project_id: id as string,
+          requester_id: userId,
+          status: "pending",
+        },
+      });
+      if (pending) {
+        return res.status(200).json({
+          success: true,
+          message: "Confidential access request already pending",
+          data: pending,
+        });
+      }
+
+      const created = await ProjectConfidentialAccessRequest.create({
+        project_id: id as string,
+        requester_id: userId,
+        status: "pending",
+        reason: reason || undefined,
+        requested_at: new Date(),
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Confidential access request submitted",
+        data: created,
+      });
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Confidential access workflow is not initialized. Apply DB migration V1022.",
+        });
+      }
+      console.error("Error requesting confidential access:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to request confidential access",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async getConfidentialAccessRequests(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const canReview = project.owner_id === userId || isWorkspaceAdmin(req.user?.role);
+      if (!canReview) {
+        return res.status(403).json({
+          success: false,
+          message: "Only project owner/admin can review requests",
+        });
+      }
+
+      const requests = await ProjectConfidentialAccessRequest.findAll({
+        where: {
+          project_id: id as string,
+        },
+        include: [
+          {
+            model: User,
+            as: "requester",
+            attributes: ["id", "full_name", "email", "role"],
+          },
+        ],
+        order: [["requested_at", "DESC"]],
+        limit: 50,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: requests,
+      });
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: "Confidential access workflow is not initialized yet.",
+        });
+      }
+      console.error("Error fetching confidential access requests:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch confidential access requests",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async reviewConfidentialAccessRequest(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id, requestId } = req.params;
+      const userId = req.user?.id;
+      const action = String(req.body?.action || "").toLowerCase();
+      const decisionNote = String(req.body?.decision_note || "").trim();
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      if (action !== "approve" && action !== "reject") {
+        return res.status(400).json({
+          success: false,
+          message: "action must be approve or reject",
+        });
+      }
+
+      const project = await Project.findByPk(id as string);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const canReview = project.owner_id === userId || isWorkspaceAdmin(req.user?.role);
+      if (!canReview) {
+        return res.status(403).json({
+          success: false,
+          message: "Only project owner/admin can review requests",
+        });
+      }
+
+      const request = await ProjectConfidentialAccessRequest.findOne({
+        where: {
+          id: requestId as string,
+          project_id: id as string,
+          status: "pending",
+        },
+      });
+
+      if (!request) {
+        return res.status(404).json({
+          success: false,
+          message: "Pending request not found",
+        });
+      }
+
+      request.status = action === "approve" ? "approved" : "rejected";
+      request.decided_by = userId;
+      request.decided_at = new Date();
+      request.decision_note = decisionNote || undefined;
+      await request.save();
+
+      return res.status(200).json({
+        success: true,
+        message: `Request ${action}d successfully`,
+        data: request,
+      });
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Confidential access workflow is not initialized. Apply DB migration V1022.",
+        });
+      }
+      console.error("Error reviewing confidential access request:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to review confidential access request",
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }

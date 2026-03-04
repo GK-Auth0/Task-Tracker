@@ -221,7 +221,6 @@ export default function TaskDetails() {
     try {
       // For now, just clear the comment - you can add comment API later
       setComment("");
-      console.log("Comment submitted:", comment);
     } catch (error) {
       console.error("Failed to submit comment:", error);
     }
@@ -232,7 +231,6 @@ export default function TaskDetails() {
 
     try {
       // This would be an API call to link the PR
-      console.log("Linking PR:", prForm);
       setShowLinkPRModal(false);
       setPrForm({
         title: "",
@@ -632,7 +630,6 @@ export default function TaskDetails() {
                           </h3>
                           <button
                             onClick={() => {
-                              console.log("Link PR button clicked");
                               setShowLinkPRModal(true);
                             }}
                             className="text-blue-600 text-sm font-semibold flex items-center gap-1 hover:underline"

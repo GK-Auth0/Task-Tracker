@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { projectController } from '../controllers/projectController';
-import { getEntityAuditLogs } from '../controllers/auditLog';
 import { authenticateToken } from '../middleware/auth';
 import { validateProject, validateProjectUpdate } from '../middleware/projectValidation';
 import { upload } from '../middleware/upload';
@@ -208,10 +207,13 @@ router.get('/users', projectController.getUsers);
  *         description: Project not found
  */
 router.get('/:id', projectController.getProject);
-router.get('/:id/activity', (req, res) => {
-  req.query.entity_type = 'project';
-  return getEntityAuditLogs(req, res);
-});
+router.post('/:id/members', requireWorkspaceRole("Member"), projectController.addProjectMember);
+router.put('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.updateProjectMemberRole);
+router.delete('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.removeProjectMember);
+router.post('/:id/confidential-access/request', projectController.requestConfidentialAccess);
+router.get('/:id/confidential-access/requests', projectController.getConfidentialAccessRequests);
+router.patch('/:id/confidential-access/requests/:requestId', projectController.reviewConfidentialAccessRequest);
+router.get('/:id/activity', projectController.getProjectActivity);
 
 /**
  * @swagger

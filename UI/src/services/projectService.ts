@@ -46,9 +46,7 @@ export const projectService = {
   createProject: async (
     data: CreateProjectRequest,
   ): Promise<ProjectResponse> => {
-    console.log("API call - Creating project with data:", data);
     const response = await api.post("/projects", data);
-    console.log("API response:", response.data);
     return response.data;
   },
 
@@ -62,31 +60,55 @@ export const projectService = {
   },
 
   // Delete project
-  deleteProject: async (id: number): Promise<void> => {
+  deleteProject: async (id: string): Promise<void> => {
     await api.delete(`/projects/${id}`);
   },
 
   // Add member to project
   addMember: async (
-    projectId: number,
-    userId: number,
-    role: string = "member",
-  ): Promise<void> => {
-    await api.post(`/projects/${projectId}/members`, { userId, role });
+    projectId: string,
+    userId: string,
+    role: "owner" | "admin" | "member" | "viewer" = "member",
+  ): Promise<{ success: boolean; message: string; data?: any }> => {
+    const response = await api.post(`/projects/${projectId}/members`, { userId, role });
+    return response.data;
   },
 
   // Remove member from project
-  removeMember: async (projectId: number, userId: number): Promise<void> => {
-    await api.delete(`/projects/${projectId}/members/${userId}`);
+  removeMember: async (
+    projectId: string,
+    userId: string,
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/projects/${projectId}/members/${userId}`);
+    return response.data;
   },
 
   // Update member role
   updateMemberRole: async (
-    projectId: number,
-    userId: number,
-    role: string,
-  ): Promise<void> => {
-    await api.put(`/projects/${projectId}/members/${userId}`, { role });
+    projectId: string,
+    userId: string,
+    role: "owner" | "admin" | "member" | "viewer",
+  ): Promise<{ success: boolean; message: string; data?: any }> => {
+    const response = await api.put(`/projects/${projectId}/members/${userId}`, { role });
+    return response.data;
+  },
+
+  getProjectUsers: async (
+    search?: string,
+  ): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      full_name: string;
+      email: string;
+      role: string;
+      avatar_url?: string;
+    }>;
+  }> => {
+    const response = await api.get("/projects/users", {
+      params: { search },
+    });
+    return response.data;
   },
 
   // Get project statistics
@@ -108,6 +130,46 @@ export const projectService = {
     id: string,
   ): Promise<{ success: boolean; data: any[] }> => {
     const response = await api.get(`/projects/${id}/files`);
+    return response.data;
+  },
+
+  getProjectRoadmap: async (
+    id: string,
+  ): Promise<{ success: boolean; data: any[]; message?: string }> => {
+    const response = await api.get(`/projects/${id}/roadmap`);
+    return response.data;
+  },
+
+  requestConfidentialAccess: async (
+    id: string,
+    reason?: string,
+  ): Promise<{ success: boolean; data: any; message: string }> => {
+    const response = await api.post(`/projects/${id}/confidential-access/request`, {
+      reason,
+    });
+    return response.data;
+  },
+
+  getConfidentialAccessRequests: async (
+    id: string,
+  ): Promise<{ success: boolean; data: any[] }> => {
+    const response = await api.get(`/projects/${id}/confidential-access/requests`);
+    return response.data;
+  },
+
+  reviewConfidentialAccessRequest: async (
+    projectId: string,
+    requestId: string,
+    action: "approve" | "reject",
+    decisionNote?: string,
+  ): Promise<{ success: boolean; data: any; message: string }> => {
+    const response = await api.patch(
+      `/projects/${projectId}/confidential-access/requests/${requestId}`,
+      {
+        action,
+        decision_note: decisionNote,
+      },
+    );
     return response.data;
   },
 };
