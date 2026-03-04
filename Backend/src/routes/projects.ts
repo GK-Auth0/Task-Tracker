@@ -4,6 +4,7 @@ import { getEntityAuditLogs } from '../controllers/auditLog';
 import { authenticateToken } from '../middleware/auth';
 import { validateProject, validateProjectUpdate } from '../middleware/projectValidation';
 import { upload } from '../middleware/upload';
+import { requireWorkspaceRole } from '../middleware/rbac';
 
 const router = Router();
 
@@ -243,7 +244,7 @@ router.get('/:id/activity', (req, res) => {
  *       400:
  *         description: Invalid input data
  */
-router.post('/', validateProject, projectController.createProject);
+router.post('/', requireWorkspaceRole("Member"), validateProject, projectController.createProject);
 
 /**
  * @swagger
@@ -274,7 +275,7 @@ router.post('/', validateProject, projectController.createProject);
  *       403:
  *         description: Insufficient permissions
  */
-router.put('/:id', validateProjectUpdate, projectController.updateProject);
+router.put('/:id', requireWorkspaceRole("Member"), validateProjectUpdate, projectController.updateProject);
 
 /**
  * @swagger
@@ -299,7 +300,7 @@ router.put('/:id', validateProjectUpdate, projectController.updateProject);
  *       403:
  *         description: Insufficient permissions
  */
-router.delete('/:id', projectController.deleteProject);
+router.delete('/:id', requireWorkspaceRole("Member"), projectController.deleteProject);
 
 /**
  * @swagger
@@ -401,7 +402,7 @@ router.get('/:id/files', projectController.getProjectFiles);
  *       200:
  *         description: File uploaded successfully
  */
-router.post('/:id/files/upload', upload.single('file'), projectController.uploadProjectFile);
+router.post('/:id/files/upload', requireWorkspaceRole("Member"), upload.single('file'), projectController.uploadProjectFile);
 
 router.get('/:id/stats', projectController.getProjectStats);
 

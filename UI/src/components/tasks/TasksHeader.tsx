@@ -4,9 +4,14 @@ import { DashboardSummary } from "./types";
 interface TasksHeaderProps {
   summary: DashboardSummary | null;
   onCreate: () => void;
+  canCreate?: boolean;
 }
 
-const TasksHeader: React.FC<TasksHeaderProps> = ({ summary, onCreate }) => {
+const TasksHeader: React.FC<TasksHeaderProps> = ({
+  summary,
+  onCreate,
+  canCreate = true,
+}) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
       <div>
@@ -18,13 +23,15 @@ const TasksHeader: React.FC<TasksHeaderProps> = ({ summary, onCreate }) => {
           overdue.
         </p>
       </div>
-      <button
-        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
-        onClick={onCreate}
-      >
-        <span className="material-symbols-outlined text-lg">add</span>
-        <span>Create Task</span>
-      </button>
+      {canCreate && (
+        <button
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
+          onClick={onCreate}
+        >
+          <span className="material-symbols-outlined text-lg">add</span>
+          <span>Create Task</span>
+        </button>
+      )}
     </div>
   );
 };

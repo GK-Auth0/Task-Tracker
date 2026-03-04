@@ -7,6 +7,7 @@ import { Op, fn, col, literal } from 'sequelize';
 import { processInvites } from "../services/invitation";
 import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
 import { parseBoundedInt } from "../helpers/query";
+import { isWorkspaceAdmin } from "../middleware/rbac";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -214,7 +215,7 @@ export class ProjectController {
         }
       });
 
-      if (!isOwner && !isMember && req.user?.role !== 'admin') {
+      if (!isOwner && !isMember && !isWorkspaceAdmin(req.user?.role)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied to this project'
@@ -381,7 +382,7 @@ export class ProjectController {
         }
       });
 
-      if (!member && req.user?.role !== 'admin') {
+      if (!member && !isWorkspaceAdmin(req.user?.role)) {
         return res.status(403).json({
           success: false,
           message: 'Insufficient permissions to update project'
@@ -439,7 +440,7 @@ export class ProjectController {
 
       // Check if user has permission to delete
       const userId = req.user?.id;
-      if (project.owner_id !== userId && req.user?.role !== 'admin') {
+      if (project.owner_id !== userId && !isWorkspaceAdmin(req.user?.role)) {
         return res.status(403).json({
           success: false,
           message: 'Only project owner or admin can delete project'

@@ -11,10 +11,12 @@ export const validateProject = [
     .withMessage('Project name must be between 1 and 255 characters'),
   
   body('description')
-    .optional()
     .trim()
-    .isLength({ max: 1000 })
-    .withMessage('Description must not exceed 1000 characters'),
+    .notEmpty()
+    .withMessage('Description is required')
+    .trim()
+    .isLength({ min: 10, max: 1000 })
+    .withMessage('Description must be between 10 and 1000 characters'),
   
   body('status')
     .optional()

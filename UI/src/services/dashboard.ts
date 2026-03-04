@@ -9,6 +9,93 @@ export interface DashboardSummary {
   completion_rate: number;
 }
 
+export interface DashboardOverviewUpcomingTask {
+  id: string;
+  title: string;
+  status: "To Do" | "In Progress" | "Done";
+  priority: "Low" | "Medium" | "High";
+  due_date?: string;
+  days_to_due: number | null;
+  project: {
+    id: string;
+    name: string;
+  } | null;
+  assignee: {
+    id: string;
+    full_name: string;
+    email: string;
+  } | null;
+}
+
+export interface DashboardOverviewActivity {
+  id: string;
+  entity_type: "task" | "project";
+  entity_id: string;
+  action:
+    | "created"
+    | "updated"
+    | "deleted"
+    | "status_changed"
+    | "assigned"
+    | "unassigned";
+  created_at: string;
+  user: {
+    id: string;
+    full_name: string;
+    email: string;
+  } | null;
+}
+
+export interface DashboardOverview {
+  summary: DashboardSummary;
+  metrics: {
+    open_tasks: number;
+    high_priority_upcoming: number;
+    due_today: number;
+    due_this_week: number;
+  };
+  upcoming_tasks: DashboardOverviewUpcomingTask[];
+  recent_activity: DashboardOverviewActivity[];
+}
+
+export interface DashboardInsightsProjectHealth {
+  id: string;
+  name: string;
+  status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
+  total_tasks: number;
+  completed_tasks: number;
+  open_tasks: number;
+  completion_rate: number;
+}
+
+export interface DashboardInsights {
+  task_status_breakdown: {
+    todo: number;
+    in_progress: number;
+    done: number;
+  };
+  task_priority_breakdown: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  due_date_breakdown: {
+    overdue: number;
+    today: number;
+    this_week: number;
+    later: number;
+    no_due_date: number;
+  };
+  project_status_breakdown: {
+    planning: number;
+    active: number;
+    on_hold: number;
+    completed: number;
+    cancelled: number;
+  };
+  project_health: DashboardInsightsProjectHealth[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -85,6 +172,35 @@ export const dashboardAPI = {
     data: DashboardSummary;
   }> => {
     const response = await api.get("/api/dashboard/summary");
+    return response.data;
+  },
+
+  getOverview: async (params?: {
+    upcomingLimit?: number;
+    activityLimit?: number;
+  }): Promise<{
+    success: boolean;
+    data: DashboardOverview;
+  }> => {
+    const query = new URLSearchParams();
+    if (params?.upcomingLimit) {
+      query.append("upcomingLimit", String(params.upcomingLimit));
+    }
+    if (params?.activityLimit) {
+      query.append("activityLimit", String(params.activityLimit));
+    }
+    const queryString = query.toString();
+    const response = await api.get(
+      `/api/dashboard/overview${queryString ? `?${queryString}` : ""}`,
+    );
+    return response.data;
+  },
+
+  getInsights: async (): Promise<{
+    success: boolean;
+    data: DashboardInsights;
+  }> => {
+    const response = await api.get("/api/dashboard/insights");
     return response.data;
   },
 };
@@ -206,7 +322,7 @@ export const tasksAPI = {
 
   createTask: async (data: {
     title: string;
-    description?: string;
+    description: string;
     project_id: string;
     assignee_id?: string;
     due_date?: string;

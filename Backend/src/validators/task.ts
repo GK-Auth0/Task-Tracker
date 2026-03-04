@@ -9,10 +9,13 @@ export const createTaskSchema = {
     },
   },
   description: {
-    optional: true,
+    notEmpty: {
+      errorMessage: "Description is required",
+    },
+    trim: true,
     isLength: {
-      options: { max: 1000 },
-      errorMessage: "Description must not exceed 1000 characters",
+      options: { min: 10, max: 1000 },
+      errorMessage: "Description must be between 10 and 1000 characters",
     },
   },
   status: {

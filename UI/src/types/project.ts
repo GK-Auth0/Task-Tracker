@@ -48,7 +48,7 @@ export interface ProjectTask {
 
 export interface CreateProjectRequest {
   name: string;
-  description?: string;
+  description: string;
   status?: "planning" | "active" | "on_hold";
   priority?: "low" | "medium" | "high";
   startDate?: string;

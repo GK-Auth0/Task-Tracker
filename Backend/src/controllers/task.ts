@@ -80,7 +80,7 @@ export const createNewTask = async (req: Request, res: Response) => {
 
     const taskData = {
       title: req.body.title,
-      description: req.body.description,
+      description: String(req.body.description || "").trim(),
       status: req.body.status || "To Do",
       priority: req.body.priority || "Medium",
       project_id: req.body.project_id,

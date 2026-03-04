@@ -39,9 +39,9 @@ export default class Task extends Model {
 
   @Column({
     type: DataType.TEXT,
-    allowNull: true,
+    allowNull: false,
   })
-  description?: string;
+  description!: string;
 
   @Column({
     type: DataType.ENUM("To Do", "In Progress", "Done"),

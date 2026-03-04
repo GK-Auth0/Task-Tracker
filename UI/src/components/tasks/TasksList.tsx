@@ -7,6 +7,7 @@ interface TasksListProps {
   onTaskClick: (taskId: string) => void;
   pinnedTaskIds?: Set<string>;
   onTaskPinToggle?: (taskId: string, shouldPin: boolean) => void;
+  canToggleStatus?: boolean;
 }
 
 const getPriorityColor = (priority: string) => {
@@ -51,6 +52,7 @@ const TasksList: React.FC<TasksListProps> = ({
   onTaskClick,
   pinnedTaskIds,
   onTaskPinToggle,
+  canToggleStatus = true,
 }) => {
   return (
     <div className="flex flex-col gap-3">
@@ -70,6 +72,7 @@ const TasksList: React.FC<TasksListProps> = ({
                 className="h-5 w-5 rounded border-slate-300 bg-transparent text-blue-600 focus:ring-blue-600 focus:ring-offset-0 focus:outline-none cursor-pointer"
                 type="checkbox"
                 checked={isCompleted}
+                disabled={!canToggleStatus}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => onTaskToggle(task.id, e.target.checked)}
               />

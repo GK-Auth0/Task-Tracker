@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { projectService } from "../services/projectService";
 import { tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
@@ -10,10 +11,14 @@ import ProjectsFilters from "../components/projects/ProjectsFilters";
 import ProjectsGrid from "../components/projects/ProjectsGrid";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
 import SavedViewsBar from "../components/preferences/SavedViewsBar";
+import { useAuth } from "../contexts/AuthContext";
+import { canManageWorkspaceContent } from "../types/roles";
 
 type ProjectStatusFilter = "all" | Project["status"];
 
 const Projects: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,6 +33,7 @@ const Projects: React.FC = () => {
   const [selectedViewId, setSelectedViewId] = useState("");
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
+  const canCreateProject = canManageWorkspaceContent(user?.role);
 
   useEffect(() => {
     fetchProjects();
@@ -35,6 +41,13 @@ const Projects: React.FC = () => {
     fetchPinnedProjects();
     fetchSavedViews();
   }, []);
+
+  useEffect(() => {
+    const query = searchParams.get("q");
+    if (query !== null) {
+      setSearchTerm(query);
+    }
+  }, [searchParams]);
 
   const fetchProjects = async () => {
     try {
@@ -93,6 +106,7 @@ const Projects: React.FC = () => {
   };
 
   const handleCreateProject = async (projectData: CreateProjectRequest) => {
+    if (!canCreateProject) return;
     try {
       console.log("Creating project with data:", projectData);
       const response = await projectService.createProject(projectData);
@@ -210,7 +224,10 @@ const Projects: React.FC = () => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="min-h-full p-8">
-        <ProjectsHeader onCreate={() => setShowCreateModal(true)} />
+        <ProjectsHeader
+          onCreate={() => setShowCreateModal(true)}
+          canCreate={canCreateProject}
+        />
 
         <SavedViewsBar
           title="Project Saved Views"
@@ -319,13 +336,14 @@ const Projects: React.FC = () => {
           onCreate={() => setShowCreateModal(true)}
           pinnedProjectIds={pinnedProjectIds}
           onProjectPinToggle={handleToggleProjectPin}
+          canCreate={canCreateProject}
         />
 
         {filteredProjects.length === 0 && <ProjectsEmptyState />}
       </div>
 
       {/* Create Project Modal */}
-      {showCreateModal && (
+      {canCreateProject && showCreateModal && (
         <CreateProjectModal
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateProject}

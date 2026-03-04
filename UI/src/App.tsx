@@ -7,6 +7,7 @@ import {
 import { QueryClient, QueryClientProvider } from "react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
+import Tasks from "./pages/Tasks";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Profile from "./pages/Profile";
@@ -18,11 +19,13 @@ import Register from "./pages/Register";
 import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./pages/NotFound";
 import TaskDetails from "./components/TaskDetails";
 import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
 import Layout from "./components/Layout";
 import AiMonitoring from "./pages/AiMonitoring";
+import { hasMinimumWorkspaceRole, type WorkspaceRole } from "./types/roles";
 
 const queryClient = new QueryClient();
 
@@ -54,7 +57,13 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return user ? <Navigate to="/dashboard" /> : <>{children}</>;
 }
 
-function RouteFallback() {
+function RoleProtectedRoute({
+  minRole,
+  children,
+}: {
+  minRole: WorkspaceRole;
+  children: React.ReactNode;
+}) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -65,7 +74,15 @@ function RouteFallback() {
     );
   }
 
-  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!hasMinimumWorkspaceRole(user.role, minRole)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function AppRoutes() {
@@ -121,6 +138,7 @@ function AppRoutes() {
         }
       >
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="tasks" element={<Tasks />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="calendar" element={<Calendar />} />
@@ -129,7 +147,14 @@ function AppRoutes() {
         <Route path="ai-monitoring" element={<AiMonitoring />} />
         <Route path="profile" element={<Profile />} />
         <Route path="coming-soon" element={<ComingSoon />} />
-        <Route path="team" element={<TeamManagement />} />
+        <Route
+          path="team"
+          element={
+            <RoleProtectedRoute minRole="Admin">
+              <TeamManagement />
+            </RoleProtectedRoute>
+          }
+        />
       </Route>
       <Route
         path="/task/:id"
@@ -139,7 +164,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<RouteFallback />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

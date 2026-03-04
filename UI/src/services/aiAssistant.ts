@@ -61,6 +61,50 @@ export interface AiServiceMetrics {
   endpoints: Record<string, AiEndpointMetric>;
 }
 
+export interface AiAutoInsightTask {
+  title: string;
+  priority: "Low" | "Medium" | "High";
+  due_date?: string;
+  status?: string;
+  estimated_hours?: number;
+}
+
+export interface AiAutoInsightProject {
+  id?: string;
+  name: string;
+  status?: string;
+  priority?: string;
+}
+
+export interface AiAutoInsights {
+  summary: string;
+  risk_level: "Low" | "Medium" | "High";
+  insights: string[];
+  recommendations: string[];
+  priority_tasks: Array<{
+    title: string;
+    priority: string;
+    due_date?: string;
+  }>;
+  snapshot_lines: string[];
+  quick_actions: string[];
+}
+
+export interface AiWorkloadForecast {
+  window_days: number;
+  due_task_count: number;
+  estimated_hours: number;
+  high_priority_due_count: number;
+  pressure: "Low" | "Medium" | "High";
+  recommendations: string[];
+}
+
+export interface AiChatContextResult {
+  reply: string;
+  context_snapshot: string;
+  quick_actions: string[];
+}
+
 export const aiAssistantAPI = {
   suggestTask: async (
     title: string,
@@ -83,6 +127,44 @@ export const aiAssistantAPI = {
 
   projectInsights: async (tasks: AiPlanTask[]): Promise<AiProjectInsights> => {
     const response = await aiApi.post("/project-insights", { tasks });
+    return response.data.data;
+  },
+
+  autoInsights: async (
+    tasks: AiAutoInsightTask[],
+    projects: AiAutoInsightProject[],
+    routeContext: string = "/dashboard",
+  ): Promise<AiAutoInsights> => {
+    const response = await aiApi.post("/auto-insights", {
+      tasks,
+      projects,
+      route_context: routeContext,
+    });
+    return response.data.data;
+  },
+
+  workloadForecast: async (
+    tasks: AiAutoInsightTask[],
+    days: number = 7,
+  ): Promise<AiWorkloadForecast> => {
+    const response = await aiApi.post("/workload-forecast", { tasks, days });
+    return response.data.data;
+  },
+
+  chatContext: async (
+    message: string,
+    tasks: AiAutoInsightTask[],
+    projects: AiAutoInsightProject[],
+    routeContext: string = "/dashboard",
+    responseMode: "concise" | "balanced" | "detailed" = "balanced",
+  ): Promise<AiChatContextResult> => {
+    const response = await aiApi.post("/chat-context", {
+      message,
+      tasks,
+      projects,
+      route_context: routeContext,
+      response_mode: responseMode,
+    });
     return response.data.data;
   },
 
