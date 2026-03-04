@@ -54,6 +54,20 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return user ? <Navigate to="/dashboard" /> : <>{children}</>;
 }
 
+function RouteFallback() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -125,6 +139,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="*" element={<RouteFallback />} />
     </Routes>
   );
 }

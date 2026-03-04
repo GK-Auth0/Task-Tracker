@@ -17,6 +17,8 @@ const OTP_SEND_ASYNC_ON_REGISTER =
   (process.env.OTP_SEND_ASYNC_ON_REGISTER || "true").trim().toLowerCase() === "true";
 const OTP_FAIL_OPEN_ON_REGISTER =
   (process.env.OTP_FAIL_OPEN_ON_REGISTER || "true").trim().toLowerCase() === "true";
+const REGISTER_METADATA_ASYNC =
+  (process.env.REGISTER_METADATA_ASYNC || "true").trim().toLowerCase() === "true";
 const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
   process.env.RESET_TOKEN_EXPIRES_MINUTES || "30",
   10,
@@ -190,6 +192,11 @@ const logOtpSendFailure = (email: string, purpose: OtpPurpose, error: unknown) =
   );
 };
 
+const logMetadataWriteFailure = (userId: string, error: unknown) => {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  console.error(`[auth] Failed to store registration metadata (userId=${userId}): ${message}`);
+};
+
 const buildAuthSuccessResult = (user: User): AuthSuccessResult => {
   return {
     user: getUserWithoutPassword(user),
@@ -227,7 +234,9 @@ const createOtpChallengeForUser = async (
     is_verified: false,
   });
 
-  if (purpose === "register" && OTP_SEND_ASYNC_ON_REGISTER) {
+  const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
+
+  if (shouldSendAsync) {
     void sendOtpNotification(user.email, otp, purpose).catch((error) => {
       logOtpSendFailure(user.email, purpose, error);
     });
@@ -269,14 +278,24 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
   });
 
   if (dto.ip) {
-    const geoData = await getIPGeolocation(dto.ip);
-    const userAgentData = dto.userAgent ? parseUserAgent(dto.userAgent) : {};
+    const writeMetadata = async () => {
+      const geoData = await getIPGeolocation(dto.ip as string);
+      const userAgentData = dto.userAgent ? parseUserAgent(dto.userAgent) : {};
 
-    await UserMetadata.create({
-      user_id: user.id,
-      ...geoData,
-      ...userAgentData,
-    });
+      await UserMetadata.create({
+        user_id: user.id,
+        ...geoData,
+        ...userAgentData,
+      });
+    };
+
+    if (REGISTER_METADATA_ASYNC) {
+      void writeMetadata().catch((error) => {
+        logMetadataWriteFailure(user.id, error);
+      });
+    } else {
+      await writeMetadata();
+    }
   }
 
   return createOtpChallengeForUser(user, "register");
@@ -406,7 +425,24 @@ export async function resendOtp(sessionId: string): Promise<OtpChallengeResult> 
   otpSession.attempts = 0;
   await otpSession.save();
 
-  await sendOtpNotification(user.email, otp, otpSession.purpose);
+  const purpose = otpSession.purpose as OtpPurpose;
+  const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
+
+  if (shouldSendAsync) {
+    void sendOtpNotification(user.email, otp, purpose).catch((error) => {
+      logOtpSendFailure(user.email, purpose, error);
+    });
+  } else {
+    try {
+      await sendOtpNotification(user.email, otp, purpose);
+    } catch (error) {
+      if (purpose === "register" && OTP_FAIL_OPEN_ON_REGISTER) {
+        logOtpSendFailure(user.email, purpose, error);
+      } else {
+        throw error;
+      }
+    }
+  }
 
   return {
     requiresOtp: true,

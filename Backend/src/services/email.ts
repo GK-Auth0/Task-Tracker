@@ -12,6 +12,10 @@ const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
 const SMTP_TIMEOUT_MS = parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10);
 const SMTP_IP_FAMILY = parseInt(process.env.SMTP_IP_FAMILY || "4", 10);
+const EMAIL_HTTP_TIMEOUT_MS = parseInt(process.env.EMAIL_HTTP_TIMEOUT_MS || "10000", 10);
+
+let smtpTransporter: any = null;
+let smtpTransporterKey: string | null = null;
 
 const buildOtpHtml = (otp: string, purpose: string) => {
   return `
@@ -102,6 +106,7 @@ export const sendOtpEmail = async (
           Authorization: `Bearer ${RESEND_API_KEY}`,
           "Content-Type": "application/json",
         },
+        timeout: EMAIL_HTTP_TIMEOUT_MS,
       },
     );
     return;
@@ -125,6 +130,7 @@ export const sendOtpEmail = async (
         headers: {
           "Content-Type": "application/json",
         },
+        timeout: EMAIL_HTTP_TIMEOUT_MS,
       },
     );
     return;
@@ -177,6 +183,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           Authorization: `Bearer ${RESEND_API_KEY}`,
           "Content-Type": "application/json",
         },
+        timeout: EMAIL_HTTP_TIMEOUT_MS,
       },
     );
     return;
@@ -199,6 +206,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
         headers: {
           "Content-Type": "application/json",
         },
+        timeout: EMAIL_HTTP_TIMEOUT_MS,
       },
     );
     return;
@@ -268,6 +276,7 @@ export const sendWorkspaceInviteEmail = async (options: {
           Authorization: `Bearer ${RESEND_API_KEY}`,
           "Content-Type": "application/json",
         },
+        timeout: EMAIL_HTTP_TIMEOUT_MS,
       },
     );
     return;
@@ -291,10 +300,34 @@ const sendSmtpEmail = async (options: {
   subject: string;
   html: string;
 }) => {
-  const transporter = nodemailer.createTransport({
+  const transporter = getSmtpTransporter(options);
+
+  await transporter.sendMail({
+    from: options.from,
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+  });
+};
+
+const getSmtpTransporter = (options: {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+}) => {
+  const key = `${options.host}:${options.port}:${options.username}`;
+  if (smtpTransporter && smtpTransporterKey === key) {
+    return smtpTransporter;
+  }
+
+  smtpTransporter = nodemailer.createTransport({
     host: options.host,
     port: options.port,
     secure: options.port === 465,
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
     family: SMTP_IP_FAMILY === 6 ? 6 : 4,
     auth: {
       user: options.username,
@@ -303,12 +336,9 @@ const sendSmtpEmail = async (options: {
     connectionTimeout: SMTP_TIMEOUT_MS,
     greetingTimeout: SMTP_TIMEOUT_MS,
     socketTimeout: SMTP_TIMEOUT_MS,
-  });
+    dnsTimeout: SMTP_TIMEOUT_MS,
+  } as any);
+  smtpTransporterKey = key;
 
-  await transporter.sendMail({
-    from: options.from,
-    to: options.to,
-    subject: options.subject,
-    html: options.html,
-  });
+  return smtpTransporter;
 };
