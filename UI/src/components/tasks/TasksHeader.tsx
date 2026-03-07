@@ -3,28 +3,38 @@ import { DashboardSummary } from "./types";
 
 interface TasksHeaderProps {
   summary: DashboardSummary | null;
+  visibleCount: number;
   onCreate: () => void;
+  canCreate?: boolean;
 }
 
-const TasksHeader: React.FC<TasksHeaderProps> = ({ summary, onCreate }) => {
+const TasksHeader: React.FC<TasksHeaderProps> = ({
+  summary,
+  visibleCount,
+  onCreate,
+  canCreate = true,
+}) => {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
-      <div>
-        <h2 className="text-gray-900 text-2xl sm:text-3xl font-black tracking-tight">
-          My Tasks
-        </h2>
-        <p className="text-gray-600 mt-1 text-sm sm:text-base">
-          You have {summary?.total_tasks || 0} tasks, {summary?.overdue_tasks || 0}{" "}
-          overdue.
-        </p>
+    <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-slate-900 text-xl sm:text-2xl font-black tracking-tight">
+            My Tasks
+          </h2>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+            {visibleCount}/{summary?.total_tasks || 0}
+          </span>
+        </div>
+        {canCreate && (
+          <button
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
+            onClick={onCreate}
+          >
+            <span className="material-symbols-outlined text-lg">add_task</span>
+            <span>Create Task</span>
+          </button>
+        )}
       </div>
-      <button
-        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
-        onClick={onCreate}
-      >
-        <span className="material-symbols-outlined text-lg">add</span>
-        <span>Create Task</span>
-      </button>
     </div>
   );
 };

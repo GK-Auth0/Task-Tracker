@@ -38,6 +38,19 @@ Optional env vars:
 - `AI_MAX_BODY_BYTES` (default `1048576`)
 - `AI_ALLOWED_ORIGINS` (comma-separated origins, use `*` for open CORS)
 - `AI_API_KEY` (optional; if set, POST endpoints require `X-API-Key`)
+- `AI_CHAT_PROVIDER` (`rule-based` default, `gemini`, or `auto`)
+- `GEMINI_API_KEY` (required when `AI_CHAT_PROVIDER=gemini` or `auto`)
+- `GEMINI_MODEL` (default `gemini-2.0-flash`)
+- `GEMINI_BASE_URL` (default `https://generativelanguage.googleapis.com/v1beta`)
+- `GEMINI_TIMEOUT_SEC` (default `12`)
+
+### Gemini integration
+
+- Gemini can enhance all core AI endpoints (`/suggest-task`, `/plan-day`, `/project-insights`, `/auto-insights`, `/workload-forecast`, `/chat-context`).
+- If Gemini fails or is not configured, every endpoint falls back to built-in deterministic logic automatically.
+- `/health` now includes:
+  - `chat_provider` (current provider mode)
+  - `gemini_configured` (`true/false` based on `GEMINI_API_KEY`)
 
 ## Endpoints
 

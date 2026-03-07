@@ -18,6 +18,14 @@ export interface Project {
   members?: ProjectMember[];
   tasks?: ProjectTask[];
   progress?: number;
+  member_count?: number;
+  confidential_access?: {
+    can_view: boolean;
+    role: string | null;
+    request_status: "none" | "pending" | "approved" | "rejected";
+    requested_at?: string | null;
+    decision_note?: string | null;
+  };
 }
 
 export interface ProjectMember {
@@ -48,7 +56,7 @@ export interface ProjectTask {
 
 export interface CreateProjectRequest {
   name: string;
-  description?: string;
+  description: string;
   status?: "planning" | "active" | "on_hold";
   priority?: "low" | "medium" | "high";
   startDate?: string;

@@ -7,13 +7,20 @@ import {
 } from "react";
 import { authAPI } from "../services/auth";
 import type { OtpChallenge } from "../services/auth";
+import {
+  normalizeWorkspaceRole,
+  type WorkspaceRole,
+} from "../types/roles";
 
 interface User {
   id: string;
   email: string;
   full_name: string;
-  role: string;
+  role: WorkspaceRole;
 }
+
+const normalizeUserRole = (role: unknown): WorkspaceRole =>
+  normalizeWorkspaceRole(role) || "Member";
 
 interface AuthContextType {
   user: User | null;
@@ -76,7 +83,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (token) {
         try {
           const response = await authAPI.getCurrentUser();
-          setUser(response.data);
+          setUser({
+            ...response.data,
+            role: normalizeUserRole(response.data.role),
+          });
         } catch (error) {
           localStorage.removeItem("token");
           setToken(null);
@@ -93,7 +103,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { user, token } = response.data;
     localStorage.setItem("token", token);
     setToken(token);
-    setUser(user);
+    setUser({ ...user, role: normalizeUserRole(user.role) });
   };
 
   const loginWithAuth0 = async (accessToken: string): Promise<void> => {
@@ -101,7 +111,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { user, token } = response.data;
     localStorage.setItem("token", token);
     setToken(token);
-    setUser(user);
+    setUser({ ...user, role: normalizeUserRole(user.role) });
   };
 
   const register = async (
@@ -125,7 +135,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     localStorage.setItem("token", token);
     setToken(token);
-    setUser(user);
+    setUser({ ...user, role: normalizeUserRole(user.role) });
   };
 
   const resendOtp = async (otpSessionId: string): Promise<OtpChallenge> => {

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { CreateProjectRequest } from "../types/project";
 import axios from "axios";
+import aiChatAPI from "../services/aiChat";
+import { buildProjectTemplate } from "../utils/descriptionTemplates";
 
 import { API_BASE_URL } from "../config/api";
 
@@ -38,6 +40,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Fetch users when search term changes
   useEffect(() => {
@@ -76,6 +81,11 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     if (!formData.name.trim()) {
       newErrors.name = "Project name is required";
     }
+    if (!formData.description.trim()) {
+      newErrors.description = "Description is required";
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = "Description should be at least 10 characters";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -83,8 +93,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     }
 
     const projectData: CreateProjectRequest = {
-      name: formData.name,
-      description: formData.description,
+      name: formData.name.trim(),
+      description: formData.description.trim(),
       status: formData.status,
       priority: formData.priority,
       memberIds: selectedMembers.map((m) => m.id),
@@ -99,7 +109,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       projectData.endDate = formData.endDate;
     }
 
-    console.log("Submitting project data:", projectData);
     onSubmit(projectData);
   };
 
@@ -161,9 +170,81 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setInvitees((prev) => prev.filter((item) => item.email !== email));
   };
 
+  const applyProjectTemplate = () => {
+    setFormData((prev) => ({
+      ...prev,
+      description: buildProjectTemplate(prev.name),
+    }));
+    setAiError("");
+    if (errors.description) {
+      setErrors((prev) => ({ ...prev, description: "" }));
+    }
+  };
+
+  const generateProjectDescriptionWithAi = async () => {
+    const name = formData.name.trim() || "Untitled Project";
+    try {
+      setAiLoading(true);
+      setAiError("");
+      const prompt = [
+        "Generate a practical project description using this exact section order:",
+        "Overview, Problem Statement, Goals, Success Metrics, Scope, Milestones, Stakeholders, Risks & Mitigation.",
+        `Project name: ${name}.`,
+        "Keep it concise, actionable, and in plain text with bullets.",
+      ].join(" ");
+      const response = await aiChatAPI.chat(prompt, "/projects/create", "balanced");
+      const draft = String(response?.data?.reply || "").trim();
+      if (!draft) {
+        setAiError("AI did not return a draft.");
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        description: draft.slice(0, 2000),
+      }));
+      if (errors.description) {
+        setErrors((prev) => ({ ...prev, description: "" }));
+      }
+    } catch (error) {
+      setAiError("AI draft unavailable right now.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const formatDescription = (
+    mode: "bold" | "italic" | "bullet" | "numbered" | "quote",
+  ) => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = formData.description.slice(start, end);
+    const hasSelection = start !== end;
+
+    const wrap = (prefix: string, suffix: string = "") => {
+      const nextText =
+        formData.description.slice(0, start) +
+        (hasSelection ? `${prefix}${selectedText}${suffix}` : `${prefix}${suffix}`) +
+        formData.description.slice(end);
+      setFormData((prev) => ({ ...prev, description: nextText }));
+      if (errors.description) {
+        setErrors((prev) => ({ ...prev, description: "" }));
+      }
+    };
+
+    if (mode === "bold") wrap("**", "**");
+    if (mode === "italic") wrap("*", "*");
+    if (mode === "bullet") wrap("- ");
+    if (mode === "numbered") wrap("1. ");
+    if (mode === "quote") wrap("> ");
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-[640px] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-[760px] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
+        <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
         {/* Modal Header */}
         <div className="border-b border-slate-100 p-6 flex items-center justify-between">
           <div>
@@ -185,6 +266,26 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
+                Project Preview
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div
+                  className="size-8 rounded-full border border-white shadow"
+                  style={{ backgroundColor: selectedColor }}
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">
+                    {formData.name.trim() || "Untitled Project"}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {selectedMembers.length} members selected • {invitees.length} invites
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Project Name */}
             <div className="flex flex-col gap-2">
               <label className="flex flex-col w-full">
@@ -212,15 +313,86 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             <div className="flex flex-col gap-2">
               <label className="flex flex-col w-full">
                 <p className="text-[#0d151b] text-sm font-semibold leading-normal pb-1">
-                  Description (Optional)
+                  Description
                 </p>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+                    onClick={applyProjectTemplate}
+                    disabled={aiLoading}
+                  >
+                    Jira Template
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-cyan-200 bg-cyan-50 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-60"
+                    onClick={generateProjectDescriptionWithAi}
+                    disabled={aiLoading}
+                  >
+                    {aiLoading ? "Generating..." : "AI Draft"}
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    onClick={() => formatDescription("bold")}
+                  >
+                    Bold
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    onClick={() => formatDescription("italic")}
+                  >
+                    Italic
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    onClick={() => formatDescription("bullet")}
+                  >
+                    Bullet
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    onClick={() => formatDescription("numbered")}
+                  >
+                    Numbered
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    onClick={() => formatDescription("quote")}
+                  >
+                    Quote
+                  </button>
+                </div>
                 <textarea
+                  ref={descriptionRef}
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  className="form-input flex w-full min-w-0 flex-1 resize-none rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border border-[#cfdce7] bg-white focus:border-blue-600 min-h-[100px] placeholder:text-[#4c759a] p-4 text-base font-normal leading-normal"
-                  placeholder="Describe the goals of this project..."
+                  maxLength={2000}
+                  className={`form-input flex w-full min-w-0 flex-1 resize-none rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border bg-white focus:border-blue-600 min-h-[120px] placeholder:text-[#4c759a] p-4 text-base font-normal leading-normal ${
+                    errors.description ? "border-red-300 bg-red-50" : "border-[#cfdce7]"
+                  }`}
+                  placeholder="Describe goals, scope, success criteria, and key milestones..."
                 />
+                <div className="mt-1 flex items-center justify-between">
+                  {errors.description ? (
+                    <p className="text-red-500 text-xs">{errors.description}</p>
+                  ) : aiError ? (
+                    <p className="text-amber-700 text-xs">{aiError}</p>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      Use simple markdown-style formatting with the buttons.
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400">
+                    {formData.description.length}/2000
+                  </p>
+                </div>
               </label>
             </div>
 

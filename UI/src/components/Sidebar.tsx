@@ -1,5 +1,10 @@
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useLocation } from "react-router-dom";
+import {
+  hasMinimumWorkspaceRole,
+  isWorkspaceAdmin,
+  type WorkspaceRole,
+} from "../types/roles";
 
 interface SidebarProps {
   isDesktopCollapsed: boolean;
@@ -9,14 +14,22 @@ interface SidebarProps {
   onCloseMobile: () => void;
 }
 
-const NAV_ITEMS = [
+type NavItem = {
+  path: string;
+  title: string;
+  icon: string;
+  minRole?: WorkspaceRole;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { path: "/dashboard", title: "Dashboard", icon: "dashboard" },
+  { path: "/tasks", title: "Tasks", icon: "check_box" },
   { path: "/projects", title: "Projects", icon: "folder_open" },
-  { path: "/dashboard", title: "Tasks", icon: "check_box" },
   { path: "/calendar", title: "Calendar", icon: "calendar_month" },
   { path: "/activity", title: "Activity Log", icon: "list_alt" },
   { path: "/chat", title: "Chat", icon: "chat_bubble" },
   { path: "/ai-monitoring", title: "AI Monitoring", icon: "monitoring" },
-  { path: "/team", title: "Team", icon: "group" },
+  { path: "/team", title: "Team", icon: "group", minRole: "Admin" as const },
   { path: "/coming-soon", title: "Settings", icon: "settings" },
 ];
 
@@ -31,6 +44,9 @@ export default function Sidebar({
   const location = useLocation();
 
   const isCollapsed = isDesktopView ? isDesktopCollapsed : false;
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    item.minRole ? hasMinimumWorkspaceRole(user?.role, item.minRole) : true,
+  );
 
   const isActive = (path: string, title: string) => {
     if (title === "Settings") {
@@ -98,7 +114,7 @@ export default function Sidebar({
 
           {/* Nav Links */}
           <nav className="flex flex-col gap-1 overflow-y-auto pr-1">
-            {NAV_ITEMS.map((item) => (
+            {visibleNavItems.map((item) => (
               <Link
                 key={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
@@ -159,7 +175,7 @@ export default function Sidebar({
                   {user?.full_name || "User"}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
-                  {user?.role || "Member"}
+                  {user?.role || "Member"}{isWorkspaceAdmin(user?.role) ? " • Workspace Admin" : ""}
                 </p>
               </div>
             )}

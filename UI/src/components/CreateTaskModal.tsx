@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
+import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
 
 interface User {
   id: string;
@@ -40,6 +41,8 @@ export default function CreateTaskModal({
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
+  const [descriptionError, setDescriptionError] = useState("");
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() => {
     const local = getTaskAiSuggestion("", "");
     return {
@@ -52,6 +55,11 @@ export default function CreateTaskModal({
   });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+
+  const applyTaskTemplate = () => {
+    setDescription(buildTaskTemplate(title).slice(0, 1000));
+    if (descriptionError) setDescriptionError("");
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -155,26 +163,25 @@ export default function CreateTaskModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || (projects.length > 0 && !projectId)) return;
+    if (!description.trim()) {
+      setDescriptionError("Description is required");
+      return;
+    }
+    if (description.trim().length < 10) {
+      setDescriptionError("Description should be at least 10 characters");
+      return;
+    }
 
     setLoading(true);
     try {
-      console.log('Creating task with data:', {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        project_id: projectId,
-        assignee_id: assigneeId || undefined,
-        due_date: dueDate || undefined,
-        priority,
-        invitees,
-      });
-      
       await tasksAPI.createTask({
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: description.trim(),
         project_id: projectId,
         assignee_id: assigneeId || undefined,
         due_date: dueDate || undefined,
         priority: priority || "Medium", // Ensure priority is never undefined
+        invitees,
       });
 
       // Reset form
@@ -218,9 +225,37 @@ export default function CreateTaskModal({
     setInvitees((prev) => prev.filter((item) => item.email !== email));
   };
 
+  const formatDescription = (
+    mode: "bold" | "italic" | "bullet" | "numbered" | "quote",
+  ) => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = description.slice(start, end);
+    const hasSelection = start !== end;
+
+    const apply = (prefix: string, suffix: string = "") => {
+      const next =
+        description.slice(0, start) +
+        (hasSelection ? `${prefix}${selectedText}${suffix}` : `${prefix}${suffix}`) +
+        description.slice(end);
+      setDescription(next.slice(0, 1000));
+      if (descriptionError) setDescriptionError("");
+    };
+
+    if (mode === "bold") apply("**", "**");
+    if (mode === "italic") apply("*", "*");
+    if (mode === "bullet") apply("- ");
+    if (mode === "numbered") apply("1. ");
+    if (mode === "quote") apply("> ");
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-[640px] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div className="bg-white w-full max-w-[760px] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
+        <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex flex-col">
@@ -242,6 +277,33 @@ export default function CreateTaskModal({
         {/* Modal Body (Form) */}
         <div className="px-6 py-4 overflow-y-auto max-h-[80vh]">
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
+                Task Preview
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">
+                    {title.trim() || "Untitled Task"}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {priority} Priority {projectId ? "• Project Selected" : ""}
+                  </p>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    priority === "High"
+                      ? "bg-rose-100 text-rose-700"
+                      : priority === "Medium"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-sky-100 text-sky-700"
+                  }`}
+                >
+                  {priority}
+                </span>
+              </div>
+            </div>
+
             {/* Task Name */}
             <div className="flex flex-col gap-2">
               <label className="text-gray-900 text-sm font-semibold">
@@ -530,12 +592,7 @@ export default function CreateTaskModal({
                   type="button"
                   className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
                   onClick={() => {
-                    const checklistText = aiSuggestion.checklist
-                      .map((item) => `- ${item}`)
-                      .join("\n");
-                    const next = description.trim()
-                      ? `${description.trim()}\n\nChecklist:\n${checklistText}`
-                      : `Checklist:\n${checklistText}`;
+                    const next = appendTaskAiDraft(description, title, aiSuggestion).slice(0, 1000);
                     setDescription(next);
                   }}
                 >
@@ -552,8 +609,16 @@ export default function CreateTaskModal({
                 </label>
                 <div className="flex gap-1">
                   <button
+                    className="h-7 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    type="button"
+                    onClick={applyTaskTemplate}
+                  >
+                    Jira Template
+                  </button>
+                  <button
                     className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
                     type="button"
+                    onClick={() => formatDescription("bold")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       format_bold
@@ -562,6 +627,7 @@ export default function CreateTaskModal({
                   <button
                     className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
                     type="button"
+                    onClick={() => formatDescription("italic")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       format_italic
@@ -570,19 +636,55 @@ export default function CreateTaskModal({
                   <button
                     className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
                     type="button"
+                    onClick={() => formatDescription("bullet")}
                   >
                     <span className="material-symbols-outlined text-lg">
                       format_list_bulleted
                     </span>
                   </button>
+                  <button
+                    className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                    type="button"
+                    onClick={() => formatDescription("numbered")}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      format_list_numbered
+                    </span>
+                  </button>
+                  <button
+                    className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                    type="button"
+                    onClick={() => formatDescription("quote")}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      format_quote
+                    </span>
+                  </button>
                 </div>
               </div>
               <textarea
-                className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 min-h-[120px] p-4 text-sm placeholder:text-slate-400"
-                placeholder="Describe the work to be done..."
+                ref={descriptionRef}
+                maxLength={1000}
+                className={`w-full rounded-lg text-gray-900 border bg-white focus:ring-blue-600 focus:border-blue-600 min-h-[120px] p-4 text-sm placeholder:text-slate-400 ${
+                  descriptionError ? "border-red-300 bg-red-50" : "border-gray-300"
+                }`}
+                placeholder="Describe the work to be done, outcome, and acceptance criteria..."
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  if (descriptionError) setDescriptionError("");
+                }}
               ></textarea>
+              <div className="flex items-center justify-between">
+                {descriptionError ? (
+                  <p className="text-xs text-red-500">{descriptionError}</p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Description is required (min 10 characters).
+                  </p>
+                )}
+                <p className="text-xs text-slate-400">{description.length}/1000</p>
+              </div>
             </div>
 
             {/* Attachments Placeholder */}
@@ -610,7 +712,11 @@ export default function CreateTaskModal({
             type="submit"
             onClick={handleSubmit}
             disabled={
-              loading || !title.trim() || (projects.length > 0 && !projectId)
+              loading ||
+              !title.trim() ||
+              !description.trim() ||
+              description.trim().length < 10 ||
+              (projects.length > 0 && !projectId)
             }
           >
             <span className="material-symbols-outlined text-lg">add_task</span>

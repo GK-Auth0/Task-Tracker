@@ -1,206 +1,230 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { dashboardAPI, tasksAPI } from "../services/dashboard";
-import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
-import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
-import AiMonitoringPanel from "../components/ai/AiMonitoringPanel";
-import CreateTaskModal from "../components/CreateTaskModal";
-import TasksHeader from "../components/tasks/TasksHeader";
-import TasksFiltersBar from "../components/tasks/TasksFiltersBar";
-import TasksList from "../components/tasks/TasksList";
-import TasksPagination from "../components/tasks/TasksPagination";
-import TasksEmptyState from "../components/tasks/TasksEmptyState";
-import SavedViewsBar from "../components/preferences/SavedViewsBar";
-import { DashboardSummary, TaskItem, TasksPagination as TasksPageData } from "../components/tasks/types";
+import {
+  dashboardAPI,
+  tasksAPI,
+  type DashboardInsights,
+  type DashboardOverview,
+  type DashboardOverviewActivity,
+  type DashboardOverviewUpcomingTask,
+} from "../services/dashboard";
+import { projectService } from "../services/projectService";
+import {
+  aiAssistantAPI,
+  type AiAutoInsightProject,
+  type AiAutoInsightTask,
+  type AiAutoInsights,
+  type AiChatContextResult,
+  type AiWorkloadForecast,
+} from "../services/aiAssistant";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import DashboardStatsGrid from "../components/dashboard/DashboardStatsGrid";
+import DashboardInsightsPanel from "../components/dashboard/DashboardInsightsPanel";
+import DashboardUpcomingTasks from "../components/dashboard/DashboardUpcomingTasks";
+import DashboardRecentActivity from "../components/dashboard/DashboardRecentActivity";
+import DashboardProjectsPanel, {
+  DashboardProjectDetail,
+} from "../components/dashboard/DashboardProjectsPanel";
+import DashboardAiPanel from "../components/dashboard/DashboardAiPanel";
+
+const formatDueText = (daysToDue: number | null) => {
+  if (daysToDue === null) return "No due date";
+  if (daysToDue < 0) return `Overdue by ${Math.abs(daysToDue)}d`;
+  if (daysToDue === 0) return "Due today";
+  if (daysToDue === 1) return "Due tomorrow";
+  return `Due in ${daysToDue}d`;
+};
+
+const formatActivityText = (activity: DashboardOverviewActivity) => {
+  const actor = activity.user?.full_name || "A user";
+  const target = activity.entity_type;
+
+  switch (activity.action) {
+    case "created":
+      return `${actor} created a ${target}`;
+    case "updated":
+      return `${actor} updated a ${target}`;
+    case "deleted":
+      return `${actor} deleted a ${target}`;
+    case "status_changed":
+      return `${actor} changed ${target} status`;
+    case "assigned":
+      return `${actor} assigned a ${target}`;
+    case "unassigned":
+      return `${actor} unassigned a ${target}`;
+    default:
+      return `${actor} updated a ${target}`;
+  }
+};
+
+const priorityBadgeClass = (priority: DashboardOverviewUpcomingTask["priority"]) => {
+  if (priority === "High") {
+    return "bg-rose-100 text-rose-700 border-rose-200";
+  }
+  if (priority === "Medium") {
+    return "bg-amber-100 text-amber-700 border-amber-200";
+  }
+  return "bg-sky-100 text-sky-700 border-sky-200";
+};
+
+const statusBadgeClass = (status: DashboardOverviewUpcomingTask["status"]) => {
+  if (status === "Done") {
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  }
+  if (status === "In Progress") {
+    return "bg-blue-100 text-blue-700 border-blue-200";
+  }
+  return "bg-slate-100 text-slate-700 border-slate-200";
+};
+
+const parseProjects = (payload: unknown): DashboardProjectDetail[] => {
+  if (Array.isArray((payload as { data?: unknown })?.data)) {
+    return ((payload as { data: unknown[] }).data || []).map((project: any) => ({
+      id: String(project?.id || ""),
+      name: String(project?.name || "Untitled Project"),
+      description: project?.description ? String(project.description) : undefined,
+      status: String(project?.status || "planning").toLowerCase(),
+      priority: String(project?.priority || "medium").toLowerCase(),
+    }));
+  }
+
+  const nested = (payload as { data?: { data?: unknown } })?.data?.data;
+  if (Array.isArray(nested)) {
+    return nested.map((project: any) => ({
+      id: String(project?.id || ""),
+      name: String(project?.name || "Untitled Project"),
+      description: project?.description ? String(project.description) : undefined,
+      status: String(project?.status || "planning").toLowerCase(),
+      priority: String(project?.priority || "medium").toLowerCase(),
+    }));
+  }
+
+  return [];
+};
+
+const mapTaskForAi = (task: {
+  title: string;
+  priority: "Low" | "Medium" | "High";
+  due_date?: string;
+  status: string;
+}): AiAutoInsightTask => ({
+  title: task.title,
+  priority: task.priority,
+  due_date: task.due_date,
+  status: task.status,
+  estimated_hours:
+    task.priority === "High" ? 3 : task.priority === "Medium" ? 2 : 1.25,
+});
+
+const mapProjectForAi = (project: DashboardProjectDetail): AiAutoInsightProject => ({
+  id: project.id,
+  name: project.name,
+  status: project.status,
+  priority: project.priority,
+});
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>("");
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [priorityFilter, setPriorityFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState<TasksPageData | null>(null);
-  const [dayPlan, setDayPlan] = useState<AiDayPlan | null>(null);
-  const [planning, setPlanning] = useState(false);
-  const [planError, setPlanError] = useState("");
-  const [pinnedTaskIds, setPinnedTaskIds] = useState<Set<string>>(new Set());
-  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
-  const [selectedViewId, setSelectedViewId] = useState("");
-  const [newViewName, setNewViewName] = useState("");
-  const [savingView, setSavingView] = useState(false);
-  const itemsPerPage = 5;
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [insights, setInsights] = useState<DashboardInsights | null>(null);
+  const [projects, setProjects] = useState<DashboardProjectDetail[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiAutoInsights, setAiAutoInsights] = useState<AiAutoInsights | null>(null);
+  const [aiForecast, setAiForecast] = useState<AiWorkloadForecast | null>(null);
+  const [aiActionReply, setAiActionReply] = useState<AiChatContextResult | null>(null);
+  const [aiActionLoading, setAiActionLoading] = useState(false);
+  const [aiTasksContext, setAiTasksContext] = useState<AiAutoInsightTask[]>([]);
+  const [aiProjectsContext, setAiProjectsContext] = useState<AiAutoInsightProject[]>([]);
 
-  useEffect(() => {
-    fetchData();
-  }, [filter, priorityFilter, statusFilter, currentPage]);
-
-  useEffect(() => {
-    fetchPinnedTasks();
-    fetchSavedViews();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchOverview = async () => {
+    setLoading(true);
     try {
-      const filters: any = {
-        page: currentPage,
-        limit: itemsPerPage,
-      };
-      if (filter === "In Progress") filters.status = "In Progress";
-      if (filter === "High Priority") filters.priority = "High";
-      if (priorityFilter) filters.priority = priorityFilter;
-      if (statusFilter) filters.status = statusFilter;
-
-      const [summaryRes, tasksRes] = await Promise.all([
-        dashboardAPI.getSummary(),
-        tasksAPI.getTasks(filters),
+      const [overviewRes, insightsRes, projectRes, tasksRes] = await Promise.all([
+        dashboardAPI.getOverview({
+          upcomingLimit: 12,
+          activityLimit: 8,
+        }),
+        dashboardAPI.getInsights(),
+        projectService.getProjects(),
+        tasksAPI.getTasks({ page: 1, limit: 80 }),
       ]);
-      setSummary(summaryRes.data);
-      setTasks(tasksRes.data);
-      setPagination(tasksRes.pagination || null);
+      setOverview(overviewRes.data);
+      setInsights(insightsRes.data);
+      const parsedProjects = parseProjects(projectRes);
+      setProjects(parsedProjects);
+
+      const aiTasks = (tasksRes.data || []).map(mapTaskForAi);
+      const aiProjects = parsedProjects.map(mapProjectForAi);
+      setAiTasksContext(aiTasks);
+      setAiProjectsContext(aiProjects);
+      setAiActionReply(null);
+
+      if (aiTasks.length > 0) {
+        setAiLoading(true);
+        setAiError("");
+        try {
+          const [autoRes, forecastRes, defaultReply] = await Promise.all([
+            aiAssistantAPI.autoInsights(aiTasks, aiProjects, "/dashboard"),
+            aiAssistantAPI.workloadForecast(aiTasks, 7),
+            aiAssistantAPI.chatContext(
+              "Show top risks in my current page",
+              aiTasks,
+              aiProjects,
+              "/dashboard",
+              "balanced",
+            ),
+          ]);
+          setAiAutoInsights(autoRes);
+          setAiForecast(forecastRes);
+          setAiActionReply(defaultReply);
+        } catch (error) {
+          setAiAutoInsights(null);
+          setAiForecast(null);
+          setAiActionReply(null);
+          setAiError("AI insights unavailable right now.");
+        } finally {
+          setAiLoading(false);
+        }
+      } else {
+        setAiAutoInsights(null);
+        setAiForecast(null);
+        setAiError("No tasks available for AI dashboard analysis.");
+      }
     } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
+      console.error("Failed to fetch dashboard overview:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTaskCreated = () => {
-    fetchData();
-  };
-
-  const fetchPinnedTasks = async () => {
+  const runAiAction = async (prompt: string) => {
+    if (!aiTasksContext.length) return;
     try {
-      const pins = await preferencesAPI.getPins("task");
-      setPinnedTaskIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
+      setAiActionLoading(true);
+      const response = await aiAssistantAPI.chatContext(
+        prompt,
+        aiTasksContext,
+        aiProjectsContext,
+        "/dashboard",
+        "balanced",
+      );
+      setAiActionReply(response);
     } catch (error) {
-      console.error("Failed to load pinned tasks:", error);
-    }
-  };
-
-  const fetchSavedViews = async () => {
-    try {
-      const views = await preferencesAPI.getSavedViews("tasks");
-      setSavedViews(views);
-    } catch (error) {
-      console.error("Failed to load saved views:", error);
-    }
-  };
-
-  const handleTaskToggle = async (taskId: string, completed: boolean) => {
-    try {
-      await tasksAPI.updateTask(taskId, {
-        status: completed ? "Done" : "To Do",
+      setAiActionReply({
+        reply: "AI assistant is unavailable at the moment. Please retry shortly.",
+        context_snapshot: "",
+        quick_actions: [],
       });
-      fetchData();
-    } catch (error) {
-      console.error("Failed to update task:", error);
-    }
-  };
-
-  const visibleTasks = tasks
-    .filter((task) =>
-      task.title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
-    )
-    .filter((task) => !showPinnedOnly || pinnedTaskIds.has(task.id));
-
-  const handleToggleTaskPin = async (taskId: string, shouldPin: boolean) => {
-    try {
-      if (shouldPin) {
-        await preferencesAPI.addPin("task", taskId);
-      } else {
-        await preferencesAPI.removePin("task", taskId);
-      }
-
-      setPinnedTaskIds((prev) => {
-        const next = new Set(prev);
-        if (shouldPin) {
-          next.add(taskId);
-        } else {
-          next.delete(taskId);
-        }
-        return next;
-      });
-    } catch (error) {
-      console.error("Failed to update task pin:", error);
-    }
-  };
-
-  const applySavedView = () => {
-    if (!selectedViewId) return;
-    const view = savedViews.find((item) => item.id === selectedViewId);
-    if (!view) return;
-    const filters = view.filters;
-    setFilter(String(filters.filter ?? ""));
-    setPriorityFilter(String(filters.priorityFilter ?? ""));
-    setStatusFilter(String(filters.statusFilter ?? ""));
-    setSearchTerm(String(filters.searchTerm ?? ""));
-    setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
-    setCurrentPage(1);
-  };
-
-  const saveCurrentView = async () => {
-    if (!newViewName.trim()) return;
-    try {
-      setSavingView(true);
-      await preferencesAPI.createSavedView({
-        page: "tasks",
-        name: newViewName.trim(),
-        filters: {
-          filter,
-          priorityFilter,
-          statusFilter,
-          searchTerm,
-          showPinnedOnly,
-        },
-      });
-      setNewViewName("");
-      await fetchSavedViews();
-    } catch (error) {
-      console.error("Failed to save current view:", error);
     } finally {
-      setSavingView(false);
+      setAiActionLoading(false);
     }
   };
 
-  const deleteSelectedView = async () => {
-    if (!selectedViewId) return;
-    try {
-      await preferencesAPI.deleteSavedView(selectedViewId);
-      setSelectedViewId("");
-      await fetchSavedViews();
-    } catch (error) {
-      console.error("Failed to delete saved view:", error);
-    }
-  };
-
-  const buildDailyPlan = async () => {
-    try {
-      setPlanning(true);
-      setPlanError("");
-      const payload = visibleTasks.map((task) => ({
-        title: task.title,
-        priority: task.priority,
-        due_date: task.due_date,
-        status: task.status,
-        estimated_hours:
-          task.priority === "High" ? 3 : task.priority === "Medium" ? 2 : 1.25,
-      }));
-      const result = await aiAssistantAPI.planDay(payload, 6);
-      setDayPlan(result);
-    } catch (error) {
-      setPlanError("AI planner unavailable right now.");
-    } finally {
-      setPlanning(false);
-    }
-  };
+  useEffect(() => {
+    fetchOverview();
+  }, []);
 
   if (loading) {
     return (
@@ -212,169 +236,54 @@ export default function Dashboard() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="min-h-full p-4 sm:p-6 lg:p-8">
-        <TasksHeader
-          summary={summary}
-          onCreate={() => setShowCreateModal(true)}
+      <div className="min-h-full p-4 sm:p-6 lg:p-8 space-y-6">
+        <DashboardHeader
+          overview={overview}
+          onOpenTasks={() => navigate("/tasks")}
+          onRefresh={fetchOverview}
         />
 
-        <SavedViewsBar
-          title="Task Saved Views"
-          views={savedViews.map((view) => ({ id: view.id, name: view.name }))}
-          selectedId={selectedViewId}
-          viewName={newViewName}
-          onSelectedIdChange={setSelectedViewId}
-          onViewNameChange={setNewViewName}
-          onApply={applySavedView}
-          onSave={saveCurrentView}
-          onDelete={deleteSelectedView}
-          saving={savingView}
+        <DashboardStatsGrid overview={overview} />
+
+        <DashboardInsightsPanel
+          insights={insights}
+          onOpenProjects={() => navigate("/projects")}
         />
 
-        <TasksFiltersBar
-          filter={filter}
-          priorityFilter={priorityFilter}
-          statusFilter={statusFilter}
-          showPriorityDropdown={showPriorityDropdown}
-          showStatusDropdown={showStatusDropdown}
-          searchTerm={searchTerm}
-          onFilterChange={setFilter}
-          onPriorityFilterChange={(value) => {
-            setPriorityFilter(value);
-            setShowPriorityDropdown(false);
-            setCurrentPage(1);
-          }}
-          onStatusFilterChange={(value) => {
-            setStatusFilter(value);
-            setShowStatusDropdown(false);
-            setCurrentPage(1);
-          }}
-          onTogglePriorityDropdown={() =>
-            setShowPriorityDropdown(!showPriorityDropdown)
+        <DashboardAiPanel
+          loading={aiLoading}
+          error={aiError}
+          autoInsights={aiAutoInsights}
+          workload={aiForecast}
+          actionReply={aiActionReply}
+          actionLoading={aiActionLoading}
+          onRunAction={runAiAction}
+        />
+
+        <DashboardProjectsPanel
+          projects={projects.slice(0, 6)}
+          projectHealthById={
+            new Map((insights?.project_health || []).map((item) => [item.id, item]))
           }
-          onToggleStatusDropdown={() => setShowStatusDropdown(!showStatusDropdown)}
-          onSearchChange={setSearchTerm}
-          onClearAll={() => {
-            setFilter("");
-            setPriorityFilter("");
-            setStatusFilter("");
-            setSearchTerm("");
-            setCurrentPage(1);
-          }}
-        />
-        <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            className={`h-9 rounded-lg border px-3 text-sm font-semibold ${
-              showPinnedOnly
-                ? "border-amber-400 bg-amber-50 text-amber-800"
-                : "border-slate-300 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowPinnedOnly((previous) => !previous)}
-          >
-            {showPinnedOnly ? "Showing Pinned Tasks" : "Show Pinned Tasks Only"}
-          </button>
-        </div>
-
-        <section className="mb-6 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-cyan-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">
-                  auto_awesome
-                </span>
-                AI Day Planner
-              </p>
-              <p className="text-xs text-cyan-900/80 mt-1">
-                Generate a focused execution plan from your current task list.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={buildDailyPlan}
-              disabled={planning || visibleTasks.length === 0}
-              className="h-9 px-4 rounded-lg bg-cyan-700 text-white text-sm font-semibold hover:bg-cyan-800 disabled:opacity-50"
-            >
-              {planning ? "Planning..." : "Generate Plan"}
-            </button>
-          </div>
-
-          {planError && (
-            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-              {planError}
-            </p>
-          )}
-
-          {dayPlan && (
-            <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <div className="rounded-lg border border-cyan-200 bg-white p-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Today Plan ({dayPlan.planned_hours}h)
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {dayPlan.today_plan.slice(0, 4).map((task) => (
-                    <li key={task.title} className="text-sm text-slate-700">
-                      • {task.title}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-lg border border-cyan-200 bg-white p-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  AI Tip
-                </p>
-                <p className="mt-2 text-sm text-slate-700">{dayPlan.tip}</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  Backlog tasks: {dayPlan.backlog.length}
-                </p>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <AiMonitoringPanel />
-
-        {visibleTasks.length > 0 ? (
-          <TasksList
-            tasks={visibleTasks}
-            onTaskToggle={handleTaskToggle}
-            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
-            pinnedTaskIds={pinnedTaskIds}
-            onTaskPinToggle={handleToggleTaskPin}
-          />
-        ) : (
-          <TasksEmptyState onCreateTask={() => setShowCreateModal(true)} />
-        )}
-
-        <TasksPagination
-          pagination={pagination}
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          onPageChange={(page) => setCurrentPage(page)}
+          onOpenProject={(projectId) => navigate(`/projects/${projectId}`)}
+          onOpenProjects={() => navigate("/projects")}
         />
 
-        <div className="mt-8 flex justify-center">
-          <button
-            className="text-slate-500 text-sm font-semibold hover:text-blue-600 transition-colors flex items-center gap-2"
-            onClick={() => {
-              setFilter("");
-              setPriorityFilter("");
-              setStatusFilter("");
-              setSearchTerm("");
-              setCurrentPage(1);
-            }}
-          >
-            View all tasks
-            <span className="material-symbols-outlined">arrow_forward</span>
-          </button>
-        </div>
+        <DashboardUpcomingTasks
+          tasks={overview?.upcoming_tasks || []}
+          onOpenTask={(taskId) => navigate(`/task/${taskId}`)}
+          onOpenTasksBoard={() => navigate("/tasks")}
+          formatDueText={formatDueText}
+          getPriorityClass={priorityBadgeClass}
+          getStatusClass={statusBadgeClass}
+        />
+
+        <DashboardRecentActivity
+          activity={overview?.recent_activity || []}
+          onOpenActivity={() => navigate("/activity")}
+          formatActivityText={formatActivityText}
+        />
       </div>
-
-      <CreateTaskModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onTaskCreated={handleTaskCreated}
-      />
     </div>
   );
 }

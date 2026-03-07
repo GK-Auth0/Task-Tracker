@@ -145,3 +145,65 @@ SELECT
 FROM projects p
 JOIN users u ON u.email = 'mike.johnson@company.com'
 WHERE p.name = 'Mobile App V2 Launch';
+
+-- Seed confidential access requests for realistic permission workflow demos
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'project_confidential_access_requests'
+  ) THEN
+    INSERT INTO project_confidential_access_requests (
+      project_id,
+      requester_id,
+      status,
+      reason,
+      decision_note,
+      requested_at,
+      decided_at,
+      decided_by
+    )
+    SELECT
+      p.id,
+      requester.id,
+      'approved',
+      'Need roadmap and file visibility to prepare integration test plan.',
+      'Approved for sprint planning and QA coordination.',
+      NOW() - INTERVAL '6 days',
+      NOW() - INTERVAL '5 days',
+      owner.id
+    FROM projects p
+    JOIN users requester ON requester.email = 'mike.johnson@company.com'
+    JOIN users owner ON owner.id = p.owner_id
+    WHERE p.name = 'Marketing Website V3'
+    UNION ALL
+    SELECT
+      p.id,
+      requester.id,
+      'pending',
+      'Need access to confidential milestones for release communication draft.',
+      NULL,
+      NOW() - INTERVAL '1 day',
+      NULL,
+      NULL
+    FROM projects p
+    JOIN users requester ON requester.email = 'sarah.wilson@company.com'
+    WHERE p.name = 'Cloud Migration Phase 2'
+    UNION ALL
+    SELECT
+      p.id,
+      requester.id,
+      'rejected',
+      'Need broad access to all project files.',
+      'Please submit a narrower request scoped to your assigned tasks.',
+      NOW() - INTERVAL '9 days',
+      NOW() - INTERVAL '8 days',
+      owner.id
+    FROM projects p
+    JOIN users requester ON requester.email = 'sarah.wilson@company.com'
+    JOIN users owner ON owner.id = p.owner_id
+    WHERE p.name = 'Mobile App V2 Launch';
+  END IF;
+END $$;

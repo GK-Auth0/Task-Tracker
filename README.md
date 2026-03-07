@@ -1,286 +1,169 @@
 # Task Tracker
 
-A full-stack task management application built with React TypeScript frontend and Node.js backend.
+Task Tracker is a full-stack project and task management platform with role-based access control, confidentiality workflows, and AI-assisted planning.
 
-## Project Structure
+This is the **main repository README**. Detailed setup and service-specific instructions are documented in module READMEs.
 
-```
+## Repository Map
+
+```text
 Task-Tracker/
-├── Backend/             # Node.js/TypeScript API server
-├── UI/                  # React TypeScript frontend
-├── DB/                  # Database migrations and schema
-├── docker-compose.yml   # Docker services configuration
-└── README.md           # This file
+├── Backend/     # API server (Node.js + TypeScript + Express)
+├── UI/          # Frontend app (React + TypeScript + Vite)
+├── DB/          # Flyway migrations + seeds
+├── AI/          # AI service
+└── README.md    # Main project overview (this file)
 ```
 
-## Prerequisites
+## Module Documentation
 
-- Node.js (v18 or higher)
-- PostgreSQL (v12 or higher)
-- Docker & Docker Compose
-- Yarn package manager
+- Backend setup and API runtime: [Backend/README.md](Backend/README.md)
+- Frontend setup and UI runtime: [UI/README.md](UI/README.md)
+- Database and migration setup: [DB/README.md](DB/README.md)
+- AI service setup and endpoints: [AI/README.md](AI/README.md)
 
-## Quick Start
+## Highlights
 
-### 1. Clone Repository
+### Authentication and Security
+- JWT authentication
+- Auth0 login support
+- OTP verification and password reset flows
+- Role-based authorization (`Admin`, `Member`, `Viewer`)
+
+### Task Workspace
+- Task CRUD with assignee and due date support
+- Status lifecycle: `To Do`, `In Progress`, `Done`
+- Priority lifecycle: `Low`, `Medium`, `High`
+- Multi-tab task interface:
+  - `Overview`
+  - `Board`
+  - `Timeline`
+  - `AI Planner`
+- Saved views and pinned tasks
+
+### Project Workspace
+- Project CRUD with ownership and members
+- Member role management (`owner`, `admin`, `member`, `viewer`)
+- Project detail tabs:
+  - Tasks
+  - Roadmap
+  - Files
+  - Activity
+- Project file uploads
+- Project activity logs
+
+### Confidential Access Workflow
+- Confidential project details can be restricted
+- Members can request confidential access with reason
+- Owner/admin review flow (approve/reject)
+- Request state tracking (`none`, `pending`, `approved`, `rejected`)
+
+### AI Capabilities
+- AI chat endpoint (`/api/ai/chat`)
+- AI day planner integrated in Tasks page
+- AI assistant widget in application layout
+
+## Role Permissions Matrix
+
+| Capability | Admin | Member | Viewer |
+|---|---|---|---|
+| Login and access app | Yes | Yes | Yes |
+| View tasks/projects they can access | Yes | Yes | Yes |
+| Create tasks | Yes | Yes | No |
+| Update task details/status | Yes | Yes | No |
+| Delete tasks | Yes | Yes | No |
+| Create projects | Yes | Yes | No |
+| Update project details (owner/admin in project) | Yes | Yes | No |
+| Manage project members (owner/admin in project) | Yes | Yes | No |
+| Request confidential access | Yes | Yes | Yes |
+| Review confidential access requests | Yes | Owner/Admin only | No |
+| Delete project | Yes | Owner only | No |
+
+## Quick Start (Top-Level)
+
+### 1) Clone
 
 ```bash
 git clone <repository-url>
 cd Task-Tracker
 ```
 
-### 2. Environment Setup
+### 2) Environment
 
-Copy environment configuration:
 ```bash
 cp .env.example .env
 ```
 
-Update `.env` with your configuration:
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5433
-DB_NAME=task_tracker_db
-DB_USER=postgres
-DB_PASSWORD=postgres
-
-# Backend Configuration
-NODE_ENV=development
-BACKEND_PORT=3000
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRES_IN=7d
-
-# Frontend Configuration
-FRONTEND_PORT=3001
-VITE_API_BASE_URL=http://localhost:3000
-
-# Docker Configuration
-POSTGRES_DB=task_tracker_db
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_PORT=5433
-```
-
-### 3. Start with Docker (Recommended)
+### 3) Run with Docker
 
 ```bash
-# Start all services
 docker-compose up -d
-
-# View logs
 docker-compose logs -f
 ```
 
-### 4. Manual Setup
+## Service URLs (Default)
 
-#### Backend Setup
-```bash
-cd Backend
-yarn install
-docker-compose up -d postgres
-docker-compose up migrator
-yarn dev
-```
+- Frontend: `http://localhost:3001`
+- Backend API: `http://localhost:3000`
+- Swagger docs: `http://localhost:3000/api-docs`
+- PostgreSQL: `localhost:5433`
 
-#### Frontend Setup
-```bash
-cd UI
-yarn install
-yarn dev
-```
+## Primary API Surface
 
-## Services
+### Auth
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/auth0`
+- `POST /api/auth/verify-otp`
+- `POST /api/auth/resend-otp`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/auth/me`
 
-- **Frontend**: http://localhost:3001
-- **Backend API**: http://localhost:3000
-- **API Documentation**: http://localhost:3000/api-docs
-- **PostgreSQL**: localhost:5433
+### Tasks
+- `GET /api/tasks`
+- `POST /api/tasks`
+- `GET /api/tasks/:id`
+- `PATCH /api/tasks/:id`
+- `DELETE /api/tasks/:id`
+- `GET /api/tasks/:id/activity`
+- `GET /api/tasks/:id/pull-requests`
+- `GET /api/tasks/:id/commits`
 
-## Features
+### Projects
+- `GET /api/projects`
+- `POST /api/projects`
+- `GET /api/projects/:id`
+- `PUT /api/projects/:id`
+- `DELETE /api/projects/:id`
+- `GET /api/projects/:id/stats`
+- `GET /api/projects/:id/roadmap`
+- `GET /api/projects/:id/files`
+- `POST /api/projects/:id/files/upload`
+- `GET /api/projects/:id/activity`
+- `GET /api/projects/users`
+- `POST /api/projects/:id/members`
+- `PUT /api/projects/:id/members/:userId`
+- `DELETE /api/projects/:id/members/:userId`
+- `POST /api/projects/:id/confidential-access/request`
+- `GET /api/projects/:id/confidential-access/requests`
+- `PATCH /api/projects/:id/confidential-access/requests/:requestId`
 
-### Authentication
-- User registration and login
-- JWT-based authentication
-- Role-based access control (Admin, Member, Viewer)
-- Protected routes
+### AI
+- `POST /api/ai/chat`
 
-### Task Management
-- Create, read, update, delete tasks
-- Task status tracking (To Do, In Progress, Done)
-- Priority levels (Low, Medium, High)
-- Due date management
-- Task assignment to team members
-- Pagination (5 items per page)
-
-### Project Management
-- Organize tasks by projects
-- Project ownership and access control
-- Project statistics and insights
-
-### Team Management
-- User management interface
-- Role-based filtering
-- Team performance metrics
-- Member invitation system
-
-### Dashboard
-- Task overview and statistics
-- Filtering by status, priority, project
-- Real-time data updates
-- Responsive design
-
-## Technology Stack
-
-### Backend
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
-- **Database**: PostgreSQL with Sequelize ORM
-- **Authentication**: JWT tokens with bcrypt
-- **Validation**: express-validator
-- **Documentation**: Swagger/OpenAPI
-- **Migrations**: Flyway
-
-### Frontend
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **Icons**: Material Symbols
-- **Routing**: React Router
-- **State**: React Context API
-- **HTTP Client**: Axios
-
-### DevOps
-- **Containerization**: Docker & Docker Compose
-- **Database**: PostgreSQL 16
-- **Package Manager**: Yarn with node-modules linker
-
-## Development
-
-### Backend Development
-```bash
-cd Backend
-yarn dev          # Start development server
-yarn build        # Build for production
-yarn test         # Run tests
-yarn lint         # Run ESLint
-```
-
-### Frontend Development
-```bash
-cd UI
-yarn dev          # Start development server
-yarn build        # Build for production
-yarn preview      # Preview production build
-yarn lint         # Run ESLint
-yarn type-check   # TypeScript checking
-```
-
-### Database Management
-```bash
-# Start database and run migrations
-cd DB
-./up.sh
-
-# Stop database
-./down.sh
-
-# Local development environment
-./env/local/_up.sh    # Start local DB with migrations
-./env/local/_down.sh  # Stop local DB
-
-# Reset database (from DB folder)
-docker-compose down
-docker-compose up -d
-```
-
-## API Documentation
-
-Swagger documentation is available at: http://localhost:3000/api-docs
-
-### Key Endpoints
-- `POST /api/auth/login` - User authentication
-- `GET /api/tasks` - Get tasks with pagination
-- `POST /api/tasks` - Create new task
-- `GET /api/dashboard/summary` - Dashboard statistics
-- `GET /api/users` - Team management
-
-## Default Users
-
-After running migrations, these test users are available:
+## Seed Users (Development)
 
 | Email | Password | Role |
-|-------|----------|------|
+|---|---|---|
 | giri.gk@company.com | password123 | Admin |
 | giridharan.gk@company.com | password123 | Member |
-| mike.johnson@company.com | password123 | Member |
-| sarah.wilson@company.com | password123 | Viewer |
 
-**Quick Test Login:**
-- **Admin Access**: giri.gk@company.com / password123
-- **Member Access**: giridharan.gk@company.com / password123
+## Notes
 
-## Production Deployment
-
-### Backend
-1. Set production environment variables
-2. Build the application: `yarn build`
-3. Run database migrations
-4. Start the server: `yarn start`
-
-### Frontend
-1. Update API base URL in environment
-2. Build the application: `yarn build`
-3. Deploy the `dist/` folder to hosting service
-
-### Docker Production
-```bash
-# Build production images
-docker-compose -f docker-compose.prod.yml build
-
-# Start production services
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Submit pull request
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Error**
-   - Ensure PostgreSQL is running on port 5433
-   - Check database credentials in `.env`
-   - Run `docker-compose up -d postgres`
-
-2. **Migration Failures**
-   - Check migration syntax and order
-   - Reset database if needed
-   - Ensure proper user permissions
-
-3. **Frontend API Errors**
-   - Verify backend is running on port 3000
-   - Check CORS configuration
-   - Confirm API base URL in frontend env
-
-4. **Authentication Issues**
-   - Clear browser localStorage
-   - Check JWT secret configuration
-   - Verify token expiration settings
-
-### Getting Help
-
-- Check individual README files in Backend/ and UI/ folders
-- Review API documentation at /api-docs
-- Check Docker logs: `docker-compose logs`
-- Verify environment configuration
+- For implementation details, scripts, and environment specifics, use the module README files linked above.
+- Main README is intentionally maintained as a high-level project overview.
 
 ## License
 
-This project is licensed under the MIT License.
+MIT

@@ -10,7 +10,7 @@ export interface TaskFilters {
 
 export interface CreateTaskDto {
   title: string;
-  description?: string;
+  description: string;
   status: string;
   priority: string;
   project_id: string;

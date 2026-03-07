@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import os
+from urllib import error as url_error
+from urllib import parse as url_parse
+from urllib import request as url_request
 from dataclasses import dataclass
 from datetime import date, timedelta
+import json
 from typing import Any
 
 
@@ -35,6 +40,17 @@ ROUTE_LABELS = {
     "/chat": "Chat",
 }
 
+AI_CHAT_PROVIDER = str(os.getenv("AI_CHAT_PROVIDER", "rule-based")).strip().lower()
+GEMINI_API_KEY = str(os.getenv("GEMINI_API_KEY", "")).strip()
+GEMINI_MODEL = str(os.getenv("GEMINI_MODEL", "gemini-2.0-flash")).strip()
+GEMINI_BASE_URL = str(
+    os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+).strip().rstrip("/")
+try:
+    GEMINI_TIMEOUT_SEC = max(3.0, float(os.getenv("GEMINI_TIMEOUT_SEC", "12")))
+except ValueError:
+    GEMINI_TIMEOUT_SEC = 12.0
+
 
 def _normalize(*parts: str) -> str:
     return " ".join(part.strip().lower() for part in parts if part).strip()
@@ -42,6 +58,131 @@ def _normalize(*parts: str) -> str:
 
 def _iso_after(days: int) -> str:
     return (date.today() + timedelta(days=days)).isoformat()
+
+
+def _use_gemini() -> bool:
+    return AI_CHAT_PROVIDER in {"gemini", "auto"} and bool(GEMINI_API_KEY)
+
+
+def _safe_priority(value: Any, fallback: str = "Medium") -> str:
+    text = str(value or "").strip().lower()
+    if text == "high":
+        return "High"
+    if text == "low":
+        return "Low"
+    if text == "medium":
+        return "Medium"
+    return fallback
+
+
+def _safe_str_list(value: Any, limit: int = 5, fallback: list[str] | None = None) -> list[str]:
+    fallback = fallback or []
+    if not isinstance(value, list):
+        return fallback
+    items: list[str] = []
+    for item in value:
+        text = str(item or "").strip()
+        if text:
+            items.append(text)
+        if len(items) >= limit:
+            break
+    return items or fallback
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    clean = str(text or "").strip()
+    if not clean:
+        return None
+    # Common model format: ```json ... ```
+    if "```" in clean:
+        clean = clean.replace("```json", "```")
+        segments = clean.split("```")
+        for segment in segments:
+            segment = segment.strip()
+            if segment.startswith("{") and segment.endswith("}"):
+                clean = segment
+                break
+    if clean.startswith("{") and clean.endswith("}"):
+        try:
+            data = json.loads(clean)
+            return data if isinstance(data, dict) else None
+        except json.JSONDecodeError:
+            return None
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(clean[start : end + 1])
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _gemini_text(prompt: str, mode_instruction: str, max_tokens: int = 700) -> str | None:
+    if not _use_gemini():
+        return None
+
+    payload = {
+        "systemInstruction": {
+            "parts": [
+                {
+                    "text": (
+                        "You are Task Tracker AI assistant. "
+                        "Focus on practical project planning and execution guidance. "
+                        "You must return safe, concise, actionable output. "
+                        f"{mode_instruction}"
+                    )
+                }
+            ]
+        },
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.25, "maxOutputTokens": max_tokens},
+    }
+
+    try:
+        model_name = url_parse.quote(GEMINI_MODEL, safe="")
+        key = url_parse.quote(GEMINI_API_KEY, safe="")
+        endpoint = f"{GEMINI_BASE_URL}/models/{model_name}:generateContent?key={key}"
+        req = url_request.Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with url_request.urlopen(req, timeout=GEMINI_TIMEOUT_SEC) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except (url_error.URLError, TimeoutError, json.JSONDecodeError, ValueError):
+        return None
+
+    candidates = data.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return None
+    content = candidates[0].get("content", {})
+    parts = content.get("parts", []) if isinstance(content, dict) else []
+    if not isinstance(parts, list):
+        return None
+
+    texts: list[str] = []
+    for part in parts:
+        if isinstance(part, dict):
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                texts.append(text.strip())
+    if not texts:
+        return None
+    return "\n".join(texts).strip()
+
+
+def _gemini_json(prompt: str, max_tokens: int = 700) -> dict[str, Any] | None:
+    text = _gemini_text(
+        prompt=prompt,
+        mode_instruction="Return only a valid JSON object with no markdown.",
+        max_tokens=max_tokens,
+    )
+    if not text:
+        return None
+    return _extract_json_object(text)
 
 
 @dataclass
@@ -106,12 +247,38 @@ def suggest_task(title: str, description: str) -> TaskSuggestion:
     if "api" in text:
         checklist.append("Validate API response and error handling")
 
-    return TaskSuggestion(
+    fallback = TaskSuggestion(
         priority=priority,
         due_date=due_date,
         estimated_hours=hours,
         checklist=checklist,
         reason=reason,
+    )
+
+    ai_result = _gemini_json(
+        (
+            "Generate task suggestion for Task Tracker. "
+            "Return JSON with keys: priority, due_date, estimated_hours, checklist, reason.\n"
+            f"title={title}\n"
+            f"description={description}\n"
+            "Rules: priority must be High/Medium/Low; due_date in YYYY-MM-DD; "
+            "estimated_hours should be realistic (0.5-16). checklist max 5 items."
+        ),
+        max_tokens=450,
+    )
+    if not ai_result:
+        return fallback
+    try:
+        estimated_hours = float(ai_result.get("estimated_hours", fallback.estimated_hours))
+    except (TypeError, ValueError):
+        estimated_hours = fallback.estimated_hours
+
+    return TaskSuggestion(
+        priority=_safe_priority(ai_result.get("priority"), fallback.priority),
+        due_date=_safe_date(ai_result.get("due_date"), 3),
+        estimated_hours=max(0.5, min(16.0, estimated_hours)),
+        checklist=_safe_str_list(ai_result.get("checklist"), limit=5, fallback=fallback.checklist),
+        reason=str(ai_result.get("reason", fallback.reason)).strip() or fallback.reason,
     )
 
 
@@ -136,12 +303,44 @@ def plan_day(tasks: list[dict[str, Any]], focus_hours: float = 6.0) -> dict[str,
             break
 
     backlog = [t for t in ordered if t not in selected]
-    return {
+    fallback = {
         "focus_hours": focus_hours,
         "planned_hours": round(used, 2),
         "today_plan": selected,
         "backlog": backlog,
         "tip": "Start with the first task and avoid context switching every 20 minutes.",
+    }
+
+    ai_result = _gemini_json(
+        (
+            "Create a daily execution plan for Task Tracker.\n"
+            "Return JSON with keys: focus_hours, planned_hours, today_plan, backlog, tip.\n"
+            "today_plan/backlog must be arrays of task objects from input list.\n"
+            f"focus_hours={focus_hours}\n"
+            f"tasks={json.dumps(tasks)[:12000]}"
+        ),
+        max_tokens=650,
+    )
+    if not ai_result:
+        return fallback
+
+    today_plan = ai_result.get("today_plan")
+    backlog_val = ai_result.get("backlog")
+    if not isinstance(today_plan, list) or not isinstance(backlog_val, list):
+        return fallback
+    try:
+        planned_hours = float(ai_result.get("planned_hours", fallback["planned_hours"]))
+        out_focus_hours = float(ai_result.get("focus_hours", focus_hours))
+    except (TypeError, ValueError):
+        return fallback
+    tip = str(ai_result.get("tip", fallback["tip"])).strip() or fallback["tip"]
+
+    return {
+        "focus_hours": max(1.0, min(12.0, out_focus_hours)),
+        "planned_hours": max(0.0, min(24.0, round(planned_hours, 2))),
+        "today_plan": today_plan[:20],
+        "backlog": backlog_val[:50],
+        "tip": tip,
     }
 
 
@@ -194,11 +393,34 @@ def project_insights(tasks: list[dict[str, Any]]) -> dict[str, Any]:
         "Set realistic due dates for tasks with no timeline.",
     ]
 
-    return {
+    fallback = {
         "summary": f"{done}/{total} tasks completed.",
         "risk_level": risk,
         "signals": signals,
         "recommendations": recommendations,
+    }
+
+    ai_result = _gemini_json(
+        (
+            "Generate project insights for Task Tracker.\n"
+            "Return JSON with keys: summary, risk_level, signals, recommendations.\n"
+            "risk_level must be High/Medium/Low and aligned to open/overdue/high-priority tasks.\n"
+            f"tasks={json.dumps(tasks)[:12000]}"
+        ),
+        max_tokens=500,
+    )
+    if not ai_result:
+        return fallback
+
+    return {
+        "summary": str(ai_result.get("summary", fallback["summary"])).strip() or fallback["summary"],
+        "risk_level": _safe_priority(ai_result.get("risk_level"), fallback["risk_level"]),
+        "signals": _safe_str_list(ai_result.get("signals"), limit=5, fallback=fallback["signals"]),
+        "recommendations": _safe_str_list(
+            ai_result.get("recommendations"),
+            limit=5,
+            fallback=fallback["recommendations"],
+        ),
     }
 
 
@@ -286,7 +508,7 @@ def auto_insights(
         "Give me a 30-minute focus plan",
     ]
 
-    return {
+    fallback = {
         "summary": insights["summary"],
         "risk_level": insights["risk_level"],
         "insights": insights["signals"][:3],
@@ -301,6 +523,56 @@ def auto_insights(
         ],
         "snapshot_lines": card_lines[:4],
         "quick_actions": quick_actions,
+    }
+
+    ai_result = _gemini_json(
+        (
+            "Generate route-aware insights for Task Tracker dashboard.\n"
+            "Return JSON with keys: summary, risk_level, insights, recommendations, "
+            "priority_tasks, snapshot_lines, quick_actions.\n"
+            f"route_context={route_context}\n"
+            f"tasks={json.dumps(tasks)[:12000]}\n"
+            f"projects={json.dumps(projects)[:6000]}"
+        ),
+        max_tokens=700,
+    )
+    if not ai_result:
+        return fallback
+
+    raw_priority_tasks = ai_result.get("priority_tasks")
+    priority_tasks: list[dict[str, Any]] = []
+    if isinstance(raw_priority_tasks, list):
+        for item in raw_priority_tasks[:5]:
+            if not isinstance(item, dict):
+                continue
+            priority_tasks.append(
+                {
+                    "title": str(item.get("title", "Untitled task")).strip() or "Untitled task",
+                    "priority": _safe_priority(item.get("priority"), "Medium"),
+                    "due_date": str(item.get("due_date", "")).strip(),
+                }
+            )
+
+    return {
+        "summary": str(ai_result.get("summary", fallback["summary"])).strip() or fallback["summary"],
+        "risk_level": _safe_priority(ai_result.get("risk_level"), fallback["risk_level"]),
+        "insights": _safe_str_list(ai_result.get("insights"), limit=4, fallback=fallback["insights"]),
+        "recommendations": _safe_str_list(
+            ai_result.get("recommendations"),
+            limit=4,
+            fallback=fallback["recommendations"],
+        ),
+        "priority_tasks": priority_tasks or fallback["priority_tasks"],
+        "snapshot_lines": _safe_str_list(
+            ai_result.get("snapshot_lines"),
+            limit=4,
+            fallback=fallback["snapshot_lines"],
+        ),
+        "quick_actions": _safe_str_list(
+            ai_result.get("quick_actions"),
+            limit=4,
+            fallback=fallback["quick_actions"],
+        ),
     }
 
 
@@ -342,13 +614,47 @@ def workload_forecast(
         "Add estimates to tasks missing effort values.",
     ]
 
-    return {
+    fallback = {
         "window_days": days,
         "due_task_count": len(due_items),
         "estimated_hours": round(total_estimate, 2),
         "high_priority_due_count": high_count,
         "pressure": pressure,
         "recommendations": recommendations,
+    }
+
+    ai_result = _gemini_json(
+        (
+            "Forecast workload for Task Tracker.\n"
+            "Return JSON with keys: window_days, due_task_count, estimated_hours, "
+            "high_priority_due_count, pressure, recommendations.\n"
+            "pressure must be High/Medium/Low.\n"
+            f"days={days}\n"
+            f"tasks={json.dumps(tasks)[:12000]}"
+        ),
+        max_tokens=450,
+    )
+    if not ai_result:
+        return fallback
+    try:
+        out_days = int(ai_result.get("window_days", fallback["window_days"]))
+        due_count = int(ai_result.get("due_task_count", fallback["due_task_count"]))
+        high_due = int(ai_result.get("high_priority_due_count", fallback["high_priority_due_count"]))
+        est_hours = float(ai_result.get("estimated_hours", fallback["estimated_hours"]))
+    except (TypeError, ValueError):
+        return fallback
+
+    return {
+        "window_days": max(1, min(30, out_days)),
+        "due_task_count": max(0, due_count),
+        "estimated_hours": max(0.0, round(est_hours, 2)),
+        "high_priority_due_count": max(0, high_due),
+        "pressure": _safe_priority(ai_result.get("pressure"), fallback["pressure"]),
+        "recommendations": _safe_str_list(
+            ai_result.get("recommendations"),
+            limit=5,
+            fallback=fallback["recommendations"],
+        ),
     }
 
 
@@ -407,8 +713,59 @@ def assistant_chat(
         reply = primary + " Next: " + " ".join(next_steps[:2])
 
     context_snapshot = " | ".join(insights["snapshot_lines"])
+    gemini_reply = _generate_gemini_reply(
+        message=clean_message,
+        route_context=route_context,
+        response_mode=response_mode,
+        insights=insights,
+        tasks=tasks,
+        projects=projects,
+    )
+    if gemini_reply:
+        reply = gemini_reply
+
     return {
         "reply": reply,
         "context_snapshot": context_snapshot,
         "quick_actions": insights["quick_actions"],
     }
+
+
+def _generate_gemini_reply(
+    message: str,
+    route_context: str,
+    response_mode: str,
+    insights: dict[str, Any],
+    tasks: list[dict[str, Any]],
+    projects: list[dict[str, Any]],
+) -> str | None:
+    if not message:
+        return None
+
+    mode_instruction = {
+        "concise": "Keep response under 80 words.",
+        "balanced": "Use medium length with actionable steps.",
+        "detailed": "Provide detailed guidance with numbered steps.",
+    }.get(response_mode, "Use medium length with actionable steps.")
+
+    top_tasks = _top_tasks(tasks, 5)
+    task_lines = []
+    for task in top_tasks:
+        task_lines.append(
+            f"- {str(task.get('title', 'Untitled'))} | {str(task.get('priority', 'Medium'))} | "
+            f"due {str(task.get('due_date', 'n/a'))} | {str(task.get('status', 'n/a'))}"
+        )
+    tasks_block = "\n".join(task_lines) if task_lines else "- No pending tasks available"
+
+    project_preview = ", ".join(str(p.get("name", "Untitled")) for p in projects[:5]) or "None"
+    prompt = (
+        f"Route: {route_context or '/dashboard'}\n"
+        f"Risk level: {insights.get('risk_level', 'Unknown')}\n"
+        f"Signals: {', '.join(insights.get('insights', [])[:3]) or 'None'}\n"
+        f"Top tasks:\n{tasks_block}\n"
+        f"Projects: {project_preview}\n"
+        f"User message: {message}\n"
+        "Respond as a task management assistant. Give practical, safe guidance only."
+    )
+
+    return _gemini_text(prompt=prompt, mode_instruction=mode_instruction, max_tokens=700)

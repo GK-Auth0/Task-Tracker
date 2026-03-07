@@ -75,12 +75,9 @@ export const createNewTask = async (req: Request, res: Response) => {
       });
     }
 
-    console.log('Received task data:', req.body);
-    console.log('Priority value:', req.body.priority, 'Type:', typeof req.body.priority);
-
     const taskData = {
       title: req.body.title,
-      description: req.body.description,
+      description: String(req.body.description || "").trim(),
       status: req.body.status || "To Do",
       priority: req.body.priority || "Medium",
       project_id: req.body.project_id,
@@ -175,8 +172,14 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
     const currentTask = await getTaskById(taskId, userId);
     
     const updateData = {
-      title: req.body.title,
-      description: req.body.description,
+      title:
+        req.body.title === undefined
+          ? undefined
+          : String(req.body.title).trim(),
+      description:
+        req.body.description === undefined
+          ? undefined
+          : String(req.body.description).trim(),
       status: req.body.status,
       priority: req.body.priority,
       assignee_id: req.body.assignee_id,

@@ -7,6 +7,7 @@ import {
   ActivityLog,
 } from "../services/dashboard";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
+import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
 
 interface TaskDetails {
   id: string;
@@ -57,6 +58,13 @@ export default function TaskDetails() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [prioritySaving, setPrioritySaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editAiLoading, setEditAiLoading] = useState(false);
+  const [editAiError, setEditAiError] = useState("");
   const [showLinkPRModal, setShowLinkPRModal] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -96,6 +104,11 @@ export default function TaskDetails() {
   useEffect(() => {
     if (task) {
       fetchAiSuggestion(task.title, task.description || "");
+      setEditTitle(task.title || "");
+      setEditDescription(task.description || "");
+      setEditError("");
+      setEditAiError("");
+      setEditMode(false);
     }
   }, [task?.id]);
 
@@ -221,9 +234,66 @@ export default function TaskDetails() {
     try {
       // For now, just clear the comment - you can add comment API later
       setComment("");
-      console.log("Comment submitted:", comment);
     } catch (error) {
       console.error("Failed to submit comment:", error);
+    }
+  };
+
+  const handleSaveTaskEdits = async () => {
+    if (!task) return;
+    const trimmedTitle = editTitle.trim();
+    const trimmedDescription = editDescription.trim();
+
+    if (trimmedTitle.length < 2) {
+      setEditError("Title must be at least 2 characters.");
+      return;
+    }
+    if (trimmedDescription.length > 1000) {
+      setEditError("Description must not exceed 1000 characters.");
+      return;
+    }
+
+    try {
+      setEditSaving(true);
+      setEditError("");
+      const response = await tasksAPI.updateTask(task.id, {
+        title: trimmedTitle,
+        description: trimmedDescription,
+      });
+      if (response.success) {
+        setTask(response.data as any);
+        setEditMode(false);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        "Failed to save task changes.";
+      setEditError(String(message));
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleGenerateEditIdeas = async () => {
+    const titleSeed = editTitle.trim() || task?.title?.trim() || "";
+    if (!titleSeed) {
+      setEditAiError("Add a task title first to generate AI ideas.");
+      return;
+    }
+
+    try {
+      setEditAiLoading(true);
+      setEditAiError("");
+      const suggestion = await aiAssistantAPI.suggestTask(
+        titleSeed,
+        editDescription.trim(),
+      );
+      setEditDescription((prev) => appendTaskAiDraft(prev, titleSeed, suggestion).slice(0, 1000));
+    } catch (error) {
+      setEditAiError("AI ideas unavailable right now.");
+    } finally {
+      setEditAiLoading(false);
     }
   };
 
@@ -232,7 +302,6 @@ export default function TaskDetails() {
 
     try {
       // This would be an API call to link the PR
-      console.log("Linking PR:", prForm);
       setShowLinkPRModal(false);
       setPrForm({
         title: "",
@@ -306,17 +375,36 @@ export default function TaskDetails() {
     { id: "activity", label: "Activity", icon: "history", count: activityLogs.length || undefined },
     { id: "attachments", label: "Attachments", icon: "attach_file" },
   ];
+  const createdAtDate = new Date(task.created_at);
+  const updatedAtDate = new Date(task.updated_at);
+  const dueDateObj = task.due_date ? new Date(task.due_date) : null;
+  const hasValidDueDate = !!dueDateObj && !Number.isNaN(dueDateObj.getTime());
+  const now = new Date();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const daysSinceCreated = Number.isNaN(createdAtDate.getTime())
+    ? 0
+    : Math.max(0, Math.floor((now.getTime() - createdAtDate.getTime()) / dayMs));
+  const daysToDue = hasValidDueDate
+    ? Math.ceil((dueDateObj!.getTime() - now.getTime()) / dayMs)
+    : null;
+  const slaLabel =
+    task.status === "Done"
+      ? "Delivered"
+      : daysToDue === null
+        ? "No Deadline"
+        : daysToDue < 0
+          ? `Overdue ${Math.abs(daysToDue)}d`
+          : daysToDue === 0
+            ? "Due Today"
+            : `${daysToDue}d Remaining`;
+  const activityPulse = activityLogs.length > 0 ? "Active" : "Quiet";
 
   return (
     <>
-      {/* Overlay Background */}
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"></div>
-
-      {/* Centered Modal Task Details */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8">
-        <div className="bg-white w-full max-w-[1100px] h-full max-h-[850px] overflow-hidden rounded-xl shadow-2xl flex flex-col">
-          {/* Modal Header */}
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-white via-slate-50 to-blue-50/40">
             <div className="flex items-center gap-4">
               <div className="flex flex-wrap gap-2 text-sm">
                 <button
@@ -363,20 +451,17 @@ export default function TaskDetails() {
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1 overflow-y-auto flex flex-col md:flex-row">
-            {/* Left Column */}
-            <div className="flex-1 p-8 space-y-8 border-r border-slate-200">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="p-5 sm:p-6 space-y-6 lg:border-r lg:border-slate-200">
               {taskError && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   {taskError}
                 </div>
               )}
 
-              {/* Title & Status */}
-              <div className="space-y-4">
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap justify-between items-start gap-4">
-                  <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight text-slate-900">
+                  <h1 className="text-2xl md:text-3xl font-black leading-tight tracking-tight text-slate-900">
                     {task.title}
                   </h1>
                   <div className="flex items-center gap-3">
@@ -396,7 +481,7 @@ export default function TaskDetails() {
                       <option value="Done">Done</option>
                     </select>
                     <button
-                      className="flex min-w-[140px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-11 px-6 bg-blue-600 text-white text-sm font-bold leading-normal tracking-wide hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex min-w-[140px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-11 px-6 bg-blue-600 text-white text-sm font-bold leading-normal tracking-wide hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleStatusUpdate("Done")}
                       disabled={task.status === "Done" || statusSaving}
                     >
@@ -413,11 +498,15 @@ export default function TaskDetails() {
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`px-3 py-1 text-xs font-bold rounded uppercase tracking-wider ${getStatusColor(task.status)}`}
+                    className={`px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider ${getStatusColor(task.status)}`}
                   >
                     {task.status}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${priorityColors.text} bg-slate-100`}>
+                    <span className={`h-2 w-2 rounded-full ${priorityColors.bg}`}></span>
+                    {task.priority}
                   </span>
                   <p className="text-slate-500 text-sm">
                     Created by {task.creator.full_name} •{" "}
@@ -426,8 +515,38 @@ export default function TaskDetails() {
                 </div>
               </div>
 
-              {/* Tabs */}
-              <div className="border-b border-slate-200">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                    SLA
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-blue-900">{slaLabel}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Age
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{daysSinceCreated}d</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Engineering
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {pullRequests.length} PRs • {commits.length} commits
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Activity
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {activityPulse} • {activityLogs.length} logs
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white px-4">
                 <div className="pb-3 pt-4 sm:hidden">
                   <select
                     aria-label="Task detail tabs"
@@ -442,15 +561,15 @@ export default function TaskDetails() {
                     ))}
                   </select>
                 </div>
-                <div className="hidden gap-8 overflow-x-auto scrollbar-hide sm:flex">
+                <div className="hidden gap-3 overflow-x-auto scrollbar-hide sm:flex">
                   {taskTabs.map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
-                      className={`flex items-center gap-2 border-b-[3px] pb-[13px] pt-4 font-bold text-sm whitespace-nowrap ${
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-bold text-sm whitespace-nowrap ${
                         activeTab === tab.id
-                          ? "border-b-blue-600 text-blue-600"
-                          : "border-b-transparent text-slate-500 hover:text-blue-600 transition-colors"
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-colors"
                       }`}
                       onClick={() => setActiveTab(tab.id)}
                     >
@@ -469,35 +588,125 @@ export default function TaskDetails() {
               {/* Tab Content */}
               {activeTab === "overview" && (
                 <>
-                  {/* Description */}
-                  <div className="space-y-3 group relative">
+                  <div className="space-y-3 group relative rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-bold text-slate-900">
                         Description
                       </h3>
-                      <button className="text-blue-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="text-blue-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+                        onClick={() => {
+                          setEditMode((prev) => !prev);
+                          setEditError("");
+                          setEditTitle(task.title || "");
+                          setEditDescription(task.description || "");
+                        }}
+                      >
                         <span className="material-symbols-outlined text-sm">
                           edit
                         </span>{" "}
-                        Edit
+                        {editMode ? "Close Editor" : "Edit"}
                       </button>
                     </div>
-                    <div className="prose max-w-none text-slate-600 leading-relaxed">
-                      <p>{task.description || "No description provided."}</p>
-                    </div>
+                    {!editMode ? (
+                      <div className="prose max-w-none text-slate-600 leading-relaxed">
+                        <p>{task.description || "No description provided."}</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {editError && (
+                          <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1">
+                            {editError}
+                          </p>
+                        )}
+                        {editAiError && (
+                          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                            {editAiError}
+                          </p>
+                        )}
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-600">
+                            Title
+                          </label>
+                          <input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                            placeholder="Task title"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-600">
+                            Description
+                          </label>
+                          <textarea
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            className="min-h-[120px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                            placeholder="Task description"
+                          />
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {editDescription.length}/1000
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              onClick={() => setEditDescription(buildTaskTemplate(editTitle).slice(0, 1000))}
+                              disabled={editSaving}
+                            >
+                              Apply Jira Template
+                            </button>
+                            <button
+                              type="button"
+                              className="h-9 rounded-lg border border-blue-300 bg-blue-50 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                              onClick={handleGenerateEditIdeas}
+                              disabled={editAiLoading || editSaving}
+                            >
+                              {editAiLoading ? "Generating..." : "AI Generate Ideas"}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            onClick={() => {
+                              setEditMode(false);
+                              setEditError("");
+                              setEditAiError("");
+                              setEditTitle(task.title || "");
+                              setEditDescription(task.description || "");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                            onClick={handleSaveTaskEdits}
+                            disabled={editSaving}
+                          >
+                            {editSaving ? "Saving..." : "Save Changes"}
+                          </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* AI Assistant */}
-                  <div className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
+                  <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-cyan-900 flex items-center gap-2">
+                      <h3 className="text-base font-bold text-blue-900 flex items-center gap-2">
                         <span className="material-symbols-outlined text-lg">
                           auto_awesome
                         </span>
                         AI Task Assistant
                       </h3>
                       <button
-                        className="h-8 px-3 rounded-md bg-cyan-700 text-white text-xs font-semibold hover:bg-cyan-800 disabled:opacity-50"
+                        className="h-8 px-3 rounded-md bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 disabled:opacity-50"
                         onClick={() =>
                           fetchAiSuggestion(task.title, task.description || "")
                         }
@@ -515,7 +724,7 @@ export default function TaskDetails() {
 
                     {aiSuggestion && (
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <div className="rounded-lg border border-blue-200 bg-white p-3">
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                             Suggested Priority
                           </p>
@@ -523,7 +732,7 @@ export default function TaskDetails() {
                             {aiSuggestion.priority}
                           </p>
                           <button
-                            className="mt-2 text-xs font-semibold text-cyan-700 hover:text-cyan-900"
+                            className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900"
                             onClick={() =>
                               handlePriorityUpdate(aiSuggestion.priority)
                             }
@@ -532,7 +741,7 @@ export default function TaskDetails() {
                             {prioritySaving ? "Applying..." : "Apply priority"}
                           </button>
                         </div>
-                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <div className="rounded-lg border border-blue-200 bg-white p-3">
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                             Suggested Due Date
                           </p>
@@ -543,7 +752,7 @@ export default function TaskDetails() {
                             Est. {aiSuggestion.estimated_hours}h effort
                           </p>
                         </div>
-                        <div className="rounded-lg border border-cyan-200 bg-white p-3">
+                          <div className="rounded-lg border border-blue-200 bg-white p-3">
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                             Why
                           </p>
@@ -551,7 +760,7 @@ export default function TaskDetails() {
                             {aiSuggestion.reason}
                           </p>
                         </div>
-                        <div className="rounded-lg border border-cyan-200 bg-white p-3 lg:col-span-3">
+                          <div className="rounded-lg border border-blue-200 bg-white p-3 lg:col-span-3">
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                             Suggested Checklist
                           </p>
@@ -567,8 +776,7 @@ export default function TaskDetails() {
                     )}
                   </div>
 
-                  {/* Activity Log */}
-                  <div className="space-y-6 pt-4">
+                  <div className="space-y-6 pt-4 rounded-2xl border border-slate-200 bg-white p-5">
                     <h3 className="text-lg font-bold text-slate-900">
                       Activity
                     </h3>
@@ -616,7 +824,7 @@ export default function TaskDetails() {
               )}
 
               {activeTab === "prs" && (
-                <div className="space-y-10">
+                <div className="space-y-10 rounded-2xl border border-slate-200 bg-white p-5">
                   {prLoading ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -632,7 +840,6 @@ export default function TaskDetails() {
                           </h3>
                           <button
                             onClick={() => {
-                              console.log("Link PR button clicked");
                               setShowLinkPRModal(true);
                             }}
                             className="text-blue-600 text-sm font-semibold flex items-center gap-1 hover:underline"
@@ -808,7 +1015,7 @@ export default function TaskDetails() {
               )}
 
               {activeTab === "activity" && (
-                <div className="space-y-6 pt-4">
+                <div className="space-y-6 pt-4 rounded-2xl border border-slate-200 bg-white p-5">
                   <h3 className="text-lg font-bold text-slate-900">
                     Activity Log
                   </h3>
@@ -940,7 +1147,7 @@ export default function TaskDetails() {
               )}
 
               {activeTab === "attachments" && (
-                <div className="space-y-6 pt-4">
+                <div className="space-y-6 pt-4 rounded-2xl border border-slate-200 bg-white p-5">
                   <div className="flex flex-wrap justify-between items-center gap-4">
                     <h3 className="text-lg font-bold text-slate-900">
                       Attachments
@@ -986,79 +1193,133 @@ export default function TaskDetails() {
               )}
             </div>
 
-            {/* Right Sidebar */}
-            <div className="w-full md:w-80 p-6 bg-slate-50 flex flex-col gap-8">
-              {/* Metadata Fields */}
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-                    Assignee
-                  </label>
-                  <div className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors group">
-                    <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
-                      {task.assignee?.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("") || "?"}
-                    </div>
-                    <span className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
-                      {task.assignee?.full_name || "Unassigned"}
-                    </span>
-                  </div>
-                </div>
-
-                {task.due_date && (
+            <div className="p-5 sm:p-6 bg-slate-50/60">
+              <div className="space-y-4 lg:sticky lg:top-6">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Task Context
+                  </p>
                   <div className="space-y-2">
-                    <label className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-                      Due Date
+                    <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                      Assignee
                     </label>
-                    <div className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors text-slate-900">
-                      <span className="material-symbols-outlined text-blue-600">
-                        calendar_today
-                      </span>
-                      <span className="text-sm font-semibold">
-                        {new Date(task.due_date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                    <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 group">
+                      <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
+                        {task.assignee?.full_name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("") || "?"}
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
+                        {task.assignee?.full_name || "Unassigned"}
                       </span>
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  <label className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-                    Priority
-                  </label>
-                  <div className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors">
-                    <div
-                      className={`w-3 h-3 rounded-full ${priorityColors.bg}`}
-                    ></div>
-                    <span
-                      className={`text-sm font-semibold ${priorityColors.text}`}
-                    >
-                      {task.priority}
-                    </span>
+                  {task.due_date && (
+                    <div className="space-y-2">
+                      <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                        Due Date
+                      </label>
+                      <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-slate-900">
+                        <span className="material-symbols-outlined text-blue-600">
+                          calendar_today
+                        </span>
+                        <span className="text-sm font-semibold">
+                          {new Date(task.due_date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                      Priority
+                    </label>
+                    <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50">
+                      <div
+                        className={`w-3 h-3 rounded-full ${priorityColors.bg}`}
+                      ></div>
+                      <span
+                        className={`text-sm font-semibold ${priorityColors.text}`}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="h-px bg-slate-200"></div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Lifecycle
+                  </p>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Created
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {Number.isNaN(createdAtDate.getTime())
+                        ? "Unknown"
+                        : createdAtDate.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Last Updated
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {Number.isNaN(updatedAtDate.getTime())
+                        ? "Unknown"
+                        : updatedAtDate.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Delivery Signal
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{slaLabel}</p>
+                  </div>
+                </div>
 
-              {/* Delete Button */}
-              <div className="mt-auto pt-6 text-center">
-                <button className="text-slate-400 hover:text-red-500 transition-colors text-xs font-medium flex items-center justify-center gap-1 mx-auto">
-                  <span className="material-symbols-outlined text-sm">
-                    delete
-                  </span>
-                  Delete Task
-                </button>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                    Integration Snapshot
+                  </p>
+                  <div className="space-y-2 text-sm text-slate-700">
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span>Linked PRs</span>
+                      <span className="font-semibold text-slate-900">{pullRequests.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span>Related Commits</span>
+                      <span className="font-semibold text-slate-900">{commits.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span>Activity Entries</span>
+                      <span className="font-semibold text-slate-900">{activityLogs.length}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                    Actions
+                  </p>
+                  <button className="w-full text-slate-500 hover:text-red-500 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-red-200 hover:bg-red-50">
+                    <span className="material-symbols-outlined text-sm">
+                      delete
+                    </span>
+                    Delete Task
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Mobile Footer */}
           <div className="md:hidden p-4 border-t border-slate-200 bg-white">
             <button
               className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1069,6 +1330,7 @@ export default function TaskDetails() {
             </button>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Link PR Modal */}

@@ -23,7 +23,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
       const isAuthRoute =
         currentPath.startsWith("/login") ||

@@ -11,8 +11,8 @@ export const createProjectSchema = {
   description: {
     optional: true,
     isLength: {
-      options: { max: 500 },
-      errorMessage: "Description must not exceed 500 characters",
+      options: { max: 2000 },
+      errorMessage: "Description must not exceed 2000 characters",
     },
   },
 };

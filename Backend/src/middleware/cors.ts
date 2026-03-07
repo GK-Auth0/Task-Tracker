@@ -24,8 +24,6 @@ export const corsOptionsDelegate = {
       return callback(null, true);
     }
 
-    console.log("CORS blocked origin:", origin);
-    console.log("Allowed origins:", appConfig.cors.allowedOrigins);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,

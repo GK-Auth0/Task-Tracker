@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { projectController } from '../controllers/projectController';
-import { getEntityAuditLogs } from '../controllers/auditLog';
 import { authenticateToken } from '../middleware/auth';
 import { validateProject, validateProjectUpdate } from '../middleware/projectValidation';
 import { upload } from '../middleware/upload';
+import { requireWorkspaceRole } from '../middleware/rbac';
 
 const router = Router();
 
@@ -207,10 +207,13 @@ router.get('/users', projectController.getUsers);
  *         description: Project not found
  */
 router.get('/:id', projectController.getProject);
-router.get('/:id/activity', (req, res) => {
-  req.query.entity_type = 'project';
-  return getEntityAuditLogs(req, res);
-});
+router.post('/:id/members', requireWorkspaceRole("Member"), projectController.addProjectMember);
+router.put('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.updateProjectMemberRole);
+router.delete('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.removeProjectMember);
+router.post('/:id/confidential-access/request', projectController.requestConfidentialAccess);
+router.get('/:id/confidential-access/requests', projectController.getConfidentialAccessRequests);
+router.patch('/:id/confidential-access/requests/:requestId', projectController.reviewConfidentialAccessRequest);
+router.get('/:id/activity', projectController.getProjectActivity);
 
 /**
  * @swagger
@@ -243,7 +246,7 @@ router.get('/:id/activity', (req, res) => {
  *       400:
  *         description: Invalid input data
  */
-router.post('/', validateProject, projectController.createProject);
+router.post('/', requireWorkspaceRole("Member"), validateProject, projectController.createProject);
 
 /**
  * @swagger
@@ -274,7 +277,7 @@ router.post('/', validateProject, projectController.createProject);
  *       403:
  *         description: Insufficient permissions
  */
-router.put('/:id', validateProjectUpdate, projectController.updateProject);
+router.put('/:id', requireWorkspaceRole("Member"), validateProjectUpdate, projectController.updateProject);
 
 /**
  * @swagger
@@ -299,7 +302,7 @@ router.put('/:id', validateProjectUpdate, projectController.updateProject);
  *       403:
  *         description: Insufficient permissions
  */
-router.delete('/:id', projectController.deleteProject);
+router.delete('/:id', requireWorkspaceRole("Member"), projectController.deleteProject);
 
 /**
  * @swagger
@@ -401,7 +404,7 @@ router.get('/:id/files', projectController.getProjectFiles);
  *       200:
  *         description: File uploaded successfully
  */
-router.post('/:id/files/upload', upload.single('file'), projectController.uploadProjectFile);
+router.post('/:id/files/upload', requireWorkspaceRole("Member"), upload.single('file'), projectController.uploadProjectFile);
 
 router.get('/:id/stats', projectController.getProjectStats);
 

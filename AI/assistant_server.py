@@ -176,6 +176,8 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "service": "ai-assistant",
                     "env": APP_ENV,
+                    "chat_provider": str(os.getenv("AI_CHAT_PROVIDER", "rule-based")).lower(),
+                    "gemini_configured": bool(str(os.getenv("GEMINI_API_KEY", "")).strip()),
                     "features": [
                         "suggest-task",
                         "plan-day",
