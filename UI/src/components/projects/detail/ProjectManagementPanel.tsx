@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Project } from "../../../types/project";
+import aiChatAPI from "../../../services/aiChat";
+import { buildProjectTemplate } from "../../../utils/descriptionTemplates";
 
 interface ProjectUser {
   id: string;
@@ -44,6 +46,8 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
   const [search, setSearch] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<"admin" | "member" | "viewer">("member");
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   const [editName, setEditName] = useState(project.name || "");
   const [editDescription, setEditDescription] = useState(project.description || "");
@@ -72,6 +76,36 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
     }
   };
 
+  const handleApplyTemplate = () => {
+    setEditDescription(buildProjectTemplate(editName));
+    setAiError("");
+  };
+
+  const handleGenerateAiDraft = async () => {
+    const name = editName.trim() || project.name || "Untitled Project";
+    try {
+      setAiLoading(true);
+      setAiError("");
+      const prompt = [
+        "Generate a practical project description using this section order:",
+        "Overview, Problem Statement, Goals, Success Metrics, Scope, Milestones, Stakeholders, Risks & Mitigation.",
+        `Project name: ${name}.`,
+        "Use plain text bullets and keep it concise.",
+      ].join(" ");
+      const response = await aiChatAPI.chat(prompt, `/projects/${project.id}`, "balanced");
+      const draft = String(response?.data?.reply || "").trim();
+      if (!draft) {
+        setAiError("AI did not return a draft.");
+        return;
+      }
+      setEditDescription(draft.slice(0, 2000));
+    } catch (error) {
+      setAiError("AI draft unavailable right now.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-5">
       <div className="flex items-center justify-between gap-2">
@@ -90,10 +124,36 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
           />
           <textarea
             value={editDescription}
-            onChange={(event) => setEditDescription(event.target.value)}
+            onChange={(event) => setEditDescription(event.target.value.slice(0, 2000))}
+            maxLength={2000}
             className="w-full min-h-[92px] rounded-lg border border-slate-200 px-3 py-2 text-sm"
             placeholder="Project description"
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleApplyTemplate}
+              className="h-8 rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              Jira Template
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateAiDraft}
+              disabled={aiLoading || saving}
+              className="h-8 rounded-md border border-cyan-200 bg-cyan-50 px-3 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-60"
+            >
+              {aiLoading ? "Generating..." : "AI Draft"}
+            </button>
+            <span className="ml-auto text-[11px] text-slate-500">
+              {editDescription.length}/2000
+            </span>
+          </div>
+          {aiError && (
+            <p className="text-xs text-amber-700 rounded-md border border-amber-200 bg-amber-50 px-2 py-1">
+              {aiError}
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <select
               value={editPriority}

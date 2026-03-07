@@ -2,12 +2,18 @@ import React from "react";
 import TasksEmptyState from "./TasksEmptyState";
 import TasksList from "./TasksList";
 import TasksPagination from "./TasksPagination";
-import { TaskItem, TasksPagination as TasksPageData } from "./types";
+import {
+  TaskGroupOption,
+  TaskItem,
+  TasksPagination as TasksPageData,
+} from "./types";
 
 interface TasksOverviewTabProps {
   tasks: TaskItem[];
   canCreateTask: boolean;
   pinnedTaskIds: Set<string>;
+  groupBy: TaskGroupOption;
+  compactMode: boolean;
   pagination: TasksPageData | null;
   currentPage: number;
   itemsPerPage: number;
@@ -22,6 +28,8 @@ const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
   tasks,
   canCreateTask,
   pinnedTaskIds,
+  groupBy,
+  compactMode,
   pagination,
   currentPage,
   itemsPerPage,
@@ -41,6 +49,8 @@ const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
           pinnedTaskIds={pinnedTaskIds}
           onTaskPinToggle={onTaskPinToggle}
           canToggleStatus={canCreateTask}
+          compactMode={compactMode}
+          groupBy={groupBy}
         />
       ) : (
         <TasksEmptyState onCreateTask={onCreateTask} canCreate={canCreateTask} />

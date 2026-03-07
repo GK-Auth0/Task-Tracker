@@ -25,7 +25,7 @@ const TasksBoardTab: React.FC<TasksBoardTabProps> = ({ tasks, onTaskClick }) => 
         },
         { key: "done", title: "Done", items: columns.done, tone: "bg-emerald-100 text-emerald-700" },
       ].map((column) => (
-        <div key={column.key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div key={column.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-black text-slate-800">{column.title}</h3>
             <span className={`rounded-md px-2 py-1 text-xs font-bold ${column.tone}`}>
@@ -43,11 +43,18 @@ const TasksBoardTab: React.FC<TasksBoardTabProps> = ({ tasks, onTaskClick }) => 
                   key={task.id}
                   type="button"
                   onClick={() => onTaskClick(task.id)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-left hover:bg-slate-100"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-left hover:bg-slate-100"
                 >
                   <p className="text-sm font-semibold text-slate-900">{task.title}</p>
                   <p className="mt-1 text-xs text-slate-600">
-                    {task.priority} {task.due_date ? `• ${new Date(task.due_date).toLocaleDateString()}` : ""}
+                    {task.priority}{" "}
+                    {task.due_date
+                      ? `• ${
+                          Number.isNaN(new Date(task.due_date).getTime())
+                            ? "No due date"
+                            : new Date(task.due_date).toLocaleDateString()
+                        }`
+                      : ""}
                   </p>
                 </button>
               ))

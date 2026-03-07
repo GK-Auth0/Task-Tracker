@@ -20,7 +20,7 @@ const TasksTimelineTab: React.FC<TasksTimelineTabProps> = ({ tasks, onTaskClick 
   }, [tasks]);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className="bg-slate-50 border-b border-slate-200 px-4 py-3">
         <h3 className="text-sm font-bold text-slate-800">Due Date Timeline</h3>
       </div>
@@ -39,7 +39,9 @@ const TasksTimelineTab: React.FC<TasksTimelineTabProps> = ({ tasks, onTaskClick 
                 <p className="text-sm font-semibold text-slate-900">{task.title}</p>
                 <p className="text-xs font-medium text-slate-600">
                   {task.due_date
-                    ? new Date(task.due_date).toLocaleDateString()
+                    ? Number.isNaN(new Date(task.due_date).getTime())
+                      ? "No due date"
+                      : new Date(task.due_date).toLocaleDateString()
                     : "No due date"}
                 </p>
               </div>

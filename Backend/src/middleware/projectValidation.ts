@@ -15,8 +15,8 @@ export const validateProject = [
     .notEmpty()
     .withMessage('Description is required')
     .trim()
-    .isLength({ min: 10, max: 1000 })
-    .withMessage('Description must be between 10 and 1000 characters'),
+    .isLength({ min: 10, max: 2000 })
+    .withMessage('Description must be between 10 and 2000 characters'),
   
   body('status')
     .optional()
@@ -100,8 +100,8 @@ export const validateProjectUpdate = [
   body('description')
     .optional()
     .trim()
-    .isLength({ max: 1000 })
-    .withMessage('Description must not exceed 1000 characters'),
+    .isLength({ max: 2000 })
+    .withMessage('Description must not exceed 2000 characters'),
   
   body('status')
     .optional()

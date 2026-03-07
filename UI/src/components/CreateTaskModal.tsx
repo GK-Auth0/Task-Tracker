@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
+import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
 
 interface User {
   id: string;
@@ -54,6 +55,11 @@ export default function CreateTaskModal({
   });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+
+  const applyTaskTemplate = () => {
+    setDescription(buildTaskTemplate(title).slice(0, 1000));
+    if (descriptionError) setDescriptionError("");
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -586,12 +592,7 @@ export default function CreateTaskModal({
                   type="button"
                   className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
                   onClick={() => {
-                    const checklistText = aiSuggestion.checklist
-                      .map((item) => `- ${item}`)
-                      .join("\n");
-                    const next = description.trim()
-                      ? `${description.trim()}\n\nChecklist:\n${checklistText}`
-                      : `Checklist:\n${checklistText}`;
+                    const next = appendTaskAiDraft(description, title, aiSuggestion).slice(0, 1000);
                     setDescription(next);
                   }}
                 >
@@ -607,6 +608,13 @@ export default function CreateTaskModal({
                   Description
                 </label>
                 <div className="flex gap-1">
+                  <button
+                    className="h-7 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    type="button"
+                    onClick={applyTaskTemplate}
+                  >
+                    Jira Template
+                  </button>
                   <button
                     className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
                     type="button"

@@ -19,6 +19,16 @@ export interface TaskItem {
   };
 }
 
+export type TaskSortOption =
+  | "due_asc"
+  | "due_desc"
+  | "priority_desc"
+  | "priority_asc"
+  | "title_asc"
+  | "recent";
+
+export type TaskGroupOption = "none" | "status" | "priority" | "due";
+
 export interface TasksPagination {
   total: number;
   totalPages: number;

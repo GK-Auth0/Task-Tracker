@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { CreateProjectRequest } from "../types/project";
 import axios from "axios";
+import aiChatAPI from "../services/aiChat";
+import { buildProjectTemplate } from "../utils/descriptionTemplates";
 
 import { API_BASE_URL } from "../config/api";
 
@@ -38,6 +40,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Fetch users when search term changes
@@ -166,6 +170,48 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setInvitees((prev) => prev.filter((item) => item.email !== email));
   };
 
+  const applyProjectTemplate = () => {
+    setFormData((prev) => ({
+      ...prev,
+      description: buildProjectTemplate(prev.name),
+    }));
+    setAiError("");
+    if (errors.description) {
+      setErrors((prev) => ({ ...prev, description: "" }));
+    }
+  };
+
+  const generateProjectDescriptionWithAi = async () => {
+    const name = formData.name.trim() || "Untitled Project";
+    try {
+      setAiLoading(true);
+      setAiError("");
+      const prompt = [
+        "Generate a practical project description using this exact section order:",
+        "Overview, Problem Statement, Goals, Success Metrics, Scope, Milestones, Stakeholders, Risks & Mitigation.",
+        `Project name: ${name}.`,
+        "Keep it concise, actionable, and in plain text with bullets.",
+      ].join(" ");
+      const response = await aiChatAPI.chat(prompt, "/projects/create", "balanced");
+      const draft = String(response?.data?.reply || "").trim();
+      if (!draft) {
+        setAiError("AI did not return a draft.");
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        description: draft.slice(0, 2000),
+      }));
+      if (errors.description) {
+        setErrors((prev) => ({ ...prev, description: "" }));
+      }
+    } catch (error) {
+      setAiError("AI draft unavailable right now.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const formatDescription = (
     mode: "bold" | "italic" | "bullet" | "numbered" | "quote",
   ) => {
@@ -272,6 +318,22 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
+                    className="h-8 px-2.5 rounded-md border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+                    onClick={applyProjectTemplate}
+                    disabled={aiLoading}
+                  >
+                    Jira Template
+                  </button>
+                  <button
+                    type="button"
+                    className="h-8 px-2.5 rounded-md border border-cyan-200 bg-cyan-50 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-60"
+                    onClick={generateProjectDescriptionWithAi}
+                    disabled={aiLoading}
+                  >
+                    {aiLoading ? "Generating..." : "AI Draft"}
+                  </button>
+                  <button
+                    type="button"
                     className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                     onClick={() => formatDescription("bold")}
                   >
@@ -311,7 +373,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  maxLength={1000}
+                  maxLength={2000}
                   className={`form-input flex w-full min-w-0 flex-1 resize-none rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border bg-white focus:border-blue-600 min-h-[120px] placeholder:text-[#4c759a] p-4 text-base font-normal leading-normal ${
                     errors.description ? "border-red-300 bg-red-50" : "border-[#cfdce7]"
                   }`}
@@ -320,13 +382,15 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 <div className="mt-1 flex items-center justify-between">
                   {errors.description ? (
                     <p className="text-red-500 text-xs">{errors.description}</p>
+                  ) : aiError ? (
+                    <p className="text-amber-700 text-xs">{aiError}</p>
                   ) : (
                     <p className="text-xs text-slate-500">
                       Use simple markdown-style formatting with the buttons.
                     </p>
                   )}
                   <p className="text-xs text-slate-400">
-                    {formData.description.length}/1000
+                    {formData.description.length}/2000
                   </p>
                 </div>
               </label>

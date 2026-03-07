@@ -12,6 +12,18 @@ const DashboardRecentActivity: React.FC<DashboardRecentActivityProps> = ({
   onOpenActivity,
   formatActivityText,
 }) => {
+  const formatTimestamp = (value?: string) => {
+    if (!value) return "Time unavailable";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Time unavailable";
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
@@ -34,12 +46,7 @@ const DashboardRecentActivity: React.FC<DashboardRecentActivityProps> = ({
               <div>
                 <p className="text-sm text-slate-700">{formatActivityText(item)}</p>
                 <p className="text-xs text-slate-500 mt-1">
-                  {new Date(item.created_at).toLocaleString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                  {formatTimestamp(item.created_at)}
                 </p>
               </div>
               <span className="text-xs uppercase tracking-wide rounded-full bg-slate-100 px-2 py-1 text-slate-600 font-semibold">

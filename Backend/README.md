@@ -38,6 +38,13 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 JWT_SECRET=your-jwt-secret-key
 JWT_EXPIRES_IN=7d
+AI_PROVIDER=ollama
+# OLLAMA_BASE_URL=http://127.0.0.1:11434
+# OLLAMA_MODEL=llama3.2:3b
+# GEMINI_API_KEY=your-gemini-api-key
+# GEMINI_MODEL=gemini-2.0-flash
+# GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+# AI_TIMEOUT_MS=20000
 ```
 
 ### 3. Database Setup
@@ -109,6 +116,13 @@ Swagger documentation available at: `http://localhost:3000/api-docs`
 ### Dashboard Endpoints
 
 - `GET /api/dashboard/summary` - Get dashboard statistics
+
+### AI Provider Configuration
+
+- `AI_PROVIDER=ollama` uses the local Ollama endpoint.
+- `AI_PROVIDER=gemini` uses Gemini via `GEMINI_API_KEY`.
+- `AI_PROVIDER=auto` prefers Gemini (when key exists), otherwise falls back to Ollama.
+- If the selected provider fails, the backend returns a safe local fallback response.
 
 ## Database Schema
 

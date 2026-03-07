@@ -16,25 +16,23 @@ const TasksTabs: React.FC<TasksTabsProps> = ({ activeTab, onTabChange }) => {
   ];
 
   return (
-    <section className="mb-6 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-      <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onTabChange(tab.key)}
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors ${
-              activeTab === tab.key
-                ? "bg-blue-600 text-white"
-                : "text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-    </section>
+    <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => onTabChange(tab.key)}
+          className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors ${
+            activeTab === tab.key
+              ? "bg-blue-600 text-white"
+              : "text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
+          {tab.label}
+        </button>
+      ))}
+    </div>
   );
 };
 

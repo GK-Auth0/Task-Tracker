@@ -75,14 +75,19 @@ export const createTaskSchema = {
 
 export const updateTaskSchema = {
   title: {
-    optional: true,
+    optional: { options: { nullable: true } },
+    trim: true,
+    notEmpty: {
+      errorMessage: "Task title cannot be empty",
+    },
     isLength: {
       options: { min: 2, max: 200 },
       errorMessage: "Task title must be between 2 and 200 characters",
     },
   },
   description: {
-    optional: true,
+    optional: { options: { nullable: true } },
+    trim: true,
     isLength: {
       options: { max: 1000 },
       errorMessage: "Description must not exceed 1000 characters",
@@ -109,8 +114,14 @@ export const updateTaskSchema = {
     },
   },
   due_date: {
-    optional: true,
-    isISO8601: {
+    optional: { options: { nullable: true } },
+    custom: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined || value === "") return true;
+        if (typeof value !== "string") return false;
+        const time = Date.parse(value);
+        return Number.isFinite(time);
+      },
       errorMessage: "Due date must be a valid ISO 8601 date",
     },
   },

@@ -12,10 +12,11 @@ import TasksTimelineTab from "../components/tasks/TasksTimelineTab";
 import TasksAiTab from "../components/tasks/TasksAiTab";
 import TasksOverviewTab from "../components/tasks/TasksOverviewTab";
 import TasksTabs, { TasksTabKey } from "../components/tasks/TasksTabs";
-import SavedViewsBar from "../components/preferences/SavedViewsBar";
 import {
   DashboardSummary,
+  TaskGroupOption,
   TaskItem,
+  TaskSortOption,
   TasksPagination as TasksPageData,
 } from "../components/tasks/types";
 import { canManageWorkspaceContent } from "../types/roles";
@@ -31,9 +32,11 @@ export default function Tasks() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showCompleted, setShowCompleted] = useState(true);
+  const [compactMode, setCompactMode] = useState(false);
+  const [sortBy, setSortBy] = useState<TaskSortOption>("recent");
+  const [groupBy, setGroupBy] = useState<TaskGroupOption>("none");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<TasksPageData | null>(null);
   const [dayPlan, setDayPlan] = useState<AiDayPlan | null>(null);
@@ -46,6 +49,8 @@ export default function Tasks() {
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
   const [activeTab, setActiveTab] = useState<TasksTabKey>("overview");
+  const [showManageViews, setShowManageViews] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
   const itemsPerPage = 12;
   const canCreateTask = canManageWorkspaceContent(user?.role);
 
@@ -129,7 +134,69 @@ export default function Tasks() {
     .filter((task) =>
       task.title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     )
+    .filter((task) => {
+      if (!showCompleted) return task.status !== "Done";
+      return true;
+    })
+    .filter((task) => {
+      if (filter === "Due Soon") {
+        if (!task.due_date) return false;
+        const due = new Date(task.due_date);
+        if (Number.isNaN(due.getTime())) return false;
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const diffDays = Math.round(
+          (new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime() -
+            today.getTime()) /
+            86400000,
+        );
+        return diffDays >= 0 && diffDays <= 3;
+      }
+      if (filter === "My Focus") {
+        return task.priority === "High" || task.status === "In Progress";
+      }
+      return true;
+    })
     .filter((task) => !showPinnedOnly || pinnedTaskIds.has(task.id));
+
+  const sortedTasks = [...visibleTasks].sort((a, b) => {
+    const priorityWeight = (value: TaskItem["priority"]) =>
+      value === "High" ? 3 : value === "Medium" ? 2 : 1;
+
+    const dateWeight = (value?: string, fallback: number = Number.MAX_SAFE_INTEGER) => {
+      if (!value) return fallback;
+      const parsed = new Date(value).getTime();
+      return Number.isNaN(parsed) ? fallback : parsed;
+    };
+
+    if (sortBy === "title_asc") {
+      return a.title.localeCompare(b.title);
+    }
+    if (sortBy === "priority_desc") {
+      return priorityWeight(b.priority) - priorityWeight(a.priority);
+    }
+    if (sortBy === "priority_asc") {
+      return priorityWeight(a.priority) - priorityWeight(b.priority);
+    }
+    if (sortBy === "due_asc") {
+      return dateWeight(a.due_date) - dateWeight(b.due_date);
+    }
+    if (sortBy === "due_desc") {
+      return dateWeight(b.due_date, 0) - dateWeight(a.due_date, 0);
+    }
+    return 0;
+  });
+
+  const highPriorityVisible = sortedTasks.filter(
+    (task) => task.priority === "High" && task.status !== "Done",
+  ).length;
+  const inProgressVisible = sortedTasks.filter(
+    (task) => task.status === "In Progress",
+  ).length;
+  const doneVisible = sortedTasks.filter((task) => task.status === "Done").length;
+  const completionVisibleRate = sortedTasks.length
+    ? Math.round((doneVisible / sortedTasks.length) * 100)
+    : 0;
 
   const handleToggleTaskPin = async (taskId: string, shouldPin: boolean) => {
     try {
@@ -163,6 +230,12 @@ export default function Tasks() {
     setStatusFilter(String(filters.statusFilter ?? ""));
     setSearchTerm(String(filters.searchTerm ?? ""));
     setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
+    setShowCompleted(
+      filters.showCompleted === undefined ? true : Boolean(filters.showCompleted),
+    );
+    setCompactMode(Boolean(filters.compactMode ?? false));
+    setSortBy(String(filters.sortBy ?? "recent") as TaskSortOption);
+    setGroupBy(String(filters.groupBy ?? "none") as TaskGroupOption);
     setCurrentPage(1);
   };
 
@@ -179,6 +252,10 @@ export default function Tasks() {
           statusFilter,
           searchTerm,
           showPinnedOnly,
+          showCompleted,
+          compactMode,
+          sortBy,
+          groupBy,
         },
       });
       setNewViewName("");
@@ -236,76 +313,186 @@ export default function Tasks() {
       <div className="min-h-full p-4 sm:p-6 lg:p-8">
         <TasksHeader
           summary={summary}
+          visibleCount={sortedTasks.length}
           onCreate={() => setShowCreateModal(true)}
           canCreate={canCreateTask}
-        />
-
-        <SavedViewsBar
-          title="Task Saved Views"
-          views={savedViews.map((view) => ({ id: view.id, name: view.name }))}
-          selectedId={selectedViewId}
-          viewName={newViewName}
-          onSelectedIdChange={setSelectedViewId}
-          onViewNameChange={setNewViewName}
-          onApply={applySavedView}
-          onSave={saveCurrentView}
-          onDelete={deleteSelectedView}
-          saving={savingView}
         />
 
         <TasksFiltersBar
           filter={filter}
           priorityFilter={priorityFilter}
           statusFilter={statusFilter}
-          showPriorityDropdown={showPriorityDropdown}
-          showStatusDropdown={showStatusDropdown}
           searchTerm={searchTerm}
+          showCompleted={showCompleted}
+          compactMode={compactMode}
+          sortBy={sortBy}
+          groupBy={groupBy}
           onFilterChange={setFilter}
           onPriorityFilterChange={(value) => {
             setPriorityFilter(value);
-            setShowPriorityDropdown(false);
             setCurrentPage(1);
           }}
           onStatusFilterChange={(value) => {
             setStatusFilter(value);
-            setShowStatusDropdown(false);
             setCurrentPage(1);
           }}
-          onTogglePriorityDropdown={() =>
-            setShowPriorityDropdown(!showPriorityDropdown)
-          }
-          onToggleStatusDropdown={() => setShowStatusDropdown(!showStatusDropdown)}
           onSearchChange={setSearchTerm}
+          onShowCompletedChange={setShowCompleted}
+          onCompactModeChange={setCompactMode}
+          onSortByChange={setSortBy}
+          onGroupByChange={setGroupBy}
           onClearAll={() => {
             setFilter("");
             setPriorityFilter("");
             setStatusFilter("");
             setSearchTerm("");
+            setShowCompleted(true);
+            setCompactMode(false);
+            setSortBy("recent");
+            setGroupBy("none");
             setCurrentPage(1);
           }}
         />
 
-        <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            className={`h-9 rounded-lg border px-3 text-sm font-semibold ${
-              showPinnedOnly
-                ? "border-amber-400 bg-amber-50 text-amber-800"
-                : "border-slate-300 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowPinnedOnly((previous) => !previous)}
-          >
-            {showPinnedOnly ? "Showing Pinned Tasks" : "Show Pinned Tasks Only"}
-          </button>
-        </div>
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                Visible: {sortedTasks.length}
+              </span>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+                Focus: {highPriorityVisible + inProgressVisible}
+              </span>
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                Pinned: {pinnedTaskIds.size}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                Completion: {completionVisibleRate}%
+              </span>
+            </div>
+            <button
+              type="button"
+              className="h-8 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={() => setShowMetrics((prev) => !prev)}
+            >
+              {showMetrics ? "Hide Details" : "Show Details"}
+            </button>
+          </div>
+          {showMetrics && (
+            <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Visible Tasks
+                </p>
+                <p className="mt-1 text-xl font-black text-slate-900">{sortedTasks.length}</p>
+              </div>
+              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                  Focus Queue
+                </p>
+                <p className="mt-1 text-xl font-black text-blue-800">
+                  {highPriorityVisible + inProgressVisible}
+                </p>
+              </div>
+              <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                  Pinned
+                </p>
+                <p className="mt-1 text-xl font-black text-amber-800">{pinnedTaskIds.size}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Completion
+                </p>
+                <p className="mt-1 text-xl font-black text-slate-900">{completionVisibleRate}%</p>
+              </div>
+            </div>
+          )}
+        </section>
 
-        <TasksTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <div className="mb-4 sticky top-2 z-20 rounded-2xl border border-slate-200/90 bg-white/95 p-2 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <TasksTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 px-1 pb-1 lg:pb-0">
+              <button
+                type="button"
+                className={`h-9 rounded-lg border px-3 text-sm font-semibold ${
+                  showPinnedOnly
+                    ? "border-amber-400 bg-amber-50 text-amber-800"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+                onClick={() => setShowPinnedOnly((previous) => !previous)}
+              >
+                {showPinnedOnly ? "Showing Pinned Tasks" : "Show Pinned Tasks Only"}
+              </button>
+              <button
+                type="button"
+                className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => setShowManageViews((prev) => !prev)}
+              >
+                {showManageViews ? "Hide Views" : `Manage Views (${savedViews.length})`}
+              </button>
+            </div>
+          </div>
+          {showManageViews && (
+            <div className="mt-3 border-t border-slate-200 px-2 pt-3 pb-1">
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <select
+                  value={selectedViewId}
+                  onChange={(event) => setSelectedViewId(event.target.value)}
+                  className="h-9 min-w-[180px] rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                >
+                  <option value="">Select saved view</option>
+                  {savedViews.map((view) => (
+                    <option key={view.id} value={view.id}>
+                      {view.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  onClick={applySavedView}
+                  disabled={!selectedViewId}
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  className="h-9 rounded-lg border border-rose-300 px-3 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  onClick={deleteSelectedView}
+                  disabled={!selectedViewId}
+                >
+                  Delete
+                </button>
+                <input
+                  value={newViewName}
+                  onChange={(event) => setNewViewName(event.target.value)}
+                  placeholder="New view name"
+                  className="h-9 min-w-[170px] rounded-lg border border-slate-300 px-3 text-sm"
+                />
+                <button
+                  type="button"
+                  className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  onClick={saveCurrentView}
+                  disabled={savingView || !newViewName.trim()}
+                >
+                  {savingView ? "Saving..." : "Save Current"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {activeTab === "overview" && (
           <TasksOverviewTab
-            tasks={visibleTasks}
+            tasks={sortedTasks}
             canCreateTask={canCreateTask}
             pinnedTaskIds={pinnedTaskIds}
+            groupBy={groupBy}
+            compactMode={compactMode}
             pagination={pagination}
             currentPage={currentPage}
             itemsPerPage={itemsPerPage}
@@ -319,14 +506,14 @@ export default function Tasks() {
 
         {activeTab === "board" && (
           <TasksBoardTab
-            tasks={visibleTasks}
+            tasks={sortedTasks}
             onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
           />
         )}
 
         {activeTab === "timeline" && (
           <TasksTimelineTab
-            tasks={visibleTasks}
+            tasks={sortedTasks}
             onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
           />
         )}
@@ -337,7 +524,7 @@ export default function Tasks() {
             planning={planning}
             planError={planError}
             dayPlan={dayPlan}
-            visibleTasks={visibleTasks}
+            visibleTasks={sortedTasks}
             onBuildDailyPlan={buildDailyPlan}
           />
         )}
