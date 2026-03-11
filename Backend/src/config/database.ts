@@ -14,9 +14,10 @@ const sequelizeOptions = appConfig.database.url
             }
           : false,
       },
+      // Reduced pool for PgBouncer
       pool: {
-        max: 20,
-        min: 2,
+        max: 5,
+        min: 1,
         acquire: 30000,
         idle: 10000,
       },
@@ -37,9 +38,10 @@ const sequelizeOptions = appConfig.database.url
             }
           : false,
       },
+      // Reduced pool for PgBouncer
       pool: {
-        max: 20,
-        min: 2,
+        max: 5,
+        min: 1,
         acquire: 30000,
         idle: 10000,
       },
