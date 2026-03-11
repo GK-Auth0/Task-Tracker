@@ -1,6 +1,23 @@
 import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit } from "../models";
 import { Op } from "sequelize";
 import type { CreateTaskDto, TaskFilters, UpdateTaskDto } from "../types/task";
+import { deleteCache, deleteCacheByPrefix } from "task-tracker-cache";
+
+const invalidateDashboardCache = async (userIds: string[]) => {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+
+  try {
+    await Promise.all(
+      uniqueIds.flatMap((userId) => [
+        deleteCache(`dashboard:summary:${userId}`),
+        deleteCache(`dashboard:insights:${userId}`),
+        deleteCacheByPrefix(`dashboard:overview:${userId}:`),
+      ]),
+    );
+  } catch (error) {
+    console.warn("[cache] Failed to invalidate dashboard cache:", error);
+  }
+};
 
 export async function getAllTasks(
   userId: string,
@@ -104,6 +121,15 @@ export async function createTask(dto: CreateTaskDto) {
     due_date: dto.due_date ? new Date(dto.due_date) : null,
   });
 
+  await invalidateDashboardCache([dto.creator_id, dto.assignee_id].filter(Boolean) as string[]);
+  if (dto.project_id) {
+    try {
+      await deleteCache(`project:stats:${dto.project_id}`);
+    } catch (error) {
+      console.warn("[cache] Failed to invalidate project stats cache:", error);
+    }
+  }
+
   const taskWithRelations = await Task.findByPk(task.id, {
     include: [
       {
@@ -192,6 +218,12 @@ export async function updateTask(
     throw new Error("Task not found or access denied");
   }
 
+  const relatedUserIds = [
+    task.creator_id,
+    task.assignee_id,
+    dto.assignee_id,
+  ].filter(Boolean) as string[];
+
   const updateData: any = {};
   if (dto.title !== undefined) updateData.title = dto.title;
   if (dto.description !== undefined) updateData.description = dto.description;
@@ -223,6 +255,15 @@ export async function updateTask(
     ],
   });
 
+  await invalidateDashboardCache(relatedUserIds);
+  if (task.project_id) {
+    try {
+      await deleteCache(`project:stats:${task.project_id}`);
+    } catch (error) {
+      console.warn("[cache] Failed to invalidate project stats cache:", error);
+    }
+  }
+
   return updatedTask?.get({ plain: true });
 }
 
@@ -239,6 +280,15 @@ export async function deleteTask(taskId: string, userId: string) {
   }
 
   await task.destroy();
+
+  await invalidateDashboardCache([task.creator_id, task.assignee_id].filter(Boolean) as string[]);
+  if (task.project_id) {
+    try {
+      await deleteCache(`project:stats:${task.project_id}`);
+    } catch (error) {
+      console.warn("[cache] Failed to invalidate project stats cache:", error);
+    }
+  }
 }
 
 export async function getTaskPullRequests(taskId: string, userId: string) {

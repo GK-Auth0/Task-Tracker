@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { deleteCache, getCache, setCache } from 'task-tracker-cache';
 import Project from '../models/project';
 import ProjectMember from '../models/ProjectMember';
 import User from '../models/user';
@@ -17,6 +18,31 @@ interface AuthenticatedRequest extends Request {
     role: string;
   };
 }
+
+const safeGetCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    return await getCache<T>(key);
+  } catch (error) {
+    console.warn('[cache] Failed to read cache:', error);
+    return null;
+  }
+};
+
+const safeSetCache = async <T>(key: string, value: T, ttlSeconds: number) => {
+  try {
+    await setCache(key, value, ttlSeconds);
+  } catch (error) {
+    console.warn('[cache] Failed to write cache:', error);
+  }
+};
+
+const safeDeleteCache = async (key: string) => {
+  try {
+    await deleteCache(key);
+  } catch (error) {
+    console.warn('[cache] Failed to delete cache:', error);
+  }
+};
 
 type AccessContext = {
   canViewConfidential: boolean;
@@ -591,6 +617,8 @@ export class ProjectController {
       // Delete project
       await project.destroy();
 
+      await safeDeleteCache(`project:stats:${id}`);
+
       res.json({
         success: true,
         message: 'Project deleted successfully'
@@ -609,6 +637,15 @@ export class ProjectController {
   async getProjectStats(req: AuthenticatedRequest, res: Response) {
     try {
       const { id } = req.params;
+
+      const cacheKey = `project:stats:${id}`;
+      const cachedStats = await safeGetCache<any>(cacheKey);
+      if (cachedStats) {
+        return res.json({
+          success: true,
+          data: cachedStats
+        });
+      }
 
       const project = await Project.findByPk(id as string);
       if (!project) {
@@ -629,15 +666,19 @@ export class ProjectController {
       const completedTasks = tasks.filter((task: any) => task.status === 'Done').length;
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+      const statsPayload = {
+        totalTasks,
+        todoTasks,
+        inProgressTasks,
+        completedTasks,
+        progress
+      };
+
+      await safeSetCache(cacheKey, statsPayload, 60);
+
       res.json({
         success: true,
-        data: {
-          totalTasks,
-          todoTasks,
-          inProgressTasks,
-          completedTasks,
-          progress
-        }
+        data: statsPayload
       });
     } catch (error) {
       console.error('Error fetching project stats:', error);

@@ -36,6 +36,7 @@
     "nodemon": "^3.1.10",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
+    "task-tracker-cache": "file:../Cache",
     "sequelize": "^6.37.7",
     "sequelize-typescript": "^2.1.6",
     "swagger-jsdoc": "^6.2.8",

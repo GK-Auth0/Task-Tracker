@@ -28,8 +28,19 @@ services:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: password
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - task-tracker-net
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   task-tracker-net:
