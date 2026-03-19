@@ -24,6 +24,17 @@ let smtpTransporterKey: string | null = null;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const logEmailError = (context: string, error: any) => {
+  const status = error?.response?.status;
+  const responseData = error?.response?.data;
+  const code = error?.code;
+  const message = error?.message || String(error);
+
+  console.error(
+    `[email] ${context} failed. status=${status ?? "n/a"} code=${code ?? "n/a"} message=${message} response=${responseData ? JSON.stringify(responseData) : "n/a"}`,
+  );
+};
+
 const isRetryableEmailError = (error: any) => {
   const status = error?.response?.status;
   if (typeof status === "number") {
@@ -119,16 +130,21 @@ export const sendOtpEmail = async (
       throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
     }
 
-    await sendSmtpEmail({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      username: EMAIL_USER,
-      password: EMAIL_PASS,
-      from: OTP_FROM_EMAIL,
-      to,
-      subject: "Your TaskTracker OTP Code",
-      html: buildOtpHtml(otp, purpose),
-    });
+    try {
+      await sendSmtpEmail({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        username: EMAIL_USER,
+        password: EMAIL_PASS,
+        from: OTP_FROM_EMAIL,
+        to,
+        subject: "Your TaskTracker OTP Code",
+        html: buildOtpHtml(otp, purpose),
+      });
+    } catch (error: any) {
+      logEmailError("SMTP OTP", error);
+      throw error;
+    }
     return;
   }
 
@@ -157,6 +173,7 @@ export const sendOtpEmail = async (
         ),
       );
     } catch (error: any) {
+      logEmailError("Resend OTP", error);
       if (EMAIL_USER && EMAIL_PASS) {
         console.warn(
           `[email] Resend OTP failed after retries, falling back to SMTP. error=${error?.message || error}`,
@@ -209,6 +226,7 @@ export const sendOtpEmail = async (
         ),
       );
     } catch (error: any) {
+      logEmailError("Webhook OTP", error);
       if (EMAIL_USER && EMAIL_PASS) {
         console.warn(
           `[email] Webhook OTP failed after retries, falling back to SMTP. error=${error?.message || error}`,
