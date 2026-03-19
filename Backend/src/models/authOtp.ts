@@ -32,10 +32,10 @@ export default class AuthOtp extends Model {
   user_id!: string;
 
   @Column({
-    type: DataType.ENUM("login", "register", "auth0"),
+    type: DataType.ENUM("login", "register", "auth0", "passwordReset"),
     allowNull: false,
   })
-  purpose!: "login" | "register" | "auth0";
+  purpose!: "login" | "register" | "auth0" | "passwordReset";
 
   @Column({
     type: DataType.STRING(255),

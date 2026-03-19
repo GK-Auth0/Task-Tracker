@@ -26,6 +26,7 @@ export interface ForgotPasswordDto {
 }
 
 export interface ResetPasswordDto {
-  token: string;
+  otpSessionId: string;
+  otp: string;
   newPassword: string;
 }

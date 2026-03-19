@@ -29,7 +29,7 @@ const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
 const AUTH0_AUDIENCE =
   process.env.AUTH0_AUDIENCE || process.env.VITE_AUTH0_AUDIENCE;
 
-type OtpPurpose = "login" | "register" | "auth0";
+type OtpPurpose = "login" | "register" | "auth0" | "passwordReset";
 
 export interface OtpChallengeResult {
   requiresOtp: true;
@@ -183,6 +183,52 @@ const shouldExposeOtp = () =>
 
 const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpose) => {
   await sendOtpEmail(email, otp, purpose);
+};
+
+const verifyOtpSession = async (
+  sessionId: string,
+  otp: string,
+  expectedPurpose: OtpPurpose,
+): Promise<User> => {
+  const otpSession = await AuthOtp.findByPk(sessionId);
+
+  if (!otpSession) {
+    throw new Error("Invalid OTP session");
+  }
+
+  if (otpSession.purpose !== expectedPurpose) {
+    throw new Error("Invalid OTP purpose");
+  }
+
+  if (otpSession.is_verified) {
+    throw new Error("OTP already used");
+  }
+
+  if (new Date(otpSession.expires_at).getTime() < Date.now()) {
+    throw new Error("OTP has expired");
+  }
+
+  if (otpSession.attempts >= OTP_MAX_ATTEMPTS) {
+    throw new Error("OTP retry limit exceeded. Please request a new code");
+  }
+
+  const actualHash = hashOtp(otp);
+  if (actualHash !== otpSession.otp_hash) {
+    otpSession.attempts += 1;
+    await otpSession.save();
+    throw new Error("Invalid OTP");
+  }
+
+  otpSession.is_verified = true;
+  otpSession.verified_at = new Date();
+  await otpSession.save();
+
+  const user = await User.findByPk(otpSession.user_id);
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user;
 };
 
 const logOtpSendFailure = (email: string, purpose: OtpPurpose, error: unknown) => {
@@ -362,42 +408,7 @@ export async function loginWithAuth0AccessToken(
 }
 
 export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
-  const otpSession = await AuthOtp.findByPk(sessionId);
-
-  if (!otpSession) {
-    throw new Error("Invalid OTP session");
-  }
-
-  if (otpSession.is_verified) {
-    throw new Error("OTP already used");
-  }
-
-  if (new Date(otpSession.expires_at).getTime() < Date.now()) {
-    throw new Error("OTP has expired");
-  }
-
-  if (otpSession.attempts >= OTP_MAX_ATTEMPTS) {
-    throw new Error("OTP retry limit exceeded. Please request a new code");
-  }
-
-  const expectedHash = otpSession.otp_hash;
-  const actualHash = hashOtp(otp);
-
-  if (expectedHash !== actualHash) {
-    otpSession.attempts += 1;
-    await otpSession.save();
-    throw new Error("Invalid OTP");
-  }
-
-  otpSession.is_verified = true;
-  otpSession.verified_at = new Date();
-  await otpSession.save();
-
-  const user = await User.findByPk(otpSession.user_id);
-  if (!user) {
-    throw new Error("User not found");
-  }
-
+  const user = await verifyOtpSession(sessionId, otp, "register");
   return buildAuthSuccessResult(user);
 }
 
@@ -453,7 +464,7 @@ export async function resendOtp(sessionId: string): Promise<OtpChallengeResult> 
   };
 }
 
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(email: string): Promise<OtpChallengeResult | undefined> {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await User.findOne({ where: { email: normalizedEmail } });
 
@@ -461,33 +472,18 @@ export async function requestPasswordReset(email: string) {
     return;
   }
 
-  await AuthPasswordReset.update(
-    {
-      is_used: true,
-      used_at: new Date(),
-    },
-    {
-      where: {
-        user_id: user.id,
-        is_used: false,
-      },
-    },
-  );
+  const result = await createOtpChallengeForUser(user, "passwordReset");
+  return result;
+}
 
-  const rawToken = randomBytes(32).toString("hex");
-  const expiresAt = new Date(
-    Date.now() + RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000,
-  );
-
-  await AuthPasswordReset.create({
-    user_id: user.id,
-    token_hash: hashResetToken(rawToken),
-    expires_at: expiresAt,
-    is_used: false,
-  });
-
-  const resetLink = `${FRONTEND_BASE_URL}/reset-password?token=${encodeURIComponent(rawToken)}`;
-  await sendPasswordResetEmail(user.email, resetLink);
+export async function resetPasswordWithOtp(
+  otpSessionId: string,
+  otp: string,
+  newPassword: string,
+) {
+  const user = await verifyOtpSession(otpSessionId, otp, "passwordReset");
+  user.password_hash = await bcrypt.hash(newPassword, 10);
+  await user.save();
 }
 
 export async function resetPasswordWithToken(token: string, newPassword: string) {

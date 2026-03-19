@@ -5,22 +5,50 @@ import { authAPI } from "../services/auth";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
-  const token = useMemo(() => searchParams.get("token") || "", [searchParams]);
+  const otpSessionId = useMemo(() => searchParams.get("otpSessionId") || "", [searchParams]);
   const navigate = useNavigate();
 
+  const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  if (!otpSessionId) {
+    return (
+      <div className="bg-gray-50 min-h-screen flex flex-col">
+        <AuthNavbar buttonText="Log in" buttonLink="/login" />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-[440px] bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+            <h1 className="text-gray-900 text-2xl font-bold mb-4">Reset Password</h1>
+            <p className="text-gray-600 text-sm mb-4">
+              OTP session not found. Please start the password reset process from the Forgot Password page.
+            </p>
+            <Link
+              to="/forgot-password"
+              className="inline-flex items-center justify-center rounded-lg px-4 py-2 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+            >
+              Go to Forgot Password
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    if (!token) {
-      setError("Invalid reset link. Missing reset token.");
+    if (!otpSessionId) {
+      setError("Invalid reset flow. Missing OTP session ID.");
+      return;
+    }
+
+    if (!/^[0-9]{6}$/.test(otp)) {
+      setError("Enter a valid 6-digit OTP.");
       return;
     }
 
@@ -36,7 +64,7 @@ export default function ResetPassword() {
 
     try {
       setLoading(true);
-      await authAPI.resetPassword(token, newPassword);
+      await authAPI.resetPassword(otpSessionId, otp, newPassword);
       setSuccess("Password reset successful. Redirecting to login...");
       setTimeout(() => navigate("/login"), 1500);
     } catch (err: any) {
@@ -77,6 +105,20 @@ export default function ResetPassword() {
           )}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-medium leading-normal">
+                OTP Code
+              </label>
+              <input
+                className="flex w-full rounded-lg text-gray-900 focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border border-gray-300 bg-white h-12 placeholder:text-gray-500 px-4 text-sm font-normal"
+                placeholder="123456"
+                required
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+              />
+            </div>
+
             <div className="flex flex-col gap-2">
               <label className="text-gray-900 text-sm font-medium leading-normal">
                 New Password

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { taskService } from "../services/taskService";
 import { projectService } from "../services/projectService";
+import { authAPI } from "../services/auth";
 
 import { API_BASE_URL } from "../config/api";
 
@@ -16,6 +17,16 @@ const Profile: React.FC = () => {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [updating, setUpdating] = useState(false);
+
+  const [resetStep, setResetStep] = useState<"idle" | "otpSent" | "done">("idle");
+  const [otpSessionId, setOtpSessionId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const otpInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchUserStats();
@@ -88,8 +99,85 @@ const Profile: React.FC = () => {
     setNewName("");
   };
 
+  const sendResetOtp = async () => {
+    if (!user?.email) return;
+
+    setResetError("");
+    setResetSuccess("");
+    setResetLoading(true);
+
+    try {
+      const response = await authAPI.forgotPassword(user.email);
+      const sessionId = response.data?.otpSessionId;
+      setOtpSessionId(sessionId || "");
+      setResetStep("otpSent");
+      setResetSuccess(
+        "An OTP has been sent to your email. Enter it below with a new password.",
+      );
+    } catch (err: any) {
+      setResetError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Unable to send reset OTP. Please try again.",
+      );
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (resetStep === "otpSent" && otpInputRef.current) {
+      otpInputRef.current.focus();
+    }
+  }, [resetStep]);
+
+  const handleResetSubmit = async () => {
+    setResetError("");
+    setResetSuccess("");
+
+    if (!otpSessionId) {
+      setResetError("OTP session missing. Request a new reset OTP.");
+      return;
+    }
+
+    if (!/^[0-9]{6}$/.test(otp)) {
+      setResetError("Enter a valid 6-digit OTP.");
+      return;
+    }
+
+    if (newPasswordValue.length < 6) {
+      setResetError("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPasswordValue !== confirmPassword) {
+      setResetError("Passwords do not match.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await authAPI.resetPassword(otpSessionId, otp, newPasswordValue);
+      setResetSuccess("Password has been reset successfully. Please log in again.");
+      setResetStep("done");
+      setOtp("");
+      setNewPasswordValue("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setResetError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to reset password",
+      );
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
-    <div className="max-w-[1440px] mx-auto flex gap-8 px-6 py-8 lg:px-10">
+    <div className="max-w-[1440px] mx-auto h-screen overflow-auto flex flex-col gap-8 px-4 py-6 sm:px-6 lg:flex-row lg:px-10 lg:py-8">
       <main className="flex-1 min-w-0">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-8 py-6 border-b border-slate-100">
@@ -206,6 +294,95 @@ const Profile: React.FC = () => {
               </div>
             </section>
 
+            <section>
+              <h3 className="text-sm font-semibold text-slate-900 mb-6 uppercase tracking-wider">
+                Change Password (OTP)
+              </h3>
+              <div className="space-y-4">
+                {resetError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{resetError}</p>
+                  </div>
+                )}
+                {resetSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-emerald-700 text-sm">{resetSuccess}</p>
+                  </div>
+                )}
+
+                {resetStep === "idle" && (
+                  <button
+                    type="button"
+                    onClick={sendResetOtp}
+                    disabled={resetLoading || !user?.email}
+                    className="w-full h-12 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {resetLoading ? "Sending OTP..." : "Send Password Reset OTP"}
+                  </button>
+                )}
+
+                {resetStep === "otpSent" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input
+                        ref={otpInputRef}
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                        placeholder="Enter OTP"
+                        className="w-full h-12 rounded-lg border border-slate-300 px-4"
+                        maxLength={6}
+                      />
+                      <input
+                        value={newPasswordValue}
+                        onChange={(e) => setNewPasswordValue(e.target.value)}
+                        placeholder="New password"
+                        type="password"
+                        className="w-full h-12 rounded-lg border border-slate-300 px-4"
+                      />
+                    </div>
+                    <input
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      type="password"
+                      className="w-full h-12 rounded-lg border border-slate-300 px-4"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetSubmit}
+                        disabled={resetLoading}
+                        className="flex-1 h-12 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {resetLoading ? "Updating..." : "Reset Password"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={sendResetOtp}
+                        disabled={resetLoading}
+                        className="flex-1 h-12 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                      >
+                        Resend OTP
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {resetStep === "done" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetStep("idle");
+                      setResetSuccess("");
+                    }}
+                    className="w-full h-12 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                  >
+                    Reset another password
+                  </button>
+                )}
+              </div>
+            </section>
+
             <div className="pt-6 border-t border-slate-100">
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <span className="material-symbols-outlined text-[18px]">
@@ -221,7 +398,7 @@ const Profile: React.FC = () => {
       </main>
 
       <aside className="w-full lg:w-80 shrink-0 space-y-6">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-6">Quick Stats</h3>
           <div className="space-y-6">
             <div className="flex items-center gap-4">
