@@ -182,7 +182,13 @@ const shouldExposeOtp = () =>
   (process.env.OTP_EXPOSE_IN_RESPONSE || "").trim().toLowerCase() === "true";
 
 const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpose) => {
+  console.log(
+    `[auth] OTP send requested (purpose=${purpose}, email=${email})`,
+  );
   await sendOtpEmail(email, otp, purpose);
+  console.log(
+    `[auth] OTP send succeeded (purpose=${purpose}, email=${email})`,
+  );
 };
 
 const verifyOtpSession = async (
