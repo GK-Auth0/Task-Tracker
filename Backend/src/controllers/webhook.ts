@@ -4,7 +4,7 @@ import nodemailer from "nodemailer";
 const WEBHOOK_SECRET = process.env.OTP_EMAIL_WEBHOOK_SECRET || "";
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
-const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS || 10000);
+const SMTP_TIMEOUT_MS = Math.min(Number(process.env.SMTP_TIMEOUT_MS || 10000), 30000);
 const SMTP_IP_FAMILY = Number(process.env.SMTP_IP_FAMILY || 4);
 const SMTP_USER = process.env.EMAIL_USER;
 const SMTP_PASS = (process.env.EMAIL_PASS || "").replace(/\s+/g, "");

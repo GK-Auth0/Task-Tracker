@@ -10,9 +10,15 @@ const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
-const SMTP_TIMEOUT_MS = parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10);
+const SMTP_TIMEOUT_MS = Math.min(
+  parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10),
+  30000,
+);
 const SMTP_IP_FAMILY = parseInt(process.env.SMTP_IP_FAMILY || "4", 10);
-const EMAIL_HTTP_TIMEOUT_MS = parseInt(process.env.EMAIL_HTTP_TIMEOUT_MS || "10000", 10);
+const EMAIL_HTTP_TIMEOUT_MS = Math.min(
+  parseInt(process.env.EMAIL_HTTP_TIMEOUT_MS || "10000", 10),
+  30000,
+);
 const EMAIL_RETRY_ATTEMPTS = parseInt(process.env.EMAIL_RETRY_ATTEMPTS || "3", 10);
 const EMAIL_RETRY_BASE_DELAY_MS = parseInt(
   process.env.EMAIL_RETRY_BASE_DELAY_MS || "500",
