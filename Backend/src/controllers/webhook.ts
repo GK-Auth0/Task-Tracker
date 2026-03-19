@@ -56,6 +56,7 @@ export const processOtpWebhook = async (req: Request, res: Response) => {
       html,
     });
 
+    console.log("[webhook] OTP email sent", { to, subject });
     return res.status(200).json({ success: true, message: "OTP email sent" });
   } catch (error) {
     console.error("[webhook] OTP email sending failed", error);
