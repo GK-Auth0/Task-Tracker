@@ -122,6 +122,14 @@ export const sendOtpEmail = async (
       throw new Error("OTP_EMAIL_WEBHOOK_URL is missing for webhook email delivery");
     }
 
+    const webhookHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (process.env.OTP_EMAIL_WEBHOOK_SECRET) {
+      webhookHeaders["x-webhook-secret"] = process.env.OTP_EMAIL_WEBHOOK_SECRET;
+    }
+
     await axios.post(
       OTP_EMAIL_WEBHOOK_URL,
       {
@@ -132,9 +140,7 @@ export const sendOtpEmail = async (
         purpose,
       },
       {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: webhookHeaders,
         timeout: EMAIL_HTTP_TIMEOUT_MS,
       },
     );

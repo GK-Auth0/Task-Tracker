@@ -8,6 +8,7 @@ import auditLogRoutes from "./routes/auditLog";
 import chatRoutes from "./routes/chat";
 import aiRoutes from "./routes/ai";
 import preferencesRoutes from "./routes/preferences";
+import webhookRoutes from "./routes/webhook";
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.use("/api/audit-logs", auditLogRoutes);
 router.use("/api/chat", chatRoutes);
 router.use("/api/ai", aiRoutes);
 router.use("/api/preferences", preferencesRoutes);
+router.use("/api/webhook", webhookRoutes);
 
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {
