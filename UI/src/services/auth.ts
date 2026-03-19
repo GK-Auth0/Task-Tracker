@@ -120,17 +120,19 @@ export const authAPI = {
     return response.data;
   },
 
-  forgotPassword: async (email: string): Promise<BasicResponse> => {
+  forgotPassword: async (email: string): Promise<OtpChallengeResponse> => {
     const response = await api.post("/api/auth/forgot-password", { email });
     return response.data;
   },
 
   resetPassword: async (
-    token: string,
+    otpSessionId: string,
+    otp: string,
     newPassword: string,
   ): Promise<BasicResponse> => {
     const response = await api.post("/api/auth/reset-password", {
-      token,
+      otpSessionId,
+      otp,
       newPassword,
     });
     return response.data;

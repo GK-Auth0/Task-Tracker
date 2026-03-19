@@ -100,12 +100,24 @@ export const forgotPasswordSchema = {
 };
 
 export const resetPasswordSchema = {
-  token: {
+  otpSessionId: {
     notEmpty: {
-      errorMessage: "Reset token is required",
+      errorMessage: "OTP session ID is required",
     },
-    isString: {
-      errorMessage: "Reset token must be a string",
+    isUUID: {
+      errorMessage: "OTP session ID must be a valid UUID",
+    },
+  },
+  otp: {
+    notEmpty: {
+      errorMessage: "OTP is required",
+    },
+    isLength: {
+      options: { min: 6, max: 6 },
+      errorMessage: "OTP must be 6 digits",
+    },
+    isNumeric: {
+      errorMessage: "OTP must contain only numbers",
     },
   },
   newPassword: {
@@ -115,3 +127,4 @@ export const resetPasswordSchema = {
     },
   },
 };
+

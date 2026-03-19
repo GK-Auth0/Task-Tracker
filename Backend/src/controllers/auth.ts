@@ -8,7 +8,7 @@ import {
   verifyOtpAndIssueToken,
   resendOtp,
   requestPasswordReset,
-  resetPasswordWithToken,
+  resetPasswordWithOtp,
 } from "../services/auth";
 
 export const register = async (req: Request, res: Response) => {
@@ -158,10 +158,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
 
   try {
-    await requestPasswordReset(req.body.email);
+    const result = await requestPasswordReset(req.body.email);
     return res.status(200).json({
       success: true,
-      message: "If this email exists, a reset link has been sent.",
+      message: "OTP sent to the provided email if it exists.",
+      data: result,
     });
   } catch (error) {
     return res.status(400).json({
@@ -176,7 +177,11 @@ export const resetPassword = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
 
   try {
-    await resetPasswordWithToken(req.body.token, req.body.newPassword);
+    await resetPasswordWithOtp(
+      req.body.otpSessionId,
+      req.body.otp,
+      req.body.newPassword,
+    );
     return res.status(200).json({
       success: true,
       message: "Password reset successful",

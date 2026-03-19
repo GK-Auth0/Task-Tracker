@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AuthNavbar from "../components/AuthNavbar";
 import AuthBackground from "../components/auth/AuthBackground";
 import AuthShowcase from "../components/auth/AuthShowcase";
@@ -10,6 +10,7 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,8 +22,15 @@ export default function ForgotPassword() {
       const response = await authAPI.forgotPassword(email);
       setSuccess(
         response.message ||
-          "If this email exists, a password reset link has been sent.",
+          "OTP sent to your email if this account exists. Please check your inbox.",
       );
+
+      const otpSessionId = response.data?.otpSessionId;
+      if (otpSessionId) {
+        setTimeout(() => {
+          navigate(`/reset-password?otpSessionId=${encodeURIComponent(otpSessionId)}`);
+        }, 1000);
+      }
     } catch (err: any) {
       setError(
         err?.response?.data?.error ||
@@ -56,7 +64,7 @@ export default function ForgotPassword() {
               Forgot Password
             </h1>
             <p className="text-gray-600 text-sm font-normal">
-              Enter your email and we will send a reset link.
+              Enter your email and we will send a one-time OTP for password reset.
             </p>
           </div>
 
@@ -91,7 +99,7 @@ export default function ForgotPassword() {
               type="submit"
               disabled={loading}
             >
-              {loading ? "Sending..." : "Send Reset Link"}
+              {loading ? "Sending..." : "Send OTP"}
             </button>
           </form>
 

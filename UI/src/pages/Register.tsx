@@ -9,12 +9,14 @@ import AuthBackground from "../components/auth/AuthBackground";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [otpChallenge, setOtpChallenge] = useState<OtpChallenge | null>(null);
 
   const { register, verifyOtp, resendOtp } = useAuth();
@@ -24,6 +26,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setFieldErrors({});
 
     if (!termsAccepted) {
       setError("Please accept the terms and conditions");
@@ -31,11 +34,30 @@ export default function Register() {
       return;
     }
 
-    try {
-      const [firstName, ...lastNameParts] = fullName.trim().split(" ");
-      const lastName = lastNameParts.join(" ") || firstName;
+    const trimFirst = firstName.trim();
+    const trimLast = lastName.trim();
+    const newFieldErrors: Record<string, string> = {};
 
-      const challenge = await register(email, password, firstName, lastName);
+    if (!trimFirst) {
+      newFieldErrors.firstName = "First name is required";
+    } else if (trimFirst.length < 2 || trimFirst.length > 50) {
+      newFieldErrors.firstName = "First name must be between 2 and 50 characters";
+    }
+
+    if (!trimLast) {
+      newFieldErrors.lastName = "Last name is required";
+    } else if (trimLast.length < 2 || trimLast.length > 50) {
+      newFieldErrors.lastName = "Last name must be between 2 and 50 characters";
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const challenge = await register(email, password, trimFirst, trimLast);
       setOtpChallenge(challenge);
     } catch (error: any) {
       if (error?.code === "ECONNABORTED") {
@@ -43,7 +65,22 @@ export default function Register() {
           "Registration request timed out. Please check backend and email configuration.",
         );
       } else {
-        setError(error.response?.data?.error || "Registration failed");
+        const apiErrors = error?.response?.data?.errors;
+        if (Array.isArray(apiErrors)) {
+          const parsedFieldErrors: Record<string, string> = {};
+          apiErrors.forEach((item: any) => {
+            if (item?.field && item?.message) {
+              parsedFieldErrors[item.field] = item.message;
+            }
+          });
+          if (Object.keys(parsedFieldErrors).length > 0) {
+            setFieldErrors(parsedFieldErrors);
+            setError(error.response?.data?.message || "Validation failed");
+            return;
+          }
+        }
+
+        setError(error.response?.data?.error || error.response?.data?.message || "Registration failed");
       }
     } finally {
       setLoading(false);
@@ -101,8 +138,8 @@ export default function Register() {
               </p>
             </div>
 
-            {/* Error Message */}
-            {error && (
+            {/* Error Message (registration stage only; OTP stage handles its own errors) */}
+            {error && !otpChallenge && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
@@ -112,21 +149,48 @@ export default function Register() {
               <>
                 {/* Form */}
                 <form className="space-y-4" onSubmit={handleSubmit}>
-                  {/* Full Name */}
+                  {/* First Name */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-slate-700 text-sm font-semibold">
-                      Full Name
+                      First Name
                     </label>
                     <div className="relative">
                       <input
                         className="w-full h-12 px-4 rounded-lg border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
-                        placeholder="John Doe"
+                        placeholder="John"
                         type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
                         required
                       />
                     </div>
+                    {fieldErrors.firstName && (
+                      <p className="text-red-600 text-xs mt-1">
+                        {fieldErrors.firstName}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Last Name */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-slate-700 text-sm font-semibold">
+                      Last Name
+                    </label>
+                    <div className="relative">
+                      <input
+                        className="w-full h-12 px-4 rounded-lg border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
+                        placeholder="Doe"
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    {fieldErrors.lastName && (
+                      <p className="text-red-600 text-xs mt-1">
+                        {fieldErrors.lastName}
+                      </p>
+                    )}
                   </div>
 
                   {/* Email */}

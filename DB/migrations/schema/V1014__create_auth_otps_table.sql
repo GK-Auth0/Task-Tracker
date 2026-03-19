@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS auth_otps (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('login', 'register', 'auth0')),
+    purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('login', 'register', 'auth0', 'passwordReset')),
     otp_hash VARCHAR(255) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     attempts INTEGER NOT NULL DEFAULT 0,

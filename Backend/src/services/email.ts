@@ -18,10 +18,15 @@ let smtpTransporter: any = null;
 let smtpTransporterKey: string | null = null;
 
 const buildOtpHtml = (otp: string, purpose: string) => {
+  const purposeDescription =
+    purpose === "passwordReset"
+      ? "password reset"
+      : `${purpose} verification`;
+
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-      <h2 style="margin: 0 0 12px;">TaskTracker Verification Code</h2>
-      <p style="margin: 0 0 12px;">Use the OTP below to complete your ${purpose} verification:</p>
+      <h2 style="margin: 0 0 12px;">TaskTracker OTP Code</h2>
+      <p style="margin: 0 0 12px;">Use the OTP below to complete your ${purposeDescription}:</p>
       <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 14px 0; color: #2563eb;">
         ${otp}
       </div>
@@ -68,7 +73,7 @@ const buildInviteHtml = (options: {
 export const sendOtpEmail = async (
   to: string,
   otp: string,
-  purpose: "login" | "register" | "auth0",
+  purpose: "login" | "register" | "auth0" | "passwordReset",
 ) => {
   if (EMAIL_PROVIDER === "smtp") {
     if (!EMAIL_USER || !EMAIL_PASS) {
