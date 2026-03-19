@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import nodemailer from "nodemailer";
 
 const WEBHOOK_SECRET = process.env.OTP_EMAIL_WEBHOOK_SECRET || "";
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_TIMEOUT_MS = Math.min(Number(process.env.SMTP_TIMEOUT_MS || 10000), 30000);
@@ -32,6 +33,9 @@ const getSmtpTransport = () => {
 };
 
 export const processOtpWebhook = async (req: Request, res: Response) => {
+  if (EMAIL_PROVIDER !== "webhook") {
+    return res.status(404).json({ success: false, message: "Webhook email provider is disabled" });
+  }
   console.log("[webhook] OTP request received", {
     to: req.body?.to,
     subject: req.body?.subject,
