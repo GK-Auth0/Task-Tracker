@@ -47,6 +47,25 @@ AI_PROVIDER=ollama
 # AI_TIMEOUT_MS=20000
 ```
 
+### Email/OTP Delivery
+
+OTP emails are sent using the provider selected by `EMAIL_PROVIDER`. Common issues when OTPs are not received:
+
+- `EMAIL_PROVIDER=resend` requires a verified sender domain. If you do not have a domain, use SMTP instead.
+- `EMAIL_PROVIDER=smtp` requires `EMAIL_USER` and `EMAIL_PASS` (use an app password for Gmail).
+- `EMAIL_PROVIDER=webhook` requires `OTP_EMAIL_WEBHOOK_URL`.
+
+Recommended local setup when you don't have a domain:
+
+```env
+EMAIL_PROVIDER=smtp
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+OTP_FROM_EMAIL=TaskTracker <your-email@gmail.com>
+```
+
 ### 3. Database Setup
 
 Start PostgreSQL with Docker:

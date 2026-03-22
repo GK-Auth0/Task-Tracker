@@ -11,6 +11,23 @@ import {
   resetPasswordWithOtp,
 } from "../services/auth";
 
+const getOtpEmailErrorHint = (error: any): string | null => {
+  const message = String(error?.message || "");
+  if (message.includes("RESEND_API_KEY")) {
+    return "Resend requires a valid API key and a verified sender domain. If you don't have a domain, set EMAIL_PROVIDER=smtp and configure EMAIL_USER/EMAIL_PASS.";
+  }
+  if (message.includes("EMAIL_USER or EMAIL_PASS")) {
+    return "SMTP credentials are missing. Set EMAIL_USER and EMAIL_PASS (e.g. a Gmail app password).";
+  }
+  if (message.includes("OTP_EMAIL_WEBHOOK_URL")) {
+    return "Webhook email delivery is enabled but OTP_EMAIL_WEBHOOK_URL is not set.";
+  }
+  if (message.includes("Unsupported EMAIL_PROVIDER")) {
+    return "EMAIL_PROVIDER must be one of smtp, resend, or webhook.";
+  }
+  return null;
+};
+
 export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
 
@@ -34,10 +51,11 @@ export const register = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
+    const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
-      message: "Registration failed",
-      error: (error as any).message,
+      message: otpHint ? "Registration failed: OTP delivery error" : "Registration failed",
+      error: otpHint ?? (error as any).message,
     });
   }
 };
@@ -146,10 +164,11 @@ export const resendOtpCode = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
+    const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
-      message: "Failed to resend OTP",
-      error: (error as any).message,
+      message: otpHint ? "Failed to resend OTP: delivery error" : "Failed to resend OTP",
+      error: otpHint ?? (error as any).message,
     });
   }
 };
@@ -165,10 +184,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
+    const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
-      message: "Failed to process forgot password request",
-      error: (error as any).message,
+      message: otpHint
+        ? "Failed to process forgot password request: delivery error"
+        : "Failed to process forgot password request",
+      error: otpHint ?? (error as any).message,
     });
   }
 };
