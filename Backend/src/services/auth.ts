@@ -2,6 +2,7 @@ import axios from "axios";
 import bcrypt from "bcrypt";
 import { createHash, createPublicKey, randomBytes, randomInt, randomUUID } from "crypto";
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
+import nodemailer from "nodemailer";
 import { appConfig } from "../config/app";
 import { AuthOtp, AuthPasswordReset, User, UserMetadata } from "../models";
 import type { LoginDto, RegisterDto } from "../types/auth";
@@ -24,6 +25,15 @@ const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
   10,
 );
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || "http://localhost:3001";
+
+// Email transporter configuration
+const transporter = nodemailer.createTransporter({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
 const AUTH0_AUDIENCE =
@@ -287,6 +297,27 @@ const createOtpChallengeForUser = async (
   });
 
   const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
+
+  // Direct email sending with logging
+  try {
+    console.log(`[EMAIL] Attempting to send OTP email to: ${user.email}`);
+    console.log(`[EMAIL] Using EMAIL_USER: ${process.env.EMAIL_USER}`);
+    console.log(`[EMAIL] OTP Code: ${otp}`);
+    
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'OTP Verification - Task Tracker',
+      text: `Your OTP is ${otp}. It will expire in 10 minutes.`,
+    });
+    
+    console.log(`[EMAIL] ✅ OTP email sent successfully to: ${user.email}`);
+  } catch (emailError) {
+    console.error(`[EMAIL] ❌ Failed to send OTP email to: ${user.email}`);
+    console.error(`[EMAIL] Error details:`, emailError);
+    throw emailError;
+  }
+    
 
   if (shouldSendAsync) {
     void sendOtpNotification(user.email, otp, purpose).catch((error) => {
