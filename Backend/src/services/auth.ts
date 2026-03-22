@@ -2,6 +2,7 @@ import axios from "axios";
 import bcrypt from "bcrypt";
 import { createHash, createPublicKey, randomBytes, randomInt, randomUUID } from "crypto";
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
+import nodemailer from "nodemailer";
 import { appConfig } from "../config/app";
 import { AuthOtp, AuthPasswordReset, User, UserMetadata } from "../models";
 import type { LoginDto, RegisterDto } from "../types/auth";
@@ -24,6 +25,15 @@ const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
   10,
 );
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || "http://localhost:3001";
+
+// Email transporter configuration
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
 const AUTH0_AUDIENCE =
@@ -182,7 +192,13 @@ const shouldExposeOtp = () =>
   (process.env.OTP_EXPOSE_IN_RESPONSE || "").trim().toLowerCase() === "true";
 
 const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpose) => {
+  console.log(
+    `[auth] OTP send requested (purpose=${purpose}, email=${email})`,
+  );
   await sendOtpEmail(email, otp, purpose);
+  console.log(
+    `[auth] OTP send succeeded (purpose=${purpose}, email=${email})`,
+  );
 };
 
 const verifyOtpSession = async (
@@ -253,6 +269,7 @@ const buildAuthSuccessResult = (user: User): AuthSuccessResult => {
 const createOtpChallengeForUser = async (
   user: User,
   purpose: OtpPurpose,
+  transaction?: any,
 ): Promise<OtpChallengeResult> => {
   await AuthOtp.update(
     {
@@ -265,6 +282,7 @@ const createOtpChallengeForUser = async (
         purpose,
         is_verified: false,
       },
+      transaction,
     },
   );
 
@@ -278,9 +296,30 @@ const createOtpChallengeForUser = async (
     expires_at: expiresAt,
     attempts: 0,
     is_verified: false,
-  });
+  }, { transaction });
 
   const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
+
+  // Direct email sending with logging
+  try {
+    console.log(`[EMAIL] Attempting to send OTP email to: ${user.email}`);
+    console.log(`[EMAIL] Using EMAIL_USER: ${process.env.EMAIL_USER}`);
+    console.log(`[EMAIL] OTP Code: ${otp}`);
+    
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'OTP Verification - Task Tracker',
+      text: `Your OTP is ${otp}. It will expire in 10 minutes.`,
+    });
+    
+    console.log(`[EMAIL] ✅ OTP email sent successfully to: ${user.email}`);
+  } catch (emailError) {
+    console.error(`[EMAIL] ❌ Failed to send OTP email to: ${user.email}`);
+    console.error(`[EMAIL] Error details:`, emailError);
+    throw emailError;
+  }
+    
 
   if (shouldSendAsync) {
     void sendOtpNotification(user.email, otp, purpose).catch((error) => {
@@ -307,8 +346,11 @@ const createOtpChallengeForUser = async (
   };
 };
 
-export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult> {
-  const existingUser = await User.findOne({ where: { email: dto.email } });
+export async function registerUser(dto: RegisterDto, transaction: any): Promise<OtpChallengeResult> {
+  const existingUser = await User.findOne({ 
+    where: { email: dto.email },
+    transaction 
+  });
 
   if (existingUser) {
     throw new Error("User already exists with this email");
@@ -321,7 +363,7 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
     password_hash: hashedPassword,
     full_name: `${dto.firstName} ${dto.lastName}`,
     role: "Member",
-  });
+  }, { transaction });
 
   if (dto.ip) {
     const writeMetadata = async () => {
@@ -332,7 +374,7 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
         user_id: user.id,
         ...geoData,
         ...userAgentData,
-      });
+      }, { transaction });
     };
 
     if (REGISTER_METADATA_ASYNC) {
@@ -344,10 +386,10 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
     }
   }
 
-  return createOtpChallengeForUser(user, "register");
+  return createOtpChallengeForUser(user, "register", transaction);
 }
 
-export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult> {
+export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult | { requiresPasswordChange: true; email: string }> {
   const user = await User.findOne({ where: { email: dto.email } });
 
   if (!user) {
@@ -358,6 +400,14 @@ export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult> {
 
   if (!isPasswordValid) {
     throw new Error("Invalid email or password");
+  }
+
+  // Check if password reset is required (for invited users)
+  if (user.password_reset_required) {
+    return {
+      requiresPasswordChange: true,
+      email: user.email,
+    };
   }
 
   // Enforce OTP verification for accounts that were created via signup OTP flow.
@@ -526,4 +576,26 @@ export async function getCurrentUser(userId: string) {
   }
 
   return getUserWithoutPassword(user);
+}
+
+export async function changePasswordForInvitedUser(
+  email: string,
+  newPassword: string
+): Promise<void> {
+  const user = await User.findOne({ where: { email } });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (!user.password_reset_required) {
+    throw new Error("Password reset not required for this user");
+  }
+
+  // Update password and remove reset requirement
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await user.update({
+    password_hash: hashedPassword,
+    password_reset_required: false,
+  });
 }

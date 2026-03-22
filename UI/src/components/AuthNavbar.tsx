@@ -12,22 +12,11 @@ export default function AuthNavbar({
   return (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white">
       <div className="flex items-center gap-4 text-gray-900">
-        <div className="size-6 text-blue-600">
-          <svg
-            fill="none"
-            viewBox="0 0 48 48"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              clipRule="evenodd"
-              d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z"
-              fill="currentColor"
-              fillRule="evenodd"
-            ></path>
-          </svg>
+        <div className="bg-blue-600 rounded-lg size-8 flex items-center justify-center text-white shrink-0">
+          <span className="material-symbols-outlined text-lg">check_circle</span>
         </div>
         <h2 className="text-lg font-bold leading-tight tracking-tight">
-          Task Tracker
+          TaskTracker
         </h2>
       </div>
       <Link

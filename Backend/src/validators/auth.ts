@@ -128,3 +128,18 @@ export const resetPasswordSchema = {
   },
 };
 
+export const changePasswordInvitedSchema = {
+  email: {
+    isEmail: {
+      errorMessage: "Please provide a valid email address",
+    },
+    normalizeEmail: true,
+  },
+  newPassword: {
+    isLength: {
+      options: { min: 8 },
+      errorMessage: "New password must be at least 8 characters long",
+    },
+  },
+};
+

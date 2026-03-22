@@ -8,14 +8,71 @@ const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "no-reply@tasktracker.local
 const OTP_EMAIL_WEBHOOK_URL = process.env.OTP_EMAIL_WEBHOOK_URL;
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+const SMTP_SERVICE = process.env.SMTP_SERVICE;
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
-const SMTP_TIMEOUT_MS = parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10);
+const SMTP_TIMEOUT_MS = Math.min(
+  parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10),
+  30000,
+);
 const SMTP_IP_FAMILY = parseInt(process.env.SMTP_IP_FAMILY || "4", 10);
-const EMAIL_HTTP_TIMEOUT_MS = parseInt(process.env.EMAIL_HTTP_TIMEOUT_MS || "10000", 10);
+const EMAIL_HTTP_TIMEOUT_MS = Math.min(
+  parseInt(process.env.EMAIL_HTTP_TIMEOUT_MS || "10000", 10),
+  30000,
+);
+const EMAIL_RETRY_ATTEMPTS = parseInt(process.env.EMAIL_RETRY_ATTEMPTS || "3", 10);
+const EMAIL_RETRY_BASE_DELAY_MS = parseInt(
+  process.env.EMAIL_RETRY_BASE_DELAY_MS || "500",
+  10,
+);
 
 let smtpTransporter: any = null;
 let smtpTransporterKey: string | null = null;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const logEmailError = (context: string, error: any) => {
+  const status = error?.response?.status;
+  const responseData = error?.response?.data;
+  const code = error?.code;
+  const message = error?.message || String(error);
+
+  console.error(
+    `[email] ${context} failed. status=${status ?? "n/a"} code=${code ?? "n/a"} message=${message} response=${responseData ? JSON.stringify(responseData) : "n/a"}`,
+  );
+};
+
+const isRetryableEmailError = (error: any) => {
+  const status = error?.response?.status;
+  if (typeof status === "number") {
+    return status >= 500 && status <= 599;
+  }
+  return Boolean(error?.code) || Boolean(error?.message);
+};
+
+const postWithRetries = async <T>(action: () => Promise<T>) => {
+  let attempt = 0;
+  let lastError: any;
+
+  const maxAttempts = Math.max(1, EMAIL_RETRY_ATTEMPTS);
+  const baseDelay = Math.max(100, EMAIL_RETRY_BASE_DELAY_MS);
+
+  while (attempt < maxAttempts) {
+    try {
+      return await action();
+    } catch (error: any) {
+      lastError = error;
+      attempt += 1;
+      if (attempt >= maxAttempts || !isRetryableEmailError(error)) {
+        break;
+      }
+      const backoff = baseDelay * 2 ** (attempt - 1);
+      await delay(backoff);
+    }
+  }
+
+  throw lastError;
+};
 
 const buildOtpHtml = (otp: string, purpose: string) => {
   const purposeDescription =
@@ -70,6 +127,29 @@ const buildInviteHtml = (options: {
   </div>
 `;
 
+const buildWelcomeHtml = (fullName: string, temporaryPassword: string) => `
+  <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+    <h2 style="margin: 0 0 12px;">Welcome to TaskTracker!</h2>
+    <p style="margin: 0 0 12px;">Hi ${fullName},</p>
+    <p style="margin: 0 0 12px;">
+      Your TaskTracker account has been created successfully. Here are your login credentials:
+    </p>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <p style="margin: 0 0 8px; font-weight: 600;">Temporary Password:</p>
+      <p style="margin: 0; font-family: monospace; font-size: 16px; color: #2563eb; font-weight: 700;">${temporaryPassword}</p>
+    </div>
+    <p style="margin: 16px 0 12px; color: #dc2626; font-weight: 600;">
+      ⚠️ Important: You must change this password on your first login for security.
+    </p>
+    <p style="margin: 0 0 12px;">
+      Please log in to TaskTracker and set up your new password.
+    </p>
+    <p style="margin: 16px 0 0; color: #64748b;">
+      If you have any questions, please contact your administrator.
+    </p>
+  </div>
+`;
+
 export const sendOtpEmail = async (
   to: string,
   otp: string,
@@ -80,16 +160,21 @@ export const sendOtpEmail = async (
       throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
     }
 
-    await sendSmtpEmail({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      username: EMAIL_USER,
-      password: EMAIL_PASS,
-      from: OTP_FROM_EMAIL,
-      to,
-      subject: "Your TaskTracker OTP Code",
-      html: buildOtpHtml(otp, purpose),
-    });
+    try {
+      await sendSmtpEmail({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        username: EMAIL_USER,
+        password: EMAIL_PASS,
+        from: OTP_FROM_EMAIL,
+        to,
+        subject: "Your TaskTracker OTP Code",
+        html: buildOtpHtml(otp, purpose),
+      });
+    } catch (error: any) {
+      logEmailError("SMTP OTP", error);
+      throw error;
+    }
     return;
   }
 
@@ -98,22 +183,45 @@ export const sendOtpEmail = async (
       throw new Error("RESEND_API_KEY is missing for OTP email delivery");
     }
 
-    await axios.post(
-      "https://api.resend.com/emails",
-      {
-        from: OTP_FROM_EMAIL,
-        to: [to],
-        subject: "Your TaskTracker OTP Code",
-        html: buildOtpHtml(otp, purpose),
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        timeout: EMAIL_HTTP_TIMEOUT_MS,
-      },
-    );
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          "https://api.resend.com/emails",
+          {
+            from: OTP_FROM_EMAIL,
+            to: [to],
+            subject: "Your TaskTracker OTP Code",
+            html: buildOtpHtml(otp, purpose),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      logEmailError("Resend OTP", error);
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Resend OTP failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject: "Your TaskTracker OTP Code",
+          html: buildOtpHtml(otp, purpose),
+        });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -122,22 +230,51 @@ export const sendOtpEmail = async (
       throw new Error("OTP_EMAIL_WEBHOOK_URL is missing for webhook email delivery");
     }
 
-    await axios.post(
-      OTP_EMAIL_WEBHOOK_URL,
-      {
-        to,
-        subject: "Your TaskTracker OTP Code",
-        html: buildOtpHtml(otp, purpose),
-        otp,
-        purpose,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: EMAIL_HTTP_TIMEOUT_MS,
-      },
-    );
+    const webhookHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (process.env.OTP_EMAIL_WEBHOOK_SECRET) {
+      webhookHeaders["x-webhook-secret"] = process.env.OTP_EMAIL_WEBHOOK_SECRET;
+    }
+
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          OTP_EMAIL_WEBHOOK_URL,
+          {
+            to,
+            subject: "Your TaskTracker OTP Code",
+            html: buildOtpHtml(otp, purpose),
+            otp,
+            purpose,
+          },
+          {
+            headers: webhookHeaders,
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      logEmailError("Webhook OTP", error);
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Webhook OTP failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject: "Your TaskTracker OTP Code",
+          html: buildOtpHtml(otp, purpose),
+        });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -175,22 +312,44 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       throw new Error("RESEND_API_KEY is missing for email delivery");
     }
 
-    await axios.post(
-      "https://api.resend.com/emails",
-      {
-        from: OTP_FROM_EMAIL,
-        to: [to],
-        subject: "Reset your TaskTracker password",
-        html: buildResetPasswordHtml(resetLink),
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        timeout: EMAIL_HTTP_TIMEOUT_MS,
-      },
-    );
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          "https://api.resend.com/emails",
+          {
+            from: OTP_FROM_EMAIL,
+            to: [to],
+            subject: "Reset your TaskTracker password",
+            html: buildResetPasswordHtml(resetLink),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Resend password reset failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject: "Reset your TaskTracker password",
+          html: buildResetPasswordHtml(resetLink),
+        });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -199,21 +358,43 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       throw new Error("OTP_EMAIL_WEBHOOK_URL is missing for webhook email delivery");
     }
 
-    await axios.post(
-      OTP_EMAIL_WEBHOOK_URL,
-      {
-        to,
-        subject: "Reset your TaskTracker password",
-        html: buildResetPasswordHtml(resetLink),
-        resetLink,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: EMAIL_HTTP_TIMEOUT_MS,
-      },
-    );
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          OTP_EMAIL_WEBHOOK_URL,
+          {
+            to,
+            subject: "Reset your TaskTracker password",
+            html: buildResetPasswordHtml(resetLink),
+            resetLink,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Webhook password reset failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject: "Reset your TaskTracker password",
+          html: buildResetPasswordHtml(resetLink),
+        });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -268,22 +449,44 @@ export const sendWorkspaceInviteEmail = async (options: {
     if (!RESEND_API_KEY) {
       throw new Error("RESEND_API_KEY is missing for email delivery");
     }
-    await axios.post(
-      "https://api.resend.com/emails",
-      {
-        from: OTP_FROM_EMAIL,
-        to: [options.to],
-        subject,
-        html,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        timeout: EMAIL_HTTP_TIMEOUT_MS,
-      },
-    );
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          "https://api.resend.com/emails",
+          {
+            from: OTP_FROM_EMAIL,
+            to: [options.to],
+            subject,
+            html,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Resend invite failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to: options.to,
+          subject,
+          html,
+        });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -321,29 +524,113 @@ const getSmtpTransporter = (options: {
   username: string;
   password: string;
 }) => {
-  const key = `${options.host}:${options.port}:${options.username}`;
+  const key = `${SMTP_SERVICE ?? ""}:${options.host}:${options.port}:${options.username}`;
   if (smtpTransporter && smtpTransporterKey === key) {
     return smtpTransporter;
   }
 
-  smtpTransporter = nodemailer.createTransport({
-    host: options.host,
-    port: options.port,
-    secure: options.port === 465,
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-    family: SMTP_IP_FAMILY === 6 ? 6 : 4,
-    auth: {
-      user: options.username,
-      pass: options.password,
-    },
-    connectionTimeout: SMTP_TIMEOUT_MS,
-    greetingTimeout: SMTP_TIMEOUT_MS,
-    socketTimeout: SMTP_TIMEOUT_MS,
-    dnsTimeout: SMTP_TIMEOUT_MS,
-  } as any);
+  smtpTransporter = nodemailer.createTransport(
+    SMTP_SERVICE
+      ? {
+          service: SMTP_SERVICE,
+          auth: {
+            user: options.username,
+            pass: options.password,
+          },
+        }
+      : {
+          host: options.host,
+          port: options.port,
+          secure: options.port === 465,
+          pool: true,
+          maxConnections: 3,
+          maxMessages: 100,
+          family: SMTP_IP_FAMILY === 6 ? 6 : 4,
+          auth: {
+            user: options.username,
+            pass: options.password,
+          },
+          connectionTimeout: SMTP_TIMEOUT_MS,
+          greetingTimeout: SMTP_TIMEOUT_MS,
+          socketTimeout: SMTP_TIMEOUT_MS,
+          dnsTimeout: SMTP_TIMEOUT_MS,
+        },
+  );
   smtpTransporterKey = key;
 
   return smtpTransporter;
+};
+
+export const sendWelcomeEmail = async (to: string, temporaryPassword: string, fullName: string) => {
+  const subject = "Welcome to TaskTracker - Your Account Details";
+  const html = buildWelcomeHtml(fullName, temporaryPassword);
+
+  if (EMAIL_PROVIDER === "smtp") {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+    }
+    await sendSmtpEmail({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      username: EMAIL_USER,
+      password: EMAIL_PASS,
+      from: OTP_FROM_EMAIL,
+      to,
+      subject,
+      html,
+    });
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "resend") {
+    if (!RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is missing for email delivery");
+    }
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          "https://api.resend.com/emails",
+          {
+            from: OTP_FROM_EMAIL,
+            to: [to],
+            subject,
+            html,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Resend welcome email failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject,
+          html,
+        });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
+
+  if (appConfig.env !== "production") {
+    console.warn(`Welcome email provider '${EMAIL_PROVIDER}' not configured. No welcome email sent to ${to}.`);
+    return;
+  }
+
+  throw new Error(`Unsupported EMAIL_PROVIDER '${EMAIL_PROVIDER}'`);
 };

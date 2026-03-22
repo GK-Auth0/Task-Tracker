@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthNavbar from "../components/AuthNavbar";
 import { authAPI } from "../services/auth";
+import RingLoader from "../components/RingLoader";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -154,7 +155,7 @@ export default function ResetPassword() {
               type="submit"
               disabled={loading}
             >
-              {loading ? "Resetting..." : "Reset Password"}
+              {loading ? <RingLoader size="sm" className="text-white" /> : "Reset Password"}
             </button>
           </form>
 

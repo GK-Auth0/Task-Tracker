@@ -142,6 +142,17 @@ export const authAPI = {
     const response = await api.get("/api/auth/me");
     return response.data;
   },
+
+  changePasswordForInvitedUser: async (
+    email: string,
+    newPassword: string,
+  ): Promise<BasicResponse> => {
+    const response = await api.post("/api/auth/change-password-invited", {
+      email,
+      newPassword,
+    });
+    return response.data;
+  },
 };
 
 export default api;

@@ -1,0 +1,70 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker API - Webhook
+  version: 1.0.0
+  description: Webhook for OTP email delivery
+servers:
+  - url: ${API_BASE_URL}
+    description: Base URL (set API_BASE_URL env)
+  - url: http://localhost:3000
+    description: Local
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        error: { type: string }
+    OtpWebhookRequest:
+      type: object
+      required: [to, subject, html]
+      properties:
+        to: { type: string, format: email }
+        subject: { type: string }
+        html: { type: string }
+paths:
+  /api/webhook/send-otp:
+    post:
+      tags: [Webhook]
+      summary: Receive OTP send request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpWebhookRequest' }
+      parameters:
+        - in: header
+          name: x-webhook-secret
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: OTP email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Webhook disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          description: Email send failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }

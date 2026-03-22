@@ -19,12 +19,14 @@ import Register from "./pages/Register";
 import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import ChangePassword from "./pages/ChangePassword";
 import NotFound from "./pages/NotFound";
 import TaskDetails from "./components/TaskDetails";
 import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
 import Layout from "./components/Layout";
 import AiMonitoring from "./pages/AiMonitoring";
+import RingLoader from "./components/RingLoader";
 import { hasMinimumWorkspaceRole, type WorkspaceRole } from "./types/roles";
 
 const queryClient = new QueryClient();
@@ -35,7 +37,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading...
+        <RingLoader size="lg" />
       </div>
     );
   }
@@ -49,7 +51,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading...
+        <RingLoader size="lg" />
       </div>
     );
   }
@@ -69,7 +71,7 @@ function RoleProtectedRoute({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading...
+        <RingLoader size="lg" />
       </div>
     );
   }
@@ -125,6 +127,14 @@ function AppRoutes() {
         element={
           <PublicRoute>
             <ResetPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/change-password"
+        element={
+          <PublicRoute>
+            <ChangePassword />
           </PublicRoute>
         }
       />

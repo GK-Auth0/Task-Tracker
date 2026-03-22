@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import AuthNavbar from "../components/AuthNavbar";
 import { isAuth0Visible, startAuth0Login } from "../config/auth0";
 import AuthShowcase from "../components/auth/AuthShowcase";
 import AuthBackground from "../components/auth/AuthBackground";
+import RingLoader from "../components/RingLoader";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,7 +17,9 @@ export default function Login() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const showAuth0 = isAuth0Visible();
+  const message = location.state?.message;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +30,11 @@ export default function Login() {
       await login(email, password);
       navigate("/dashboard");
     } catch (error: any) {
+      if (error.message === "PASSWORD_CHANGE_REQUIRED") {
+        navigate("/change-password", { state: { email } });
+        return;
+      }
+      
       if (error?.code === "ECONNABORTED") {
         setError("Login request timed out. Please check backend and email configuration.");
       } else {
@@ -75,6 +83,13 @@ export default function Login() {
               Enter your credentials to access your account
             </p>
           </div>
+
+          {/* Success Message */}
+          {message && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-600 text-sm">{message}</p>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -143,7 +158,7 @@ export default function Login() {
                   type="submit"
                   disabled={loading || auth0Loading}
                 >
-                  {loading ? "Signing in..." : "Login"}
+                  {loading ? <RingLoader size="sm" className="text-white" /> : "Login"}
                 </button>
           </form>
 
@@ -161,9 +176,9 @@ export default function Login() {
                 type="button"
                 onClick={handleAuth0Signin}
                 disabled={loading || auth0Loading}
-                className="w-full h-12 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+                className="w-full h-12 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center"
               >
-                {auth0Loading ? "Redirecting..." : "Continue with Auth0"}
+                {auth0Loading ? <RingLoader size="sm" /> : "Continue with Auth0"}
               </button>
             </>
           )}

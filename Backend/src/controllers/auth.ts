@@ -9,10 +9,30 @@ import {
   resendOtp,
   requestPasswordReset,
   resetPasswordWithOtp,
+  changePasswordForInvitedUser,
 } from "../services/auth";
+import sequelize from "../config/database";
+
+const getOtpEmailErrorHint = (error: any): string | null => {
+  const message = String(error?.message || "");
+  if (message.includes("RESEND_API_KEY")) {
+    return "Resend requires a valid API key and a verified sender domain. If you don't have a domain, set EMAIL_PROVIDER=smtp and configure EMAIL_USER/EMAIL_PASS.";
+  }
+  if (message.includes("EMAIL_USER or EMAIL_PASS")) {
+    return "SMTP credentials are missing. Set EMAIL_USER and EMAIL_PASS (e.g. a Gmail app password).";
+  }
+  if (message.includes("OTP_EMAIL_WEBHOOK_URL")) {
+    return "Webhook email delivery is enabled but OTP_EMAIL_WEBHOOK_URL is not set.";
+  }
+  if (message.includes("Unsupported EMAIL_PROVIDER")) {
+    return "EMAIL_PROVIDER must be one of smtp, resend, or webhook.";
+  }
+  return null;
+};
 
 export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
+  const transaction = await sequelize.transaction();
 
   try {
     const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
@@ -27,17 +47,20 @@ export const register = async (req: Request, res: Response) => {
       userAgent,
     };
 
-    const result = await registerUser(userData);
+    const result = await registerUser(userData,transaction);
+    await transaction.commit();
     return res.status(201).json({
       success: true,
       message: "Registration initiated. OTP verification required",
       data: result,
     });
   } catch (error) {
+    await transaction.rollback();
+    const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
-      message: "Registration failed",
-      error: (error as any).message,
+      message: otpHint ? "Registration failed: OTP delivery error" : "Registration failed",
+      error: otpHint ?? (error as any).message,
     });
   }
 };
@@ -146,10 +169,11 @@ export const resendOtpCode = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
+    const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
-      message: "Failed to resend OTP",
-      error: (error as any).message,
+      message: otpHint ? "Failed to resend OTP: delivery error" : "Failed to resend OTP",
+      error: otpHint ?? (error as any).message,
     });
   }
 };
@@ -165,10 +189,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
+    const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
-      message: "Failed to process forgot password request",
-      error: (error as any).message,
+      message: otpHint
+        ? "Failed to process forgot password request: delivery error"
+        : "Failed to process forgot password request",
+      error: otpHint ?? (error as any).message,
     });
   }
 };
@@ -194,3 +221,54 @@ export const resetPassword = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const changePasswordInvited = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    await changePasswordForInvitedUser(
+      req.body.email,
+      req.body.newPassword,
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to change password",
+      error: (error as any).message,
+    });
+  }
+};
+
+
+export const invite=async(req:Request,res:Response)=>{
+   if (handleValidationErrors(req, res)) return;
+   const transaction=await sequelize.transaction()
+   try{
+ const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
+    const userAgent = req.headers['user-agent'];
+    
+    const userData = {
+      email: req.body.email,
+      password: req.body.password,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      ip: clientIP,
+      userAgent,
+    };
+
+    const result = await registerUser(userData,transaction);
+    await transaction.commit();
+    return res.status(201).json({
+      success: true,
+      message: "Registration initiated. OTP verification required",
+      data: result,
+    });
+
+   }catch(error){
+
+   }
+}
