@@ -4,6 +4,7 @@ import AuthNavbar from "../components/AuthNavbar";
 import AuthBackground from "../components/auth/AuthBackground";
 import AuthShowcase from "../components/auth/AuthShowcase";
 import { authAPI } from "../services/auth";
+import RingLoader from "../components/RingLoader";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -99,7 +100,7 @@ export default function ForgotPassword() {
               type="submit"
               disabled={loading}
             >
-              {loading ? "Sending..." : "Send OTP"}
+              {loading ? <RingLoader size="sm" className="text-white" /> : "Send OTP"}
             </button>
           </form>
 

@@ -11,6 +11,7 @@ import {
   normalizeWorkspaceRole,
   type WorkspaceRole,
 } from "../types/roles";
+import RingLoader from "../components/RingLoader";
 
 interface User {
   id: string;
@@ -100,7 +101,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (email: string, password: string): Promise<void> => {
     const response = await authAPI.login({ email, password });
-    const { user, token } = response.data;
+    const { user, token, requiresPasswordChange } = response.data;
+    
+    if (requiresPasswordChange) {
+      throw new Error("PASSWORD_CHANGE_REQUIRED");
+    }
+    
     localStorage.setItem("token", token);
     setToken(token);
     setUser({ ...user, role: normalizeUserRole(user.role) });

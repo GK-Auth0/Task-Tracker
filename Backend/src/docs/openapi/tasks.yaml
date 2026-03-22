@@ -1,0 +1,293 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker API - Tasks
+  version: 1.0.0
+  description: Task CRUD and activity endpoints
+servers:
+  - url: ${API_BASE_URL}
+    description: Base URL (set API_BASE_URL env)
+  - url: http://localhost:3000
+    description: Local
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        error: { type: string }
+    Task:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        status: { type: string, enum: ["To Do", "In Progress", "Done"] }
+        priority: { type: string, enum: [Low, Medium, High] }
+        project_id: { type: string, format: uuid }
+        assignee_id: { type: string, format: uuid, nullable: true }
+        due_date: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CreateTaskRequest:
+      type: object
+      required: [title, description, project_id]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 200 }
+        description: { type: string, minLength: 10, maxLength: 1000 }
+        status: { type: string, enum: ["To Do", "In Progress", "Done"] }
+        priority: { type: string, enum: [Low, Medium, High] }
+        project_id: { type: string, format: uuid }
+        assignee_id: { type: string, format: uuid }
+        due_date: { type: string, format: date-time }
+        invitees:
+          type: array
+          items:
+            type: object
+            properties:
+              full_name: { type: string }
+              email: { type: string, format: email }
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title: { type: string, minLength: 2, maxLength: 200 }
+        description: { type: string, maxLength: 1000 }
+        status: { type: string, enum: ["To Do", "In Progress", "Done"] }
+        priority: { type: string, enum: [Low, Medium, High] }
+        assignee_id: { type: string, format: uuid }
+        due_date: { type: string, format: date-time, nullable: true }
+paths:
+  /api/tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10 }
+        - in: query
+          name: projectId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: priority
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        '200':
+          description: Tasks retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Task' }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    post:
+      tags: [Tasks]
+      summary: Create task
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTaskRequest' }
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/Task' }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /api/tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Get task by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Task retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/Task' }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    patch:
+      tags: [Tasks]
+      summary: Update task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateTaskRequest' }
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/Task' }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    delete:
+      tags: [Tasks]
+      summary: Delete task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /api/tasks/{id}/activity:
+    get:
+      tags: [Tasks]
+      summary: Get task activity logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Activity retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { type: object }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /api/tasks/{id}/pull-requests:
+    get:
+      tags: [Tasks]
+      summary: Get task pull requests
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Pull requests retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { type: object }
+  /api/tasks/{id}/commits:
+    get:
+      tags: [Tasks]
+      summary: Get task commits
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Commits retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { type: object }

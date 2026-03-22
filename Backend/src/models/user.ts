@@ -58,6 +58,20 @@ export default class User extends Model {
   })
   role!: "Admin" | "Member" | "Viewer";
 
+  @Default(false)
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+  })
+  password_reset_required!: boolean;
+
+  @Default(false)
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+  })
+  is_invited_user!: boolean;
+
   @CreatedAt
   created_at!: Date;
 

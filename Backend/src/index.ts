@@ -9,6 +9,7 @@ import chatRoutes from "./routes/chat";
 import aiRoutes from "./routes/ai";
 import preferencesRoutes from "./routes/preferences";
 import webhookRoutes from "./routes/webhook";
+import inviteRoutes from "./routes/invite";
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.use("/api/chat", chatRoutes);
 router.use("/api/ai", aiRoutes);
 router.use("/api/preferences", preferencesRoutes);
 router.use("/api/webhook", webhookRoutes);
+router.use("/api/invites", inviteRoutes);
 
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {

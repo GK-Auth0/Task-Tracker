@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import RingLoader from "../components/RingLoader";
 import {
   dashboardAPI,
   tasksAPI,
@@ -229,7 +230,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading...
+        <RingLoader size="lg" />
       </div>
     );
   }

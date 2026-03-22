@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import RingLoader from "./RingLoader";
 
 interface OtpVerificationProps {
   email: string;
@@ -69,9 +70,9 @@ const OtpVerification: React.FC<OtpVerificationProps> = ({
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+          className="w-full h-12 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
         >
-          {loading ? "Verifying..." : "Verify OTP"}
+          {loading ? <RingLoader size="sm" className="text-white" /> : "Verify OTP"}
         </button>
       </form>
 
@@ -79,9 +80,9 @@ const OtpVerification: React.FC<OtpVerificationProps> = ({
         type="button"
         onClick={resendCode}
         disabled={resending || loading}
-        className="w-full h-10 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+        className="w-full h-10 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center"
       >
-        {resending ? "Resending..." : "Resend OTP"}
+        {resending ? <RingLoader size="sm" /> : "Resend OTP"}
       </button>
     </div>
   );

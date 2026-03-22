@@ -1,0 +1,199 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker API - Preferences
+  version: 1.0.0
+  description: Pins and saved views
+servers:
+  - url: ${API_BASE_URL}
+    description: Base URL (set API_BASE_URL env)
+  - url: http://localhost:3000
+    description: Local
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        error: { type: string }
+    PinnedItem:
+      type: object
+      additionalProperties: true
+    SavedView:
+      type: object
+      additionalProperties: true
+    PinRequest:
+      type: object
+      required: [entity_type, entity_id]
+      properties:
+        entity_type: { type: string }
+        entity_id: { type: string }
+        note: { type: string }
+    SavedViewRequest:
+      type: object
+      required: [page, name]
+      properties:
+        page: { type: string }
+        name: { type: string }
+        filters: { type: object }
+        is_default: { type: boolean }
+    SavedViewUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        filters: { type: object }
+        is_default: { type: boolean }
+paths:
+  /api/preferences/pins:
+    get:
+      tags: [Preferences]
+      summary: List pinned items
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: entity_type
+          schema: { type: string }
+      responses:
+        '200':
+          description: Pins retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PinnedItem' }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    post:
+      tags: [Preferences]
+      summary: Pin an item
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PinRequest' }
+      responses:
+        '201':
+          description: Item pinned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/PinnedItem' }
+  /api/preferences/pins/{entityType}/{entityId}:
+    delete:
+      tags: [Preferences]
+      summary: Remove pinned item
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: entityType
+          required: true
+          schema: { type: string }
+        - in: path
+          name: entityId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+  /api/preferences/saved-views:
+    get:
+      tags: [Preferences]
+      summary: List saved views
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: string }
+      responses:
+        '200':
+          description: Views retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SavedView' }
+    post:
+      tags: [Preferences]
+      summary: Create saved view
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SavedViewRequest' }
+      responses:
+        '201':
+          description: Saved view created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/SavedView' }
+  /api/preferences/saved-views/{id}:
+    patch:
+      tags: [Preferences]
+      summary: Update saved view
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SavedViewUpdate' }
+      responses:
+        '200':
+          description: Saved view updated
+    delete:
+      tags: [Preferences]
+      summary: Remove saved view
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Saved view removed

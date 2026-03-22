@@ -269,6 +269,7 @@ const buildAuthSuccessResult = (user: User): AuthSuccessResult => {
 const createOtpChallengeForUser = async (
   user: User,
   purpose: OtpPurpose,
+  transaction?: any,
 ): Promise<OtpChallengeResult> => {
   await AuthOtp.update(
     {
@@ -281,6 +282,7 @@ const createOtpChallengeForUser = async (
         purpose,
         is_verified: false,
       },
+      transaction,
     },
   );
 
@@ -294,7 +296,7 @@ const createOtpChallengeForUser = async (
     expires_at: expiresAt,
     attempts: 0,
     is_verified: false,
-  });
+  }, { transaction });
 
   const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
 
@@ -344,8 +346,11 @@ const createOtpChallengeForUser = async (
   };
 };
 
-export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult> {
-  const existingUser = await User.findOne({ where: { email: dto.email } });
+export async function registerUser(dto: RegisterDto, transaction: any): Promise<OtpChallengeResult> {
+  const existingUser = await User.findOne({ 
+    where: { email: dto.email },
+    transaction 
+  });
 
   if (existingUser) {
     throw new Error("User already exists with this email");
@@ -358,7 +363,7 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
     password_hash: hashedPassword,
     full_name: `${dto.firstName} ${dto.lastName}`,
     role: "Member",
-  });
+  }, { transaction });
 
   if (dto.ip) {
     const writeMetadata = async () => {
@@ -369,7 +374,7 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
         user_id: user.id,
         ...geoData,
         ...userAgentData,
-      });
+      }, { transaction });
     };
 
     if (REGISTER_METADATA_ASYNC) {
@@ -381,10 +386,10 @@ export async function registerUser(dto: RegisterDto): Promise<OtpChallengeResult
     }
   }
 
-  return createOtpChallengeForUser(user, "register");
+  return createOtpChallengeForUser(user, "register", transaction);
 }
 
-export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult> {
+export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult | { requiresPasswordChange: true; email: string }> {
   const user = await User.findOne({ where: { email: dto.email } });
 
   if (!user) {
@@ -395,6 +400,14 @@ export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult> {
 
   if (!isPasswordValid) {
     throw new Error("Invalid email or password");
+  }
+
+  // Check if password reset is required (for invited users)
+  if (user.password_reset_required) {
+    return {
+      requiresPasswordChange: true,
+      email: user.email,
+    };
   }
 
   // Enforce OTP verification for accounts that were created via signup OTP flow.
@@ -563,4 +576,26 @@ export async function getCurrentUser(userId: string) {
   }
 
   return getUserWithoutPassword(user);
+}
+
+export async function changePasswordForInvitedUser(
+  email: string,
+  newPassword: string
+): Promise<void> {
+  const user = await User.findOne({ where: { email } });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (!user.password_reset_required) {
+    throw new Error("Password reset not required for this user");
+  }
+
+  // Update password and remove reset requirement
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await user.update({
+    password_hash: hashedPassword,
+    password_reset_required: false,
+  });
 }

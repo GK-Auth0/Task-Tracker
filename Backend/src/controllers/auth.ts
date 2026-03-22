@@ -9,7 +9,9 @@ import {
   resendOtp,
   requestPasswordReset,
   resetPasswordWithOtp,
+  changePasswordForInvitedUser,
 } from "../services/auth";
+import sequelize from "../config/database";
 
 const getOtpEmailErrorHint = (error: any): string | null => {
   const message = String(error?.message || "");
@@ -30,6 +32,7 @@ const getOtpEmailErrorHint = (error: any): string | null => {
 
 export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
+  const transaction = await sequelize.transaction();
 
   try {
     const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
@@ -44,13 +47,15 @@ export const register = async (req: Request, res: Response) => {
       userAgent,
     };
 
-    const result = await registerUser(userData);
+    const result = await registerUser(userData,transaction);
+    await transaction.commit();
     return res.status(201).json({
       success: true,
       message: "Registration initiated. OTP verification required",
       data: result,
     });
   } catch (error) {
+    await transaction.rollback();
     const otpHint = getOtpEmailErrorHint(error);
     return res.status(400).json({
       success: false,
@@ -216,3 +221,54 @@ export const resetPassword = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const changePasswordInvited = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    await changePasswordForInvitedUser(
+      req.body.email,
+      req.body.newPassword,
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to change password",
+      error: (error as any).message,
+    });
+  }
+};
+
+
+export const invite=async(req:Request,res:Response)=>{
+   if (handleValidationErrors(req, res)) return;
+   const transaction=await sequelize.transaction()
+   try{
+ const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
+    const userAgent = req.headers['user-agent'];
+    
+    const userData = {
+      email: req.body.email,
+      password: req.body.password,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      ip: clientIP,
+      userAgent,
+    };
+
+    const result = await registerUser(userData,transaction);
+    await transaction.commit();
+    return res.status(201).json({
+      success: true,
+      message: "Registration initiated. OTP verification required",
+      data: result,
+    });
+
+   }catch(error){
+
+   }
+}

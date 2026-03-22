@@ -6,6 +6,7 @@ import OtpVerification from "../components/OtpVerification";
 import type { OtpChallenge } from "../services/auth";
 import AuthShowcase from "../components/auth/AuthShowcase";
 import AuthBackground from "../components/auth/AuthBackground";
+import RingLoader from "../components/RingLoader";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -275,7 +276,7 @@ export default function Register() {
                     type="submit"
                     disabled={loading}
                   >
-                    {loading ? "Creating Account..." : "Create Account"}
+                    {loading ? <RingLoader size="sm" className="text-white" /> : "Create Account"}
                   </button>
                 </form>
               </>

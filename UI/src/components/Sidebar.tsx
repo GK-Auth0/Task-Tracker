@@ -75,24 +75,49 @@ export default function Sidebar({
       >
         <div className="flex flex-col gap-6 min-h-0 h-full">
           {/* Logo/Brand and Toggle */}
-          <div className="flex gap-3 items-center justify-between">
+          <div
+            className={`flex gap-3 ${
+              isCollapsed
+                ? "flex-col items-center justify-center"
+                : "items-center justify-between"
+            }`}
+          >
             <div className="flex gap-3 items-center overflow-hidden">
-              <div className="bg-blue-600 rounded-lg size-10 flex items-center justify-center text-white shrink-0">
-                <span className="material-symbols-outlined">check_circle</span>
-              </div>
-              {!isCollapsed && (
-                <div className="flex flex-col min-w-0">
-                  <h1 className="text-gray-900 text-base font-bold leading-tight truncate">
-                    TaskTracker
-                  </h1>
-                  <p className="text-gray-600 text-xs font-normal truncate">
-                    Pro Team Edition
-                  </p>
+              {isCollapsed ? (
+                <div className="flex flex-col items-center gap-1">
+                  <div className="bg-blue-600 rounded-lg size-10 flex items-center justify-center text-white shrink-0">
+                    <span className="material-symbols-outlined">
+                      check_circle
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold tracking-wide text-gray-700">
+                    TT
+                  </span>
                 </div>
+              ) : (
+                <>
+                  <div className="bg-blue-600 rounded-lg size-10 flex items-center justify-center text-white shrink-0">
+                    <span className="material-symbols-outlined">
+                      check_circle
+                    </span>
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <h1 className="text-gray-900 text-base font-bold leading-tight truncate">
+                      TaskTracker
+                    </h1>
+                    <p className="text-gray-600 text-xs font-normal truncate">
+                      Pro Team Edition
+                    </p>
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div
+              className={`flex items-center gap-2 ${
+                isCollapsed ? "justify-center" : ""
+              }`}
+            >
               <button
                 onClick={onCloseMobile}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors lg:hidden"
@@ -102,7 +127,9 @@ export default function Sidebar({
               </button>
               <button
                 onClick={onToggleDesktopCollapse}
-                className="hidden lg:flex p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className={`hidden lg:flex p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors ${
+                  isCollapsed ? "mt-1" : ""
+                }`}
                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
                 <span className="material-symbols-outlined text-lg">

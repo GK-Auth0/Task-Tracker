@@ -4,6 +4,7 @@ import { dashboardAPI, tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
 import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
 import { useAuth } from "../contexts/AuthContext";
+import RingLoader from "../components/RingLoader";
 import CreateTaskModal from "../components/CreateTaskModal";
 import TasksHeader from "../components/tasks/TasksHeader";
 import TasksFiltersBar from "../components/tasks/TasksFiltersBar";
@@ -303,7 +304,7 @@ export default function Tasks() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading...
+        <RingLoader size="lg" />
       </div>
     );
   }
@@ -475,11 +476,11 @@ export default function Tasks() {
                 />
                 <button
                   type="button"
-                  className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
                   onClick={saveCurrentView}
                   disabled={savingView || !newViewName.trim()}
                 >
-                  {savingView ? "Saving..." : "Save Current"}
+                  {savingView ? <RingLoader size="sm" className="text-white" /> : "Save Current"}
                 </button>
               </div>
             </div>

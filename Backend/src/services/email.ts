@@ -127,6 +127,29 @@ const buildInviteHtml = (options: {
   </div>
 `;
 
+const buildWelcomeHtml = (fullName: string, temporaryPassword: string) => `
+  <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+    <h2 style="margin: 0 0 12px;">Welcome to TaskTracker!</h2>
+    <p style="margin: 0 0 12px;">Hi ${fullName},</p>
+    <p style="margin: 0 0 12px;">
+      Your TaskTracker account has been created successfully. Here are your login credentials:
+    </p>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <p style="margin: 0 0 8px; font-weight: 600;">Temporary Password:</p>
+      <p style="margin: 0; font-family: monospace; font-size: 16px; color: #2563eb; font-weight: 700;">${temporaryPassword}</p>
+    </div>
+    <p style="margin: 16px 0 12px; color: #dc2626; font-weight: 600;">
+      ⚠️ Important: You must change this password on your first login for security.
+    </p>
+    <p style="margin: 0 0 12px;">
+      Please log in to TaskTracker and set up your new password.
+    </p>
+    <p style="margin: 16px 0 0; color: #64748b;">
+      If you have any questions, please contact your administrator.
+    </p>
+  </div>
+`;
+
 export const sendOtpEmail = async (
   to: string,
   otp: string,
@@ -536,4 +559,78 @@ const getSmtpTransporter = (options: {
   smtpTransporterKey = key;
 
   return smtpTransporter;
+};
+
+export const sendWelcomeEmail = async (to: string, temporaryPassword: string, fullName: string) => {
+  const subject = "Welcome to TaskTracker - Your Account Details";
+  const html = buildWelcomeHtml(fullName, temporaryPassword);
+
+  if (EMAIL_PROVIDER === "smtp") {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+    }
+    await sendSmtpEmail({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      username: EMAIL_USER,
+      password: EMAIL_PASS,
+      from: OTP_FROM_EMAIL,
+      to,
+      subject,
+      html,
+    });
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "resend") {
+    if (!RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is missing for email delivery");
+    }
+    try {
+      await postWithRetries(() =>
+        axios.post(
+          "https://api.resend.com/emails",
+          {
+            from: OTP_FROM_EMAIL,
+            to: [to],
+            subject,
+            html,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            timeout: EMAIL_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+    } catch (error: any) {
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Resend welcome email failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject,
+          html,
+        });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
+
+  if (appConfig.env !== "production") {
+    console.warn(`Welcome email provider '${EMAIL_PROVIDER}' not configured. No welcome email sent to ${to}.`);
+    return;
+  }
+
+  throw new Error(`Unsupported EMAIL_PROVIDER '${EMAIL_PROVIDER}'`);
 };

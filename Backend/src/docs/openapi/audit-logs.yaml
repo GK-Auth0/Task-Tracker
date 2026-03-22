@@ -1,0 +1,67 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker API - Audit Logs
+  version: 1.0.0
+  description: Audit trail endpoints
+servers:
+  - url: ${API_BASE_URL}
+    description: Base URL (set API_BASE_URL env)
+  - url: http://localhost:3000
+    description: Local
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        error: { type: string }
+    AuditLog:
+      type: object
+      additionalProperties: true
+paths:
+  /api/audit-logs:
+    get:
+      tags: [AuditLogs]
+      summary: Get audit logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: entity_type
+          schema: { type: string, enum: [task, project] }
+        - in: query
+          name: entity_id
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Logs retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditLog' }
+        '400':
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
