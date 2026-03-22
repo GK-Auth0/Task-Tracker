@@ -27,7 +27,7 @@ const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
 // Email transporter configuration
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
