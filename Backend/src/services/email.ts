@@ -8,6 +8,7 @@ const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "no-reply@tasktracker.local
 const OTP_EMAIL_WEBHOOK_URL = process.env.OTP_EMAIL_WEBHOOK_URL;
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+const SMTP_SERVICE = process.env.SMTP_SERVICE;
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
 const SMTP_TIMEOUT_MS = Math.min(
@@ -500,28 +501,38 @@ const getSmtpTransporter = (options: {
   username: string;
   password: string;
 }) => {
-  const key = `${options.host}:${options.port}:${options.username}`;
+  const key = `${SMTP_SERVICE ?? ""}:${options.host}:${options.port}:${options.username}`;
   if (smtpTransporter && smtpTransporterKey === key) {
     return smtpTransporter;
   }
 
-  smtpTransporter = nodemailer.createTransport({
-    host: options.host,
-    port: options.port,
-    secure: options.port === 465,
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-    family: SMTP_IP_FAMILY === 6 ? 6 : 4,
-    auth: {
-      user: options.username,
-      pass: options.password,
-    },
-    connectionTimeout: SMTP_TIMEOUT_MS,
-    greetingTimeout: SMTP_TIMEOUT_MS,
-    socketTimeout: SMTP_TIMEOUT_MS,
-    dnsTimeout: SMTP_TIMEOUT_MS,
-  } as any);
+  smtpTransporter = nodemailer.createTransport(
+    SMTP_SERVICE
+      ? {
+          service: SMTP_SERVICE,
+          auth: {
+            user: options.username,
+            pass: options.password,
+          },
+        }
+      : {
+          host: options.host,
+          port: options.port,
+          secure: options.port === 465,
+          pool: true,
+          maxConnections: 3,
+          maxMessages: 100,
+          family: SMTP_IP_FAMILY === 6 ? 6 : 4,
+          auth: {
+            user: options.username,
+            pass: options.password,
+          },
+          connectionTimeout: SMTP_TIMEOUT_MS,
+          greetingTimeout: SMTP_TIMEOUT_MS,
+          socketTimeout: SMTP_TIMEOUT_MS,
+          dnsTimeout: SMTP_TIMEOUT_MS,
+        },
+  );
   smtpTransporterKey = key;
 
   return smtpTransporter;
