@@ -27,6 +27,16 @@ export const createTaskSchema = {
   },
   priority: {
     optional: true,
+    customSanitizer: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return value;
+        const normalized = String(value).trim().toLowerCase();
+        if (normalized === "low") return "Low";
+        if (normalized === "medium") return "Medium";
+        if (normalized === "high") return "High";
+        return value;
+      },
+    },
     isIn: {
       options: [["Low", "Medium", "High"]],
       errorMessage: "Priority must be one of: Low, Medium, High",
@@ -102,6 +112,16 @@ export const updateTaskSchema = {
   },
   priority: {
     optional: true,
+    customSanitizer: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return value;
+        const normalized = String(value).trim().toLowerCase();
+        if (normalized === "low") return "Low";
+        if (normalized === "medium") return "Medium";
+        if (normalized === "high") return "High";
+        return value;
+      },
+    },
     isIn: {
       options: [["Low", "Medium", "High"]],
       errorMessage: "Priority must be one of: Low, Medium, High",
