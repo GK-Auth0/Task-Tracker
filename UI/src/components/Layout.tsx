@@ -19,6 +19,7 @@ export default function Layout() {
   const [isDesktopView, setIsDesktopView] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
   );
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("sidebarCollapsed", JSON.stringify(isDesktopCollapsed));
@@ -67,6 +68,18 @@ export default function Layout() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isMobileOpen]);
 
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    const onClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-profile-menu]")) {
+        setIsProfileOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onClickOutside);
+    return () => window.removeEventListener("mousedown", onClickOutside);
+  }, [isProfileOpen]);
+
   return (
     <div className="bg-gray-50 text-gray-900 antialiased min-h-screen">
       <div className="flex h-screen overflow-hidden">
@@ -104,26 +117,55 @@ export default function Layout() {
                 <span className="material-symbols-outlined">help_outline</span>
               </button>
               <div className="hidden sm:block h-8 w-px bg-slate-200 mx-2"></div>
-              <div className="flex items-center gap-2">
+              <div className="relative" data-profile-menu>
                 <button
-                  onClick={() => navigate("/profile")}
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
                   className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold hover:bg-blue-600/30 transition-colors cursor-pointer"
+                  aria-label="Open profile menu"
                 >
                   {user?.full_name
                     ?.split(" ")
                     .map((n) => n[0])
                     .join("") || "U"}
                 </button>
-                <button
-                  onClick={() => {
-                    logout();
-                    navigate("/login");
-                  }}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  <span className="material-symbols-outlined text-sm">logout</span>
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100">
+                      <p className="text-sm font-semibold text-slate-800 truncate">
+                        {user?.full_name || "User"}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        navigate("/profile");
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        navigate("/settings");
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      Settings
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        logout();
+                        navigate("/login");
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </header>
