@@ -238,6 +238,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   };
 
   return (
+    <>
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-[760px] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
         <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
@@ -615,6 +616,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       sendInviteImmediately={INVITE_SENDS_IMMEDIATELY}
       showRoleSelector
     />
+    </>
   );
 };
 
