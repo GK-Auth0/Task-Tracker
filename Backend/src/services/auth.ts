@@ -281,32 +281,50 @@ const sendOtpWithFallback = async (
   otp: string,
   purpose: OtpPurpose,
 ) => {
+  console.log(
+    `[auth] OTP send via provider starting (purpose=${purpose}, email=${email})`,
+  );
+  try {
+    await sendOtpNotification(email, otp, purpose);
+    console.log(
+      `[auth] OTP send via provider completed (purpose=${purpose}, email=${email})`,
+    );
+    return;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(
+      `[auth] OTP send via provider failed (purpose=${purpose}, email=${email}): ${message}`,
+    );
+  }
+
+  console.log(
+    `[auth] OTP send via SMTP fallback starting (purpose=${purpose}, email=${email})`,
+  );
   const transporter = getOtpTransporter();
   if (transporter) {
     try {
-      console.log(
-        `[auth] Direct OTP email send starting (purpose=${purpose}, email=${email})`,
-      );
       await sendOtpDirectEmail(email, otp, purpose);
       console.log(
-        `[auth] Direct OTP email send completed (purpose=${purpose}, email=${email})`,
+        `[auth] OTP send via SMTP fallback completed (purpose=${purpose}, email=${email})`,
       );
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
+      const code = (error as any)?.code;
+      if (code === "ENETUNREACH") {
+        console.warn(
+          "[auth] SMTP network unreachable. If this is an IPv6 issue, set SMTP_IP_FAMILY=4 to force IPv4.",
+        );
+      }
       console.error(
         `[auth] Direct OTP email failed (purpose=${purpose}, email=${email}): ${message}`,
       );
     }
+  } else {
+    console.warn(
+      "[auth] SMTP fallback is not configured. Set EMAIL_USER and EMAIL_PASS to enable it.",
+    );
   }
-
-  console.log(
-    `[auth] OTP send via provider fallback starting (purpose=${purpose}, email=${email})`,
-  );
-  await sendOtpNotification(email, otp, purpose);
-  console.log(
-    `[auth] OTP send via provider fallback completed (purpose=${purpose}, email=${email})`,
-  );
 };
 
 const verifyOtpSession = async (
