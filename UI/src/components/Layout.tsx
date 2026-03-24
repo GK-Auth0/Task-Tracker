@@ -8,7 +8,7 @@ import NotificationBell from "./layout/NotificationBell";
 import GlobalSearch from "./layout/GlobalSearch";
 
 export default function Layout() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(() => {
@@ -100,15 +100,27 @@ export default function Layout() {
                 <span className="material-symbols-outlined">help_outline</span>
               </button>
               <div className="hidden sm:block h-8 w-px bg-slate-200 mx-2"></div>
-              <button
-                onClick={() => navigate("/profile")}
-                className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold hover:bg-blue-600/30 transition-colors cursor-pointer"
-              >
-                {user?.full_name
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("") || "U"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold hover:bg-blue-600/30 transition-colors cursor-pointer"
+                >
+                  {user?.full_name
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("") || "U"}
+                </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate("/login");
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  <span className="material-symbols-outlined text-sm">logout</span>
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </div>
             </div>
           </header>
 

@@ -5,6 +5,7 @@ import aiChatAPI from "../services/aiChat";
 import { buildProjectTemplate } from "../utils/descriptionTemplates";
 
 import { API_BASE_URL } from "../config/api";
+import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
 
 interface User {
   id: string;
@@ -22,6 +23,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const INVITE_SENDS_IMMEDIATELY = true;
   const [formData, setFormData] = useState<CreateProjectRequest>({
     name: "",
     description: "",
@@ -37,9 +39,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [inviteName, setInviteName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -98,8 +99,10 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       status: formData.status,
       priority: formData.priority,
       memberIds: selectedMembers.map((m) => m.id),
-      invitees,
     };
+    if (!INVITE_SENDS_IMMEDIATELY) {
+      projectData.invitees = invitees;
+    }
 
     // Only add dates if they have values
     if (formData.startDate && formData.startDate.trim()) {
@@ -149,21 +152,14 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     (member) => !selectedMembers.find((m) => m.id === member.id),
   );
 
-  const addInvitee = () => {
-    const full_name = inviteName.trim();
-    const email = inviteEmail.trim().toLowerCase();
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!full_name || !emailValid) return;
-
+  const addInviteeFromDialog = (invitee: { full_name: string; email: string }) => {
     const existsInSelected = selectedMembers.some(
-      (member) => member.email.toLowerCase() === email,
+      (member) => member.email.toLowerCase() === invitee.email,
     );
-    const existsInInvitees = invitees.some((item) => item.email === email);
-    if (existsInSelected || existsInInvitees) return;
-
-    setInvitees((prev) => [...prev, { full_name, email }]);
-    setInviteName("");
-    setInviteEmail("");
+    const existsInInvitees = invitees.some((item) => item.email === invitee.email);
+    if (existsInSelected || existsInInvitees) return false;
+    setInvitees((prev) => [...prev, invitee]);
+    return true;
   };
 
   const removeInvitee = (email: string) => {
@@ -554,28 +550,16 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[#0d151b] text-sm font-semibold leading-normal pb-1">
-                Invite New Member by Email
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto] gap-2">
-                <input
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  className="h-11 rounded-lg border border-[#cfdce7] bg-white px-3 text-sm"
-                  placeholder="Full name"
-                />
-                <input
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="h-11 rounded-lg border border-[#cfdce7] bg-white px-3 text-sm"
-                  placeholder="Email address"
-                />
+              <div className="flex items-center justify-between">
+                <p className="text-[#0d151b] text-sm font-semibold leading-normal">
+                  Invite New Member by Email
+                </p>
                 <button
                   type="button"
-                  onClick={addInvitee}
-                  className="h-11 px-4 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+                  onClick={() => setInviteDialogOpen(true)}
+                  className="h-8 px-3 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
                 >
-                  Add Invite
+                  Invite
                 </button>
               </div>
               {invitees.length > 0 && (
@@ -623,6 +607,14 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         </div>
       </div>
     </div>
+    <InviteCollaboratorDialog
+      open={inviteDialogOpen}
+      onClose={() => setInviteDialogOpen(false)}
+      onAddInvite={addInviteeFromDialog}
+      title="Invite Team Member"
+      sendInviteImmediately={INVITE_SENDS_IMMEDIATELY}
+      showRoleSelector
+    />
   );
 };
 

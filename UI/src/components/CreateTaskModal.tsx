@@ -3,6 +3,7 @@ import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
+import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
 
 interface User {
   id: string;
@@ -36,6 +37,7 @@ export default function CreateTaskModal({
   onClose,
   onTaskCreated,
 }: CreateTaskModalProps) {
+  const INVITE_SENDS_IMMEDIATELY = true;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -48,9 +50,8 @@ export default function CreateTaskModal({
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
-  const [inviteName, setInviteName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() => {
@@ -191,7 +192,7 @@ export default function CreateTaskModal({
         assignee_id: assigneeId || undefined,
         due_date: dueDate || undefined,
         priority: normalizePriority(priority), // Ensure priority is valid
-        invitees,
+        invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
       });
 
       // Reset form
@@ -202,8 +203,6 @@ export default function CreateTaskModal({
       setPriority("Medium");
       setProjectId("");
       setInvitees([]);
-      setInviteName("");
-      setInviteEmail("");
 
       onTaskCreated();
       onClose();
@@ -216,19 +215,11 @@ export default function CreateTaskModal({
 
   if (!isOpen) return null;
 
-  const addInvitee = () => {
-    const full_name = inviteName.trim();
-    const email = inviteEmail.trim().toLowerCase();
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!full_name || !emailValid) return;
-
-    const existsInUsers = users.some((user) => user.email.toLowerCase() === email);
-    const existsInInvitees = invitees.some((item) => item.email === email);
-    if (existsInUsers || existsInInvitees) return;
-
-    setInvitees((prev) => [...prev, { full_name, email }]);
-    setInviteName("");
-    setInviteEmail("");
+  const addInviteeFromDialog = (invitee: { full_name: string; email: string }) => {
+    const existsInInvitees = invitees.some((item) => item.email === invitee.email);
+    if (existsInInvitees) return false;
+    setInvitees((prev) => [...prev, invitee]);
+    return true;
   };
 
   const removeInvitee = (email: string) => {
@@ -467,28 +458,16 @@ export default function CreateTaskModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-gray-900 text-sm font-semibold">
-                Invite Collaborator (Not in Workspace)
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto] gap-2">
-                <input
-                  className="h-11 rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 px-3 text-sm"
-                  placeholder="Full name"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                />
-                <input
-                  className="h-11 rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 px-3 text-sm"
-                  placeholder="Email address"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                />
+              <div className="flex items-center justify-between">
+                <label className="text-gray-900 text-sm font-semibold">
+                  Invite Collaborator (Not in Workspace)
+                </label>
                 <button
                   type="button"
-                  onClick={addInvitee}
-                  className="h-11 rounded-lg bg-slate-900 text-white text-sm font-semibold px-4 hover:bg-slate-800"
+                  onClick={() => setInviteDialogOpen(true)}
+                  className="h-8 px-3 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
                 >
-                  Add Invite
+                  Invite
                 </button>
               </div>
               {invitees.length > 0 && (
@@ -735,5 +714,13 @@ export default function CreateTaskModal({
         </div>
       </div>
     </div>
+    <InviteCollaboratorDialog
+      open={inviteDialogOpen}
+      onClose={() => setInviteDialogOpen(false)}
+      onAddInvite={addInviteeFromDialog}
+      title="Invite Collaborator"
+      sendInviteImmediately={INVITE_SENDS_IMMEDIATELY}
+      showRoleSelector
+    />
   );
 }
