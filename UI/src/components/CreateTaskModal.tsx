@@ -254,6 +254,7 @@ export default function CreateTaskModal({
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-[760px] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
         <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
@@ -722,5 +723,6 @@ export default function CreateTaskModal({
       sendInviteImmediately={INVITE_SENDS_IMMEDIATELY}
       showRoleSelector
     />
+    </>
   );
 }
