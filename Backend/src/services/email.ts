@@ -215,7 +215,7 @@ export const sendOtpEmail = async (
           from: OTP_FROM_EMAIL,
           to,
           subject: "Your TaskTracker OTP Code",
-          html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes()),
+          html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes(), UI_APP_URL),
         });
         return;
       }
@@ -318,7 +318,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink),
+          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
         });
         return;
       }
