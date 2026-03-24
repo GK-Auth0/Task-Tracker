@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import AuthNavbar from "../components/AuthNavbar";
@@ -19,9 +19,17 @@ export default function Register() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [otpChallenge, setOtpChallenge] = useState<OtpChallenge | null>(null);
+  const [otpInfo, setOtpInfo] = useState("");
+  const [showOtpInfo, setShowOtpInfo] = useState(true);
 
   const { register, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!showOtpInfo || !otpInfo) return;
+    const timer = setTimeout(() => setShowOtpInfo(false), 5000);
+    return () => clearTimeout(timer);
+  }, [showOtpInfo, otpInfo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +68,12 @@ export default function Register() {
     try {
       const challenge = await register(email, password, trimFirst, trimLast);
       setOtpChallenge(challenge);
+      if (challenge?.resent) {
+        setOtpInfo("We found an unverified account — OTP sent again.");
+        setShowOtpInfo(true);
+      } else {
+        setOtpInfo("");
+      }
     } catch (error: any) {
       if (error?.code === "ECONNABORTED") {
         setError(
@@ -111,6 +125,8 @@ export default function Register() {
       setError("");
       const refreshedChallenge = await resendOtp(otpChallenge!.otpSessionId);
       setOtpChallenge(refreshedChallenge);
+      setOtpInfo("We found an unverified account — OTP sent again.");
+      setShowOtpInfo(true);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || "Failed to resend OTP");
     }
@@ -286,13 +302,28 @@ export default function Register() {
                 </form>
               </>
             ) : (
-              <OtpVerification
-                email={otpChallenge.email}
-                onVerify={handleVerifyOtp}
-                onResend={handleResendOtp}
-                loading={loading}
-                error={error}
-              />
+              <>
+                {otpInfo && showOtpInfo && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start justify-between gap-3">
+                    <p className="text-amber-700 text-sm">{otpInfo}</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowOtpInfo(false)}
+                      className="text-amber-700 hover:text-amber-800"
+                      aria-label="Dismiss"
+                    >
+                      <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                  </div>
+                )}
+                <OtpVerification
+                  email={otpChallenge.email}
+                  onVerify={handleVerifyOtp}
+                  onResend={handleResendOtp}
+                  loading={loading}
+                  error={error}
+                />
+              </>
             )}
 
             {/* Footer Link */}

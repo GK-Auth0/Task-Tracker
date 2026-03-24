@@ -100,6 +100,13 @@ export const login = async (req: Request, res: Response) => {
     };
 
     const result = await loginUser(loginData);
+    if ((result as any)?.requiresOtp) {
+      return res.status(200).json({
+        success: true,
+        message: "OTP verification required",
+        data: result,
+      });
+    }
     return res.status(200).json({
       success: true,
       message: "Login successful",

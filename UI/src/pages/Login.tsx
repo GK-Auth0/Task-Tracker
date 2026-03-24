@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import type { OtpChallenge } from "../services/auth";
 import AuthNavbar from "../components/AuthNavbar";
 import { isAuth0Visible, startAuth0Login } from "../config/auth0";
 import AuthShowcase from "../components/auth/AuthShowcase";
 import AuthBackground from "../components/auth/AuthBackground";
 import RingLoader from "../components/RingLoader";
+import OtpVerification from "../components/OtpVerification";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -14,12 +16,21 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [auth0Loading, setAuth0Loading] = useState(false);
   const [error, setError] = useState("");
+  const [otpChallenge, setOtpChallenge] = useState<OtpChallenge | null>(null);
+  const [otpInfo, setOtpInfo] = useState("");
+  const [showOtpInfo, setShowOtpInfo] = useState(true);
 
-  const { login } = useAuth();
+  const { login, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const showAuth0 = isAuth0Visible();
   const message = location.state?.message;
+
+  useEffect(() => {
+    if (!showOtpInfo || !otpInfo) return;
+    const timer = setTimeout(() => setShowOtpInfo(false), 5000);
+    return () => clearTimeout(timer);
+  }, [showOtpInfo, otpInfo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +41,16 @@ export default function Login() {
       await login(email, password);
       navigate("/dashboard");
     } catch (error: any) {
+      if (error?.code === "OTP_REQUIRED") {
+        setOtpChallenge(error?.data || null);
+        if (error?.data?.resent) {
+          setOtpInfo("We found an unverified account — OTP sent again.");
+          setShowOtpInfo(true);
+        } else {
+          setOtpInfo("");
+        }
+        return;
+      }
       if (error.message === "PASSWORD_CHANGE_REQUIRED") {
         navigate("/change-password", { state: { email } });
         return;
@@ -42,6 +63,31 @@ export default function Login() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (otp: string) => {
+    try {
+      setLoading(true);
+      setError("");
+      await verifyOtp(otpChallenge!.otpSessionId, otp);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || "OTP verification failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    try {
+      setError("");
+      const refreshed = await resendOtp(otpChallenge!.otpSessionId);
+      setOtpChallenge(refreshed);
+      setOtpInfo("We found an unverified account — OTP sent again.");
+      setShowOtpInfo(true);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || "Failed to resend OTP");
     }
   };
 
@@ -91,14 +137,37 @@ export default function Login() {
             </div>
           )}
 
-          {/* Error Message */}
-          {error && (
+          {/* Error Message (login stage only) */}
+          {error && !otpChallenge && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
             </div>
           )}
 
-          {/* Login Form */}
+          {otpChallenge ? (
+            <>
+              {otpInfo && showOtpInfo && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start justify-between gap-3">
+                  <p className="text-amber-700 text-sm">{otpInfo}</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOtpInfo(false)}
+                    className="text-amber-700 hover:text-amber-800"
+                    aria-label="Dismiss"
+                  >
+                    <span className="material-symbols-outlined text-base">close</span>
+                  </button>
+                </div>
+              )}
+              <OtpVerification
+                email={otpChallenge.email}
+                onVerify={handleVerifyOtp}
+                onResend={handleResendOtp}
+                loading={loading}
+                error={error}
+              />
+            </>
+          ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
                 {/* Email Field */}
                 <div className="flex flex-col gap-2">
@@ -161,6 +230,7 @@ export default function Login() {
                   {loading ? <RingLoader size="sm" className="text-white" /> : "Login"}
                 </button>
           </form>
+          )}
 
           {showAuth0 && (
             <>

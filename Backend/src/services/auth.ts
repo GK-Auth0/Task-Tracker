@@ -50,6 +50,7 @@ export interface OtpChallengeResult {
   email: string;
   expiresAt: string;
   otp?: string;
+  resent?: boolean;
 }
 
 export interface AuthSuccessResult {
@@ -399,8 +400,8 @@ const createOtpChallengeForUser = async (
 ): Promise<OtpChallengeResult> => {
   await AuthOtp.update(
     {
-      is_verified: true,
-      verified_at: new Date(),
+      expires_at: new Date(),
+      attempts: OTP_MAX_ATTEMPTS,
     },
     {
       where: {
@@ -466,6 +467,18 @@ const createOtpChallengeForUser = async (
   };
 };
 
+const getRegisterOtpStatus = async (userId: string): Promise<"none" | "pending" | "verified"> => {
+  const sessions = await AuthOtp.findAll({
+    where: {
+      user_id: userId,
+      purpose: "register",
+    },
+  });
+  if (sessions.length === 0) return "none";
+  if (sessions.some((session) => session.is_verified)) return "verified";
+  return "pending";
+};
+
 export async function registerUser(dto: RegisterDto, transaction: any): Promise<OtpChallengeResult> {
   const existingUser = await User.findOne({ 
     where: { email: dto.email },
@@ -473,6 +486,11 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   });
 
   if (existingUser) {
+    const status = await getRegisterOtpStatus(existingUser.id);
+    if (status === "pending") {
+      const challenge = await createOtpChallengeForUser(existingUser, "register", transaction);
+      return { ...challenge, resent: true };
+    }
     throw new Error("User already exists with this email");
   }
 
@@ -512,7 +530,13 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   return createOtpChallengeForUser(user, "register", transaction);
 }
 
-export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult | { requiresPasswordChange: true; email: string }> {
+export async function loginUser(
+  dto: LoginDto,
+): Promise<
+  | AuthSuccessResult
+  | { requiresPasswordChange: true; email: string }
+  | OtpChallengeResult
+> {
   const user = await User.findOne({ where: { email: dto.email } });
 
   if (!user) {
@@ -533,18 +557,9 @@ export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult | { re
     };
   }
 
-  // Enforce OTP verification for accounts that were created via signup OTP flow.
-  const registerOtpSessions = await AuthOtp.findAll({
-    where: {
-      user_id: user.id,
-      purpose: "register",
-    },
-  });
-  if (
-    registerOtpSessions.length > 0 &&
-    !registerOtpSessions.some((session) => session.is_verified)
-  ) {
-    throw new Error("Please verify your email OTP before logging in");
+  const registerOtpStatus = await getRegisterOtpStatus(user.id);
+  if (registerOtpStatus === "pending") {
+    return createOtpChallengeForUser(user, "register");
   }
 
   return buildAuthSuccessResult(user);

@@ -101,12 +101,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (email: string, password: string): Promise<void> => {
     const response = await authAPI.login({ email, password });
-    const { user, token, requiresPasswordChange } = response.data;
-    
-    if (requiresPasswordChange) {
+    const data: any = response.data;
+
+    if (data?.requiresPasswordChange) {
       throw new Error("PASSWORD_CHANGE_REQUIRED");
     }
-    
+
+    if (data?.requiresOtp) {
+      const err: any = new Error("OTP_REQUIRED");
+      err.code = "OTP_REQUIRED";
+      err.data = data;
+      throw err;
+    }
+
+    const { user, token } = data;
     localStorage.setItem("token", token);
     setToken(token);
     setUser({ ...user, role: normalizeUserRole(user.role) });
