@@ -43,11 +43,14 @@ export default function Login() {
     } catch (error: any) {
       if (error?.code === "OTP_REQUIRED") {
         setOtpChallenge(error?.data || null);
+        setError("");
+        setOtpInfo("OTP verification required. We sent a code to your email.");
+        setShowOtpInfo(true);
         if (error?.data?.resent) {
           setOtpInfo("We found an unverified account — OTP sent again.");
           setShowOtpInfo(true);
         } else {
-          setOtpInfo("");
+          setOtpInfo("OTP verification required. We sent a code to your email.");
         }
         return;
       }
