@@ -7,7 +7,7 @@ import { appConfig } from "../config/app";
 import { AuthOtp, AuthPasswordReset, User, UserMetadata } from "../models";
 import type { LoginDto, RegisterDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
-import { sendOtpEmail, sendPasswordResetEmail } from "./email";
+import { sendOtpEmail, sendPasswordResetEmail, sendSignupWelcomeEmail } from "./email";
 
 const JWT_SECRET = appConfig.jwt.secret;
 const JWT_EXPIRES_IN = appConfig.jwt.expiresIn || "7d";
@@ -582,6 +582,17 @@ export async function loginWithAuth0AccessToken(
 
 export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
   const user = await verifyOtpSession(sessionId, otp, "register");
+
+  try {
+    await sendSignupWelcomeEmail(user.email, user.full_name || "there");
+  } catch (error) {
+    console.error(
+      `[auth] Failed to send signup welcome email (userId=${user.id}): ${
+        (error as any)?.message || error
+      }`,
+    );
+  }
+
   return buildAuthSuccessResult(user);
 }
 
