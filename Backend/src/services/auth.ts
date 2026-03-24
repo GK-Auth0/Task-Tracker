@@ -468,23 +468,26 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   }, { transaction });
 
   if (dto.ip) {
-    const writeMetadata = async () => {
+    const writeMetadata = async (useTransaction: boolean) => {
       const geoData = await getIPGeolocation(dto.ip as string);
       const userAgentData = dto.userAgent ? parseUserAgent(dto.userAgent) : {};
 
-      await UserMetadata.create({
-        user_id: user.id,
-        ...geoData,
-        ...userAgentData,
-      }, { transaction });
+      await UserMetadata.create(
+        {
+          user_id: user.id,
+          ...geoData,
+          ...userAgentData,
+        },
+        useTransaction ? { transaction } : undefined,
+      );
     };
 
     if (REGISTER_METADATA_ASYNC) {
-      void writeMetadata().catch((error) => {
+      void writeMetadata(false).catch((error) => {
         logMetadataWriteFailure(user.id, error);
       });
     } else {
-      await writeMetadata();
+      await writeMetadata(true);
     }
   }
 
