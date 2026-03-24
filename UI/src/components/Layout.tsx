@@ -83,7 +83,8 @@ export default function Layout() {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
           {/* Top Navigation */}
-          <header className="sticky top-0 z-30 flex items-center justify-between bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-8 py-3 gap-4">
+          <header className="sticky top-0 z-30 flex items-center justify-between bg-white/90 backdrop-blur border-b border-slate-200/70 px-4 sm:px-8 py-3 gap-4 shadow-sm relative">
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
             <div className="flex items-center gap-3 flex-1 max-w-md">
               <button
                 className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg lg:hidden"
@@ -129,8 +130,13 @@ export default function Layout() {
             <div className="pointer-events-none absolute inset-0 z-0">
               <AppBackgroundArt />
             </div>
-            <div className="relative h-full">
+            <div className="relative h-full flex flex-col">
               <Outlet />
+              <footer className="mt-auto border-t border-slate-100 bg-white px-4 sm:px-8 py-4 text-center">
+                <p className="text-slate-400 text-xs">
+                  © 2026 Task Tracker Inc. All rights reserved.
+                </p>
+              </footer>
             </div>
             <AiAssistantWidget />
           </div>
