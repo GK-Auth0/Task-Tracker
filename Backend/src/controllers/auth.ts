@@ -30,12 +30,37 @@ const getOtpEmailErrorHint = (error: any): string | null => {
   return null;
 };
 
+const extractClientIp = (req: Request): string | undefined => {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const realIp = req.headers["x-real-ip"];
+  const raw =
+    (typeof forwardedFor === "string" && forwardedFor.split(",")[0]?.trim()) ||
+    (typeof realIp === "string" && realIp.trim()) ||
+    req.ip ||
+    req.connection.remoteAddress ||
+    undefined;
+
+  if (!raw) return undefined;
+
+  let ip = raw.trim();
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.replace("::ffff:", "");
+  }
+  if (ip.startsWith("[") && ip.includes("]")) {
+    ip = ip.slice(1, ip.indexOf("]"));
+  } else if (ip.includes(":") && ip.includes(".") && ip.split(":").length === 2) {
+    ip = ip.split(":")[0];
+  }
+
+  return ip;
+};
+
 export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
   const transaction = await sequelize.transaction();
 
   try {
-    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
+    const clientIP = extractClientIp(req);
     const userAgent = req.headers['user-agent'];
     
     const userData = {
