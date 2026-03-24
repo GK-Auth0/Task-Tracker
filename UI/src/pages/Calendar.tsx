@@ -196,8 +196,8 @@ const Calendar: React.FC = () => {
   });
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden">
-      <div className="flex-1 min-h-0 min-w-0 flex flex-col p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-10 overflow-visible xl:overflow-y-auto">
+    <div className="flex min-h-0 flex-col xl:flex-row">
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-10">
         <CalendarHeader
           calendarType={calendarType}
           currentDate={currentDate}
