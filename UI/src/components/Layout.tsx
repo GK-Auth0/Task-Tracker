@@ -97,7 +97,10 @@ export default function Layout() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
               <NotificationBell />
-              <button className="hidden sm:block p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+              <button
+                className="hidden sm:block p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+                onClick={() => navigate("/help")}
+              >
                 <span className="material-symbols-outlined">help_outline</span>
               </button>
               <div className="hidden sm:block h-8 w-px bg-slate-200 mx-2"></div>

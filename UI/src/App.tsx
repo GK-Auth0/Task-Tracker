@@ -26,6 +26,8 @@ import ComingSoon from "./components/ComingSoon";
 import TeamManagement from "./components/TeamManagement";
 import Layout from "./components/Layout";
 import AiMonitoring from "./pages/AiMonitoring";
+import Settings from "./pages/Settings";
+import Help from "./pages/Help";
 import RingLoader from "./components/RingLoader";
 import { hasMinimumWorkspaceRole, type WorkspaceRole } from "./types/roles";
 
@@ -155,6 +157,8 @@ function AppRoutes() {
         <Route path="activity" element={<ActivityLog />} />
         <Route path="chat" element={<Chat />} />
         <Route path="ai-monitoring" element={<AiMonitoring />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="help" element={<Help />} />
         <Route path="profile" element={<Profile />} />
         <Route path="coming-soon" element={<ComingSoon />} />
         <Route

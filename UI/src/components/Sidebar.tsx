@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: "/chat", title: "Chat", icon: "chat_bubble" },
   { path: "/ai-monitoring", title: "AI Monitoring", icon: "monitoring" },
   { path: "/team", title: "Team", icon: "group", minRole: "Admin" as const },
-  { path: "/coming-soon", title: "Settings", icon: "settings" },
+  { path: "/settings", title: "Settings", icon: "settings" },
 ];
 
 export default function Sidebar({
@@ -49,9 +49,6 @@ export default function Sidebar({
   );
 
   const isActive = (path: string, title: string) => {
-    if (title === "Settings") {
-      return location.pathname === "/coming-soon";
-    }
     return location.pathname === path;
   };
 
