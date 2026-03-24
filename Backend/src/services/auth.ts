@@ -26,14 +26,17 @@ const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
 );
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
-// Email transporter configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+const SMTP_SERVICE = process.env.SMTP_SERVICE;
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+const SMTP_SECURE = (process.env.SMTP_SECURE || "").trim().toLowerCase();
+const SMTP_TIMEOUT_MS = Math.min(parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10), 30000);
+const SMTP_IP_FAMILY = parseInt(process.env.SMTP_IP_FAMILY || "4", 10);
+
+let otpTransporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+let otpTransporterKey: string | null = null;
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
 const AUTH0_AUDIENCE =
@@ -191,6 +194,44 @@ const hashResetToken = (token: string) =>
 const shouldExposeOtp = () =>
   (process.env.OTP_EXPOSE_IN_RESPONSE || "").trim().toLowerCase() === "true";
 
+const getOtpTransporter = () => {
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    return null;
+  }
+
+  const secure = SMTP_SECURE ? SMTP_SECURE === "true" : SMTP_PORT === 465;
+  const key = JSON.stringify({
+    EMAIL_USER,
+    EMAIL_PASS,
+    SMTP_SERVICE,
+    SMTP_HOST,
+    SMTP_PORT,
+    secure,
+    SMTP_TIMEOUT_MS,
+    SMTP_IP_FAMILY,
+  });
+
+  if (!otpTransporter || otpTransporterKey !== key) {
+    otpTransporterKey = key;
+    otpTransporter = nodemailer.createTransport({
+      service: SMTP_SERVICE || undefined,
+      host: SMTP_SERVICE ? undefined : SMTP_HOST,
+      port: SMTP_SERVICE ? undefined : SMTP_PORT,
+      secure,
+      auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
+      },
+      connectionTimeout: SMTP_TIMEOUT_MS,
+      greetingTimeout: SMTP_TIMEOUT_MS,
+      socketTimeout: SMTP_TIMEOUT_MS,
+      family: SMTP_IP_FAMILY,
+    });
+  }
+
+  return otpTransporter;
+};
+
 const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpose) => {
   console.log(
     `[auth] OTP send requested (purpose=${purpose}, email=${email})`,
@@ -198,6 +239,73 @@ const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpo
   await sendOtpEmail(email, otp, purpose);
   console.log(
     `[auth] OTP send succeeded (purpose=${purpose}, email=${email})`,
+  );
+};
+
+const sendOtpDirectEmail = async (
+  email: string,
+  otp: string,
+  purpose: OtpPurpose,
+) => {
+  const transporter = getOtpTransporter();
+  if (!transporter || !EMAIL_USER || !EMAIL_PASS) {
+    throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+  }
+
+  const expiresIn = process.env.OTP_EXPIRES_MINUTES || "10";
+  const subject =
+    purpose === "passwordReset"
+      ? "Your TaskTracker Password Reset OTP"
+      : "Your TaskTracker OTP Code";
+
+  await transporter.sendMail({
+    from: EMAIL_USER,
+    to: email,
+    subject,
+    text: `Your OTP is ${otp}. It will expire in ${expiresIn} minutes.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+        <h2 style="margin: 0 0 12px;">TaskTracker OTP Code</h2>
+        <p style="margin: 0 0 12px;">Use the OTP below to complete your verification:</p>
+        <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 14px 0; color: #2563eb;">
+          ${otp}
+        </div>
+        <p style="margin: 0;">This OTP expires in ${expiresIn} minutes.</p>
+      </div>
+    `,
+  });
+};
+
+const sendOtpWithFallback = async (
+  email: string,
+  otp: string,
+  purpose: OtpPurpose,
+) => {
+  const transporter = getOtpTransporter();
+  if (transporter) {
+    try {
+      console.log(
+        `[auth] Direct OTP email send starting (purpose=${purpose}, email=${email})`,
+      );
+      await sendOtpDirectEmail(email, otp, purpose);
+      console.log(
+        `[auth] Direct OTP email send completed (purpose=${purpose}, email=${email})`,
+      );
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error(
+        `[auth] Direct OTP email failed (purpose=${purpose}, email=${email}): ${message}`,
+      );
+    }
+  }
+
+  console.log(
+    `[auth] OTP send via provider fallback starting (purpose=${purpose}, email=${email})`,
+  );
+  await sendOtpNotification(email, otp, purpose);
+  console.log(
+    `[auth] OTP send via provider fallback completed (purpose=${purpose}, email=${email})`,
   );
 };
 
@@ -298,36 +406,30 @@ const createOtpChallengeForUser = async (
     is_verified: false,
   }, { transaction });
 
-  const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
-
-  // Direct email sending with logging
-  try {
-    console.log(`[EMAIL] Attempting to send OTP email to: ${user.email}`);
-    console.log(`[EMAIL] Using EMAIL_USER: ${process.env.EMAIL_USER}`);
-    console.log(`[EMAIL] OTP Code: ${otp}`);
-    
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: 'OTP Verification - Task Tracker',
-      text: `Your OTP is ${otp}. It will expire in 10 minutes.`,
-    });
-    
-    console.log(`[EMAIL] ✅ OTP email sent successfully to: ${user.email}`);
-  } catch (emailError) {
-    console.error(`[EMAIL] ❌ Failed to send OTP email to: ${user.email}`);
-    console.error(`[EMAIL] Error details:`, emailError);
-    throw emailError;
-  }
-    
+  const shouldSendAsync = purpose === "register" ? true : false;
 
   if (shouldSendAsync) {
-    void sendOtpNotification(user.email, otp, purpose).catch((error) => {
-      logOtpSendFailure(user.email, purpose, error);
-    });
+    console.log(
+      `[auth] OTP send queued async (purpose=${purpose}, email=${user.email})`,
+    );
+    void sendOtpWithFallback(user.email, otp, purpose)
+      .then(() => {
+        console.log(
+          `[auth] OTP send async completed (purpose=${purpose}, email=${user.email})`,
+        );
+      })
+      .catch((error) => {
+        logOtpSendFailure(user.email, purpose, error);
+      });
   } else {
     try {
-      await sendOtpNotification(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP send starting (purpose=${purpose}, email=${user.email})`,
+      );
+      await sendOtpWithFallback(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP send completed (purpose=${purpose}, email=${user.email})`,
+      );
     } catch (error) {
       if (purpose === "register" && OTP_FAIL_OPEN_ON_REGISTER) {
         logOtpSendFailure(user.email, purpose, error);
@@ -487,15 +589,30 @@ export async function resendOtp(sessionId: string): Promise<OtpChallengeResult> 
   await otpSession.save();
 
   const purpose = otpSession.purpose as OtpPurpose;
-  const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
+  const shouldSendAsync = purpose === "register" ? true : false;
 
   if (shouldSendAsync) {
-    void sendOtpNotification(user.email, otp, purpose).catch((error) => {
-      logOtpSendFailure(user.email, purpose, error);
-    });
+    console.log(
+      `[auth] OTP resend queued async (purpose=${purpose}, email=${user.email})`,
+    );
+    void sendOtpWithFallback(user.email, otp, purpose)
+      .then(() => {
+        console.log(
+          `[auth] OTP resend async completed (purpose=${purpose}, email=${user.email})`,
+        );
+      })
+      .catch((error) => {
+        logOtpSendFailure(user.email, purpose, error);
+      });
   } else {
     try {
-      await sendOtpNotification(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP resend starting (purpose=${purpose}, email=${user.email})`,
+      );
+      await sendOtpWithFallback(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP resend completed (purpose=${purpose}, email=${user.email})`,
+      );
     } catch (error) {
       if (purpose === "register" && OTP_FAIL_OPEN_ON_REGISTER) {
         logOtpSendFailure(user.email, purpose, error);

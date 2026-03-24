@@ -63,7 +63,7 @@ export default function Register() {
     } catch (error: any) {
       if (error?.code === "ECONNABORTED") {
         setError(
-          "Registration request timed out. Please check backend and email configuration.",
+          "Registration is taking longer than expected. Please try again.",
         );
       } else {
         const apiErrors = error?.response?.data?.errors;
@@ -76,12 +76,17 @@ export default function Register() {
           });
           if (Object.keys(parsedFieldErrors).length > 0) {
             setFieldErrors(parsedFieldErrors);
-            setError(error.response?.data?.message || "Validation failed");
+            setError("Please fix the highlighted fields and try again.");
             return;
           }
         }
 
-        setError(error.response?.data?.error || error.response?.data?.message || "Registration failed");
+        const status = error?.response?.status;
+        if (status && status >= 500) {
+          setError("We couldn't create your account right now. Please try again.");
+        } else {
+          setError("We couldn't create your account. Please check your details and try again.");
+        }
       }
     } finally {
       setLoading(false);
