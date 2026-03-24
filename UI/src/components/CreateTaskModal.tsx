@@ -21,6 +21,16 @@ interface CreateTaskModalProps {
   onTaskCreated: () => void;
 }
 
+const normalizePriority = (
+  value: string | undefined,
+): "Low" | "Medium" | "High" => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "low") return "Low";
+  if (normalized === "medium") return "Medium";
+  if (normalized === "high") return "High";
+  return "Medium";
+};
+
 export default function CreateTaskModal({
   isOpen,
   onClose,
@@ -180,7 +190,7 @@ export default function CreateTaskModal({
         project_id: projectId,
         assignee_id: assigneeId || undefined,
         due_date: dueDate || undefined,
-        priority: priority || "Medium", // Ensure priority is never undefined
+        priority: normalizePriority(priority), // Ensure priority is valid
         invitees,
       });
 
@@ -575,7 +585,7 @@ export default function CreateTaskModal({
                 <button
                   type="button"
                   className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
-                  onClick={() => setPriority(aiSuggestion.priority)}
+                  onClick={() => setPriority(normalizePriority(aiSuggestion.priority))}
                 >
                   Apply Priority: {aiSuggestion.priority}
                 </button>

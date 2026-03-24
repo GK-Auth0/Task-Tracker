@@ -113,11 +113,11 @@ export default function Layout() {
           </header>
 
           {/* Page Content */}
-          <div className="relative isolate flex-1 overflow-y-auto">
+          <div className="relative flex-1 overflow-y-auto">
             <div className="pointer-events-none absolute inset-0 z-0">
               <AppBackgroundArt />
             </div>
-            <div className="relative z-10 h-full">
+            <div className="relative h-full">
               <Outlet />
             </div>
             <AiAssistantWidget />
