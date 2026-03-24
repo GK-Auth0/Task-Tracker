@@ -81,9 +81,9 @@ export default function Layout() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
           {/* Top Navigation */}
-          <header className="flex items-center justify-between bg-white border-b border-slate-200 px-4 sm:px-8 py-3 gap-4">
+          <header className="sticky top-0 z-30 flex items-center justify-between bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-8 py-3 gap-4">
             <div className="flex items-center gap-3 flex-1 max-w-md">
               <button
                 className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg lg:hidden"
@@ -113,7 +113,7 @@ export default function Layout() {
           </header>
 
           {/* Page Content */}
-          <div className="relative isolate flex-1 overflow-hidden">
+          <div className="relative isolate flex-1 overflow-y-auto">
             <div className="pointer-events-none absolute inset-0 z-0">
               <AppBackgroundArt />
             </div>

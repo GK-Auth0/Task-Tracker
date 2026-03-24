@@ -176,14 +176,14 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    const onClickOutside = (event: MouseEvent) => {
+    const onClickOutside = (event: PointerEvent) => {
       if (!wrapperRef.current) return;
       if (!wrapperRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
-    window.addEventListener("mousedown", onClickOutside);
-    return () => window.removeEventListener("mousedown", onClickOutside);
+    window.addEventListener("pointerdown", onClickOutside);
+    return () => window.removeEventListener("pointerdown", onClickOutside);
   }, []);
 
   const visibleItems = useMemo(
@@ -216,8 +216,9 @@ export default function NotificationBell() {
     <div className="relative" ref={wrapperRef}>
       <button
         type="button"
-        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative"
+        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative touch-manipulation"
         onClick={() => setOpen((prev) => !prev)}
+        onPointerDown={(event) => event.stopPropagation()}
       >
         <span className="material-symbols-outlined">notifications</span>
         {unreadCount > 0 && (
