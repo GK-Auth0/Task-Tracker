@@ -37,8 +37,12 @@ export const createTaskSchema = {
         return value;
       },
     },
-    isIn: {
-      options: [["Low", "Medium", "High"]],
+    custom: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return true;
+        const normalized = String(value).trim().toLowerCase();
+        return ["low", "medium", "high"].includes(normalized);
+      },
       errorMessage: "Priority must be one of: Low, Medium, High",
     },
   },
@@ -122,8 +126,12 @@ export const updateTaskSchema = {
         return value;
       },
     },
-    isIn: {
-      options: [["Low", "Medium", "High"]],
+    custom: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return true;
+        const normalized = String(value).trim().toLowerCase();
+        return ["low", "medium", "high"].includes(normalized);
+      },
       errorMessage: "Priority must be one of: Low, Medium, High",
     },
   },
