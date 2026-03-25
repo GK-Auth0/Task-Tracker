@@ -73,7 +73,8 @@ DB/
 
 ## Migration Numbering
 
-- **V1xxx**: Schema migrations (tables, indexes, triggers)
-- **V2xxx**: Data seeding migrations
+Flyway uses a single global version order across all configured locations.
+That means versions in `schema/` and `seeder/` still share the same sequence.
 
-Follows Flyway migration naming convention.
+- Use a version greater than the current highest applied migration.
+- Do not add a new `V1xxx` migration after `V2xxx` files have already been applied in production unless you intentionally rely on out-of-order execution.

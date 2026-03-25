@@ -1,7 +1,8 @@
 import swaggerUi from "swagger-ui-express";
 import express, { Express } from "express";
-import { promises as fs } from "fs";
+import fs from "fs";
 import path from "path";
+import YAML from "yaml";
 
 const specMap = [
   { slug: "auth", title: "Auth", file: "./src/docs/openapi/auth.yaml" },
@@ -19,16 +20,41 @@ const specMap = [
 ];
 
 export const setupSwagger = (app: Express) => {
+  const primaryDir = path.join(__dirname, "../docs/openapi");
   const specsDirs = [
+    primaryDir,
     path.join(process.cwd(), "src/docs/openapi"),
     path.join(process.cwd(), "dist/docs/openapi"),
+    path.join(process.cwd(), "Backend/src/docs/openapi"),
+    path.join(process.cwd(), "Backend/dist/docs/openapi"),
+    path.join(__dirname, "docs/openapi"),
   ];
 
-  const resolveSpecPath = async (fileName: string) => {
+  const findSpecsDir = () => {
+    let best: { dir: string; count: number } | null = null;
+    for (const dir of specsDirs) {
+      try {
+        const entries = fs.readdirSync(dir);
+        const count = entries.filter((file) => file.endsWith(".yaml")).length;
+        if (count > 0) {
+          if (!best || count > best.count) {
+            best = { dir, count };
+          }
+        }
+      } catch {
+        // try next
+      }
+    }
+    return best?.dir || null;
+  };
+
+  const activeSpecsDir = findSpecsDir();
+
+  const resolveSpecPath = (fileName: string) => {
     for (const dir of specsDirs) {
       const fullPath = path.join(dir, fileName);
       try {
-        await fs.access(fullPath);
+        fs.accessSync(fullPath);
         return fullPath;
       } catch {
         // try next
@@ -37,21 +63,35 @@ export const setupSwagger = (app: Express) => {
     return null;
   };
 
-  app.get("/api-docs/specs/:spec", async (req, res) => {
+  const loadSpec = (fileName: string) => {
+    const filePath =
+      (activeSpecsDir && path.join(activeSpecsDir, fileName)) ||
+      resolveSpecPath(fileName);
+    if (!filePath) return null;
+    const content = fs.readFileSync(filePath, "utf8");
+    try {
+      return YAML.parse(content);
+    } catch (error) {
+      console.error(`[swagger] Failed to parse ${filePath}:`, error);
+      return null;
+    }
+  };
+
+  app.get("/api-docs/specs/:spec", (req, res) => {
     const fileName = req.params.spec;
     if (!fileName || !fileName.endsWith(".yaml")) {
       return res.status(400).send("Invalid spec name");
     }
-    const filePath = await resolveSpecPath(fileName);
+    const filePath = resolveSpecPath(fileName);
     if (!filePath) {
       return res.status(404).send("Spec not found");
     }
-    const content = await fs.readFile(filePath, "utf8");
+    const content = fs.readFileSync(filePath, "utf8");
     res.type("text/yaml").send(content);
   });
 
   // Index page with links to each module doc
-  app.get("/api-docs", (_req, res) => {
+  app.get("/api-docs/index", (_req, res) => {
     const links = specMap
       .map(
         (spec) =>
@@ -73,42 +113,91 @@ export const setupSwagger = (app: Express) => {
         <body>
           <h1>Task Tracker API Docs</h1>
           <p>Select a module:</p>
-          <ul><li><a href="/api-docs/all">All Modules</a></li></ul>
+          <ul><li><a href="/api-docs">All Modules</a></li></ul>
           <ul>${links}</ul>
         </body>
       </html>
     `);
   });
 
-  // Combined UI (multi-spec selector)
+  const mergedSpec = (() => {
+    const base = {
+      openapi: "3.0.3",
+      info: { title: "Task Tracker API", version: "1.0.0" },
+      servers: [
+        { url: "http://localhost:3000", description: "Local" },
+      ],
+      paths: {},
+      components: {},
+      tags: [],
+    } as any;
+
+    const specsToMerge =
+      activeSpecsDir && fs.existsSync(activeSpecsDir)
+        ? fs
+            .readdirSync(activeSpecsDir)
+            .filter((file) => file.endsWith(".yaml"))
+        : specMap.map((spec) => `${spec.slug}.yaml`);
+
+    specsToMerge.forEach((file) => {
+      const parsed = loadSpec(file);
+      if (!parsed) return;
+      base.paths = { ...base.paths, ...(parsed.paths || {}) };
+      base.components = {
+        ...base.components,
+        ...(parsed.components || {}),
+        schemas: {
+          ...(base.components?.schemas || {}),
+          ...(parsed.components?.schemas || {}),
+        },
+        securitySchemes: {
+          ...(base.components?.securitySchemes || {}),
+          ...(parsed.components?.securitySchemes || {}),
+        },
+      };
+      if (Array.isArray(parsed.tags)) {
+        base.tags = [...base.tags, ...parsed.tags];
+      }
+      if (Array.isArray(parsed.servers)) {
+        base.servers = parsed.servers;
+      }
+    });
+
+    return base;
+  })();
+
+  console.log(
+    `[swagger] Using specs dir: ${activeSpecsDir || "auto"} | paths: ${
+      Object.keys(mergedSpec.paths || {}).length
+    }`,
+  );
+
+  app.get("/api-docs/all", (_req, res) => {
+    res.redirect("/api-docs");
+  });
+
+  // Combined UI (single merged spec)
   app.use(
-    "/api-docs/all",
+    "/api-docs",
     swaggerUi.serve,
-    swaggerUi.setup(null, {
+    swaggerUi.setup(mergedSpec, {
       explorer: false,
       customCss: ".swagger-ui .topbar { display: none }",
       customSiteTitle: "Task Tracker API - All Modules",
-      swaggerOptions: {
-        urls: specMap.map((spec) => ({
-          name: spec.title,
-          url: `/api-docs/specs/${spec.slug}.yaml`,
-        })),
-      },
     }),
   );
 
   // Module-specific Swagger UIs
   specMap.forEach((spec) => {
+    const parsed = loadSpec(`${spec.slug}.yaml`);
+    if (!parsed) return;
     app.use(
       `/api-docs/${spec.slug}`,
       swaggerUi.serve,
-      swaggerUi.setup(null, {
+      swaggerUi.setup(parsed, {
         explorer: false,
         customCss: ".swagger-ui .topbar { display: none }",
         customSiteTitle: `Task Tracker API - ${spec.title}`,
-        swaggerOptions: {
-          url: `/api-docs/specs/${spec.slug}.yaml`,
-        },
       }),
     );
   });

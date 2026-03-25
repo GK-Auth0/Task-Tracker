@@ -176,14 +176,14 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    const onClickOutside = (event: MouseEvent) => {
+    const onClickOutside = (event: PointerEvent) => {
       if (!wrapperRef.current) return;
       if (!wrapperRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
-    window.addEventListener("mousedown", onClickOutside);
-    return () => window.removeEventListener("mousedown", onClickOutside);
+    window.addEventListener("pointerdown", onClickOutside);
+    return () => window.removeEventListener("pointerdown", onClickOutside);
   }, []);
 
   const visibleItems = useMemo(
@@ -216,8 +216,9 @@ export default function NotificationBell() {
     <div className="relative" ref={wrapperRef}>
       <button
         type="button"
-        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative"
+        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative touch-manipulation"
         onClick={() => setOpen((prev) => !prev)}
+        onPointerDown={(event) => event.stopPropagation()}
       >
         <span className="material-symbols-outlined">notifications</span>
         {unreadCount > 0 && (
@@ -228,7 +229,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white shadow-2xl z-50">
+        <div className="fixed left-3 right-3 top-16 z-50 max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:max-h-[420px]">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <p className="text-sm font-bold text-slate-800">Notifications</p>
             <div className="flex items-center gap-2">
@@ -266,7 +267,7 @@ export default function NotificationBell() {
             ))}
           </div>
 
-          <div className="max-h-[420px] overflow-y-auto">
+          <div className="max-h-[calc(70vh-112px)] overflow-y-auto sm:max-h-[320px]">
             {loading && items.length === 0 ? (
               <p className="px-4 py-6 text-sm text-slate-500">Loading notifications...</p>
             ) : visibleItems.length === 0 ? (

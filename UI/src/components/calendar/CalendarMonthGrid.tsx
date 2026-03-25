@@ -20,9 +20,9 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
   onIsToday,
 }) => {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex-1 flex flex-col min-h-[520px]">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex-1 flex flex-col min-h-[420px] sm:min-h-[520px]">
       <div className="overflow-x-auto">
-        <div className="min-w-[680px]">
+        <div className="min-w-[520px] sm:min-w-[680px]">
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
               <div
@@ -36,7 +36,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
 
           <div
             className="grid grid-cols-7 divide-x divide-y divide-slate-200"
-            style={{ gridAutoRows: "minmax(90px, 1fr)" }}
+            style={{ gridAutoRows: "minmax(72px, 1fr)" }}
           >
             {days.map((day, index) => {
               const dayTasks = onGetTasksForDate(day.date);

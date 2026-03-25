@@ -27,8 +27,22 @@ export const createTaskSchema = {
   },
   priority: {
     optional: true,
-    isIn: {
-      options: [["Low", "Medium", "High"]],
+    customSanitizer: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return value;
+        const normalized = String(value).trim().toLowerCase();
+        if (normalized === "low") return "Low";
+        if (normalized === "medium") return "Medium";
+        if (normalized === "high") return "High";
+        return value;
+      },
+    },
+    custom: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return true;
+        const normalized = String(value).trim().toLowerCase();
+        return ["low", "medium", "high"].includes(normalized);
+      },
       errorMessage: "Priority must be one of: Low, Medium, High",
     },
   },
@@ -102,8 +116,22 @@ export const updateTaskSchema = {
   },
   priority: {
     optional: true,
-    isIn: {
-      options: [["Low", "Medium", "High"]],
+    customSanitizer: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return value;
+        const normalized = String(value).trim().toLowerCase();
+        if (normalized === "low") return "Low";
+        if (normalized === "medium") return "Medium";
+        if (normalized === "high") return "High";
+        return value;
+      },
+    },
+    custom: {
+      options: (value: unknown) => {
+        if (value === null || value === undefined) return true;
+        const normalized = String(value).trim().toLowerCase();
+        return ["low", "medium", "high"].includes(normalized);
+      },
       errorMessage: "Priority must be one of: Low, Medium, High",
     },
   },

@@ -7,7 +7,7 @@ import { appConfig } from "../config/app";
 import { AuthOtp, AuthPasswordReset, User, UserMetadata } from "../models";
 import type { LoginDto, RegisterDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
-import { sendOtpEmail, sendPasswordResetEmail } from "./email";
+import { sendOtpEmail, sendPasswordResetEmail, sendSignupWelcomeEmail } from "./email";
 
 const JWT_SECRET = appConfig.jwt.secret;
 const JWT_EXPIRES_IN = appConfig.jwt.expiresIn || "7d";
@@ -26,14 +26,17 @@ const RESET_TOKEN_EXPIRES_MINUTES = parseInt(
 );
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
-// Email transporter configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+const SMTP_SERVICE = process.env.SMTP_SERVICE;
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+const SMTP_SECURE = (process.env.SMTP_SECURE || "").trim().toLowerCase();
+const SMTP_TIMEOUT_MS = Math.min(parseInt(process.env.SMTP_TIMEOUT_MS || "10000", 10), 30000);
+const SMTP_IP_FAMILY = parseInt(process.env.SMTP_IP_FAMILY || "4", 10);
+
+let otpTransporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+let otpTransporterKey: string | null = null;
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
 const AUTH0_AUDIENCE =
@@ -47,6 +50,7 @@ export interface OtpChallengeResult {
   email: string;
   expiresAt: string;
   otp?: string;
+  resent?: boolean;
 }
 
 export interface AuthSuccessResult {
@@ -191,6 +195,44 @@ const hashResetToken = (token: string) =>
 const shouldExposeOtp = () =>
   (process.env.OTP_EXPOSE_IN_RESPONSE || "").trim().toLowerCase() === "true";
 
+const getOtpTransporter = () => {
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    return null;
+  }
+
+  const secure = SMTP_SECURE ? SMTP_SECURE === "true" : SMTP_PORT === 465;
+  const key = JSON.stringify({
+    EMAIL_USER,
+    EMAIL_PASS,
+    SMTP_SERVICE,
+    SMTP_HOST,
+    SMTP_PORT,
+    secure,
+    SMTP_TIMEOUT_MS,
+    SMTP_IP_FAMILY,
+  });
+
+  if (!otpTransporter || otpTransporterKey !== key) {
+    otpTransporterKey = key;
+    otpTransporter = nodemailer.createTransport({
+      service: SMTP_SERVICE || undefined,
+      host: SMTP_SERVICE ? undefined : SMTP_HOST,
+      port: SMTP_SERVICE ? undefined : SMTP_PORT,
+      secure,
+      auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
+      },
+      connectionTimeout: SMTP_TIMEOUT_MS,
+      greetingTimeout: SMTP_TIMEOUT_MS,
+      socketTimeout: SMTP_TIMEOUT_MS,
+      family: SMTP_IP_FAMILY,
+    });
+  }
+
+  return otpTransporter;
+};
+
 const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpose) => {
   console.log(
     `[auth] OTP send requested (purpose=${purpose}, email=${email})`,
@@ -199,6 +241,91 @@ const sendOtpNotification = async (email: string, otp: string, purpose: OtpPurpo
   console.log(
     `[auth] OTP send succeeded (purpose=${purpose}, email=${email})`,
   );
+};
+
+const sendOtpDirectEmail = async (
+  email: string,
+  otp: string,
+  purpose: OtpPurpose,
+) => {
+  const transporter = getOtpTransporter();
+  if (!transporter || !EMAIL_USER || !EMAIL_PASS) {
+    throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+  }
+
+  const expiresIn = process.env.OTP_EXPIRES_MINUTES || "10";
+  const subject =
+    purpose === "passwordReset"
+      ? "Your TaskTracker Password Reset OTP"
+      : "Your TaskTracker OTP Code";
+
+  await transporter.sendMail({
+    from: EMAIL_USER,
+    to: email,
+    subject,
+    text: `Your OTP is ${otp}. It will expire in ${expiresIn} minutes.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+        <h2 style="margin: 0 0 12px;">TaskTracker OTP Code</h2>
+        <p style="margin: 0 0 12px;">Use the OTP below to complete your verification:</p>
+        <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 14px 0; color: #2563eb;">
+          ${otp}
+        </div>
+        <p style="margin: 0;">This OTP expires in ${expiresIn} minutes.</p>
+      </div>
+    `,
+  });
+};
+
+const sendOtpWithFallback = async (
+  email: string,
+  otp: string,
+  purpose: OtpPurpose,
+) => {
+  console.log(
+    `[auth] OTP send via provider starting (purpose=${purpose}, email=${email})`,
+  );
+  try {
+    await sendOtpNotification(email, otp, purpose);
+    console.log(
+      `[auth] OTP send via provider completed (purpose=${purpose}, email=${email})`,
+    );
+    return;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(
+      `[auth] OTP send via provider failed (purpose=${purpose}, email=${email}): ${message}`,
+    );
+  }
+
+  console.log(
+    `[auth] OTP send via SMTP fallback starting (purpose=${purpose}, email=${email})`,
+  );
+  const transporter = getOtpTransporter();
+  if (transporter) {
+    try {
+      await sendOtpDirectEmail(email, otp, purpose);
+      console.log(
+        `[auth] OTP send via SMTP fallback completed (purpose=${purpose}, email=${email})`,
+      );
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const code = (error as any)?.code;
+      if (code === "ENETUNREACH") {
+        console.warn(
+          "[auth] SMTP network unreachable. If this is an IPv6 issue, set SMTP_IP_FAMILY=4 to force IPv4.",
+        );
+      }
+      console.error(
+        `[auth] Direct OTP email failed (purpose=${purpose}, email=${email}): ${message}`,
+      );
+    }
+  } else {
+    console.warn(
+      "[auth] SMTP fallback is not configured. Set EMAIL_USER and EMAIL_PASS to enable it.",
+    );
+  }
 };
 
 const verifyOtpSession = async (
@@ -273,8 +400,8 @@ const createOtpChallengeForUser = async (
 ): Promise<OtpChallengeResult> => {
   await AuthOtp.update(
     {
-      is_verified: true,
-      verified_at: new Date(),
+      expires_at: new Date(),
+      attempts: OTP_MAX_ATTEMPTS,
     },
     {
       where: {
@@ -298,36 +425,30 @@ const createOtpChallengeForUser = async (
     is_verified: false,
   }, { transaction });
 
-  const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
-
-  // Direct email sending with logging
-  try {
-    console.log(`[EMAIL] Attempting to send OTP email to: ${user.email}`);
-    console.log(`[EMAIL] Using EMAIL_USER: ${process.env.EMAIL_USER}`);
-    console.log(`[EMAIL] OTP Code: ${otp}`);
-    
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: 'OTP Verification - Task Tracker',
-      text: `Your OTP is ${otp}. It will expire in 10 minutes.`,
-    });
-    
-    console.log(`[EMAIL] ✅ OTP email sent successfully to: ${user.email}`);
-  } catch (emailError) {
-    console.error(`[EMAIL] ❌ Failed to send OTP email to: ${user.email}`);
-    console.error(`[EMAIL] Error details:`, emailError);
-    throw emailError;
-  }
-    
+  const shouldSendAsync = purpose === "register" ? true : false;
 
   if (shouldSendAsync) {
-    void sendOtpNotification(user.email, otp, purpose).catch((error) => {
-      logOtpSendFailure(user.email, purpose, error);
-    });
+    console.log(
+      `[auth] OTP send queued async (purpose=${purpose}, email=${user.email})`,
+    );
+    void sendOtpWithFallback(user.email, otp, purpose)
+      .then(() => {
+        console.log(
+          `[auth] OTP send async completed (purpose=${purpose}, email=${user.email})`,
+        );
+      })
+      .catch((error) => {
+        logOtpSendFailure(user.email, purpose, error);
+      });
   } else {
     try {
-      await sendOtpNotification(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP send starting (purpose=${purpose}, email=${user.email})`,
+      );
+      await sendOtpWithFallback(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP send completed (purpose=${purpose}, email=${user.email})`,
+      );
     } catch (error) {
       if (purpose === "register" && OTP_FAIL_OPEN_ON_REGISTER) {
         logOtpSendFailure(user.email, purpose, error);
@@ -346,6 +467,18 @@ const createOtpChallengeForUser = async (
   };
 };
 
+const getRegisterOtpStatus = async (userId: string): Promise<"none" | "pending" | "verified"> => {
+  const sessions = await AuthOtp.findAll({
+    where: {
+      user_id: userId,
+      purpose: "register",
+    },
+  });
+  if (sessions.length === 0) return "none";
+  if (sessions.some((session) => session.is_verified)) return "verified";
+  return "pending";
+};
+
 export async function registerUser(dto: RegisterDto, transaction: any): Promise<OtpChallengeResult> {
   const existingUser = await User.findOne({ 
     where: { email: dto.email },
@@ -353,6 +486,11 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   });
 
   if (existingUser) {
+    const status = await getRegisterOtpStatus(existingUser.id);
+    if (status === "pending") {
+      const challenge = await createOtpChallengeForUser(existingUser, "register", transaction);
+      return { ...challenge, resent: true };
+    }
     throw new Error("User already exists with this email");
   }
 
@@ -366,30 +504,39 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   }, { transaction });
 
   if (dto.ip) {
-    const writeMetadata = async () => {
+    const writeMetadata = async (useTransaction: boolean) => {
       const geoData = await getIPGeolocation(dto.ip as string);
       const userAgentData = dto.userAgent ? parseUserAgent(dto.userAgent) : {};
 
-      await UserMetadata.create({
-        user_id: user.id,
-        ...geoData,
-        ...userAgentData,
-      }, { transaction });
+      await UserMetadata.create(
+        {
+          user_id: user.id,
+          ...geoData,
+          ...userAgentData,
+        },
+        useTransaction ? { transaction } : undefined,
+      );
     };
 
     if (REGISTER_METADATA_ASYNC) {
-      void writeMetadata().catch((error) => {
+      void writeMetadata(false).catch((error) => {
         logMetadataWriteFailure(user.id, error);
       });
     } else {
-      await writeMetadata();
+      await writeMetadata(true);
     }
   }
 
   return createOtpChallengeForUser(user, "register", transaction);
 }
 
-export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult | { requiresPasswordChange: true; email: string }> {
+export async function loginUser(
+  dto: LoginDto,
+): Promise<
+  | AuthSuccessResult
+  | { requiresPasswordChange: true; email: string }
+  | OtpChallengeResult
+> {
   const user = await User.findOne({ where: { email: dto.email } });
 
   if (!user) {
@@ -410,18 +557,9 @@ export async function loginUser(dto: LoginDto): Promise<AuthSuccessResult | { re
     };
   }
 
-  // Enforce OTP verification for accounts that were created via signup OTP flow.
-  const registerOtpSessions = await AuthOtp.findAll({
-    where: {
-      user_id: user.id,
-      purpose: "register",
-    },
-  });
-  if (
-    registerOtpSessions.length > 0 &&
-    !registerOtpSessions.some((session) => session.is_verified)
-  ) {
-    throw new Error("Please verify your email OTP before logging in");
+  const registerOtpStatus = await getRegisterOtpStatus(user.id);
+  if (registerOtpStatus === "pending") {
+    return createOtpChallengeForUser(user, "register");
   }
 
   return buildAuthSuccessResult(user);
@@ -459,6 +597,17 @@ export async function loginWithAuth0AccessToken(
 
 export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
   const user = await verifyOtpSession(sessionId, otp, "register");
+
+  try {
+    await sendSignupWelcomeEmail(user.email, user.full_name || "there");
+  } catch (error) {
+    console.error(
+      `[auth] Failed to send signup welcome email (userId=${user.id}): ${
+        (error as any)?.message || error
+      }`,
+    );
+  }
+
   return buildAuthSuccessResult(user);
 }
 
@@ -487,15 +636,30 @@ export async function resendOtp(sessionId: string): Promise<OtpChallengeResult> 
   await otpSession.save();
 
   const purpose = otpSession.purpose as OtpPurpose;
-  const shouldSendAsync = purpose === "register" ? OTP_SEND_ASYNC_ON_REGISTER : false;
+  const shouldSendAsync = purpose === "register" ? true : false;
 
   if (shouldSendAsync) {
-    void sendOtpNotification(user.email, otp, purpose).catch((error) => {
-      logOtpSendFailure(user.email, purpose, error);
-    });
+    console.log(
+      `[auth] OTP resend queued async (purpose=${purpose}, email=${user.email})`,
+    );
+    void sendOtpWithFallback(user.email, otp, purpose)
+      .then(() => {
+        console.log(
+          `[auth] OTP resend async completed (purpose=${purpose}, email=${user.email})`,
+        );
+      })
+      .catch((error) => {
+        logOtpSendFailure(user.email, purpose, error);
+      });
   } else {
     try {
-      await sendOtpNotification(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP resend starting (purpose=${purpose}, email=${user.email})`,
+      );
+      await sendOtpWithFallback(user.email, otp, purpose);
+      console.log(
+        `[auth] OTP resend completed (purpose=${purpose}, email=${user.email})`,
+      );
     } catch (error) {
       if (purpose === "register" && OTP_FAIL_OPEN_ON_REGISTER) {
         logOtpSendFailure(user.email, purpose, error);

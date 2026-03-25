@@ -58,15 +58,7 @@ export interface RegisterData {
 export interface AuthResponse {
   success: boolean;
   message: string;
-  data: {
-    user: {
-      id: string;
-      email: string;
-      full_name: string;
-      role: string;
-    };
-    token: string;
-  };
+  data: LoginResponseData;
 }
 
 export interface OtpChallenge {
@@ -75,6 +67,7 @@ export interface OtpChallenge {
   email: string;
   expiresAt: string;
   otp?: string;
+  resent?: boolean;
 }
 
 export interface OtpChallengeResponse {
@@ -82,6 +75,19 @@ export interface OtpChallengeResponse {
   message: string;
   data: OtpChallenge;
 }
+
+export type LoginResponseData =
+  | {
+      user: {
+        id: string;
+        email: string;
+        full_name: string;
+        role: string;
+      };
+      token: string;
+    }
+  | { requiresPasswordChange: true; email: string }
+  | OtpChallenge;
 
 export interface BasicResponse {
   success: boolean;

@@ -1,10 +1,18 @@
 import axios from "axios";
 import nodemailer from "nodemailer";
 import { appConfig } from "../config/app";
+import {
+  buildInviteHtml,
+  buildOtpHtml,
+  buildResetPasswordHtml,
+  buildSignupWelcomeHtml,
+  buildWelcomeHtml,
+} from "../email/templates";
 
-const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "resend").toLowerCase();
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "no-reply@tasktracker.local";
+const UI_APP_URL = process.env.UI_APP_URL || process.env.FRONTEND_URL || "http://localhost:3001";
 const OTP_EMAIL_WEBHOOK_URL = process.env.OTP_EMAIL_WEBHOOK_URL;
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
@@ -74,81 +82,36 @@ const postWithRetries = async <T>(action: () => Promise<T>) => {
   throw lastError;
 };
 
-const buildOtpHtml = (otp: string, purpose: string) => {
-  const purposeDescription =
-    purpose === "passwordReset"
-      ? "password reset"
-      : `${purpose} verification`;
+const getOtpExpiresMinutes = () => process.env.OTP_EXPIRES_MINUTES || "10";
 
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-      <h2 style="margin: 0 0 12px;">TaskTracker OTP Code</h2>
-      <p style="margin: 0 0 12px;">Use the OTP below to complete your ${purposeDescription}:</p>
-      <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 14px 0; color: #2563eb;">
-        ${otp}
-      </div>
-      <p style="margin: 0 0 6px;">This OTP expires in ${process.env.OTP_EXPIRES_MINUTES || "10"} minutes.</p>
-      <p style="margin: 0; color: #64748b;">If you did not request this code, please ignore this email.</p>
-    </div>
-  `;
+const sendResendEmail = async (options: {
+  to: string;
+  subject: string;
+  html: string;
+}) => {
+  if (!RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is missing for email delivery");
+  }
+
+  await postWithRetries(() =>
+    axios.post(
+      "https://api.resend.com/emails",
+      {
+        from: OTP_FROM_EMAIL,
+        to: [options.to],
+        subject: options.subject,
+        html: options.html,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        timeout: EMAIL_HTTP_TIMEOUT_MS,
+      },
+    ),
+  );
 };
-
-const buildResetPasswordHtml = (resetLink: string) => {
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-      <h2 style="margin: 0 0 12px;">TaskTracker Password Reset</h2>
-      <p style="margin: 0 0 12px;">Click the button below to reset your password.</p>
-      <a href="${resetLink}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600;">
-        Reset Password
-      </a>
-      <p style="margin: 16px 0 6px;">If the button does not work, use this link:</p>
-      <p style="margin: 0; word-break: break-all; color: #334155;">${resetLink}</p>
-      <p style="margin: 16px 0 0; color: #64748b;">If you did not request this, please ignore this email.</p>
-    </div>
-  `;
-};
-
-const buildInviteHtml = (options: {
-  fullName: string;
-  contextType: "project" | "task";
-  inviteUrl: string;
-}) => `
-  <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-    <h2 style="margin: 0 0 12px;">You're Invited to TaskTracker</h2>
-    <p style="margin: 0 0 12px;">Hi ${options.fullName},</p>
-    <p style="margin: 0 0 12px;">
-      You were invited to collaborate on a ${options.contextType} in TaskTracker.
-    </p>
-    <a href="${options.inviteUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600;">
-      Accept Invitation
-    </a>
-    <p style="margin: 16px 0 6px;">If the button does not work, use this link:</p>
-    <p style="margin: 0; word-break: break-all; color: #334155;">${options.inviteUrl}</p>
-  </div>
-`;
-
-const buildWelcomeHtml = (fullName: string, temporaryPassword: string) => `
-  <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-    <h2 style="margin: 0 0 12px;">Welcome to TaskTracker!</h2>
-    <p style="margin: 0 0 12px;">Hi ${fullName},</p>
-    <p style="margin: 0 0 12px;">
-      Your TaskTracker account has been created successfully. Here are your login credentials:
-    </p>
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px; font-weight: 600;">Temporary Password:</p>
-      <p style="margin: 0; font-family: monospace; font-size: 16px; color: #2563eb; font-weight: 700;">${temporaryPassword}</p>
-    </div>
-    <p style="margin: 16px 0 12px; color: #dc2626; font-weight: 600;">
-      ⚠️ Important: You must change this password on your first login for security.
-    </p>
-    <p style="margin: 0 0 12px;">
-      Please log in to TaskTracker and set up your new password.
-    </p>
-    <p style="margin: 16px 0 0; color: #64748b;">
-      If you have any questions, please contact your administrator.
-    </p>
-  </div>
-`;
 
 export const sendOtpEmail = async (
   to: string,
@@ -169,7 +132,7 @@ export const sendOtpEmail = async (
         from: OTP_FROM_EMAIL,
         to,
         subject: "Your TaskTracker OTP Code",
-        html: buildOtpHtml(otp, purpose),
+        html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes(), UI_APP_URL),
       });
     } catch (error: any) {
       logEmailError("SMTP OTP", error);
@@ -179,29 +142,12 @@ export const sendOtpEmail = async (
   }
 
   if (EMAIL_PROVIDER === "resend") {
-    if (!RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY is missing for OTP email delivery");
-    }
-
     try {
-      await postWithRetries(() =>
-        axios.post(
-          "https://api.resend.com/emails",
-          {
-            from: OTP_FROM_EMAIL,
-            to: [to],
-            subject: "Your TaskTracker OTP Code",
-            html: buildOtpHtml(otp, purpose),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            timeout: EMAIL_HTTP_TIMEOUT_MS,
-          },
-        ),
-      );
+      await sendResendEmail({
+        to,
+        subject: "Your TaskTracker OTP Code",
+        html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes(), UI_APP_URL),
+      });
     } catch (error: any) {
       logEmailError("Resend OTP", error);
       if (EMAIL_USER && EMAIL_PASS) {
@@ -216,7 +162,7 @@ export const sendOtpEmail = async (
           from: OTP_FROM_EMAIL,
           to,
           subject: "Your TaskTracker OTP Code",
-          html: buildOtpHtml(otp, purpose),
+          html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes(), UI_APP_URL),
         });
         return;
       }
@@ -245,7 +191,7 @@ export const sendOtpEmail = async (
           {
             to,
             subject: "Your TaskTracker OTP Code",
-            html: buildOtpHtml(otp, purpose),
+            html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes(), UI_APP_URL),
             otp,
             purpose,
           },
@@ -269,7 +215,7 @@ export const sendOtpEmail = async (
           from: OTP_FROM_EMAIL,
           to,
           subject: "Your TaskTracker OTP Code",
-          html: buildOtpHtml(otp, purpose),
+          html: buildOtpHtml(otp, purpose, getOtpExpiresMinutes(), UI_APP_URL),
         });
         return;
       }
@@ -302,35 +248,18 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       from: OTP_FROM_EMAIL,
       to,
       subject: "Reset your TaskTracker password",
-      html: buildResetPasswordHtml(resetLink),
+      html: buildResetPasswordHtml(resetLink, UI_APP_URL),
     });
     return;
   }
 
   if (EMAIL_PROVIDER === "resend") {
-    if (!RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY is missing for email delivery");
-    }
-
     try {
-      await postWithRetries(() =>
-        axios.post(
-          "https://api.resend.com/emails",
-          {
-            from: OTP_FROM_EMAIL,
-            to: [to],
-            subject: "Reset your TaskTracker password",
-            html: buildResetPasswordHtml(resetLink),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            timeout: EMAIL_HTTP_TIMEOUT_MS,
-          },
-        ),
-      );
+      await sendResendEmail({
+        to,
+        subject: "Reset your TaskTracker password",
+        html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+      });
     } catch (error: any) {
       if (EMAIL_USER && EMAIL_PASS) {
         console.warn(
@@ -344,7 +273,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink),
+          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
         });
         return;
       }
@@ -365,7 +294,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           {
             to,
             subject: "Reset your TaskTracker password",
-            html: buildResetPasswordHtml(resetLink),
+            html: buildResetPasswordHtml(resetLink, UI_APP_URL),
             resetLink,
           },
           {
@@ -389,7 +318,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink),
+          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
         });
         return;
       }
@@ -416,8 +345,7 @@ export const sendWorkspaceInviteEmail = async (options: {
   projectId?: string;
   taskId?: string;
 }) => {
-  const appUrl = process.env.UI_APP_URL || "http://localhost:3001";
-  const inviteUrl = `${appUrl}/signup?invite=${options.inviteToken}&type=${options.contextType}${
+  const inviteUrl = `${UI_APP_URL}/signup?invite=${options.inviteToken}&type=${options.contextType}${
     options.projectId ? `&project=${options.projectId}` : ""
   }${options.taskId ? `&task=${options.taskId}` : ""}`;
 
@@ -426,6 +354,7 @@ export const sendWorkspaceInviteEmail = async (options: {
     fullName: options.fullName,
     contextType: options.contextType,
     inviteUrl,
+    appUrl: UI_APP_URL,
   });
 
   if (EMAIL_PROVIDER === "smtp") {
@@ -446,28 +375,12 @@ export const sendWorkspaceInviteEmail = async (options: {
   }
 
   if (EMAIL_PROVIDER === "resend") {
-    if (!RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY is missing for email delivery");
-    }
     try {
-      await postWithRetries(() =>
-        axios.post(
-          "https://api.resend.com/emails",
-          {
-            from: OTP_FROM_EMAIL,
-            to: [options.to],
-            subject,
-            html,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            timeout: EMAIL_HTTP_TIMEOUT_MS,
-          },
-        ),
-      );
+      await sendResendEmail({
+        to: options.to,
+        subject,
+        html,
+      });
     } catch (error: any) {
       if (EMAIL_USER && EMAIL_PASS) {
         console.warn(
@@ -563,7 +476,7 @@ const getSmtpTransporter = (options: {
 
 export const sendWelcomeEmail = async (to: string, temporaryPassword: string, fullName: string) => {
   const subject = "Welcome to TaskTracker - Your Account Details";
-  const html = buildWelcomeHtml(fullName, temporaryPassword);
+  const html = buildWelcomeHtml(fullName, temporaryPassword, UI_APP_URL);
 
   if (EMAIL_PROVIDER === "smtp") {
     if (!EMAIL_USER || !EMAIL_PASS) {
@@ -583,32 +496,74 @@ export const sendWelcomeEmail = async (to: string, temporaryPassword: string, fu
   }
 
   if (EMAIL_PROVIDER === "resend") {
-    if (!RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY is missing for email delivery");
-    }
     try {
-      await postWithRetries(() =>
-        axios.post(
-          "https://api.resend.com/emails",
-          {
-            from: OTP_FROM_EMAIL,
-            to: [to],
-            subject,
-            html,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            timeout: EMAIL_HTTP_TIMEOUT_MS,
-          },
-        ),
-      );
+      await sendResendEmail({
+        to,
+        subject,
+        html,
+      });
     } catch (error: any) {
       if (EMAIL_USER && EMAIL_PASS) {
         console.warn(
           `[email] Resend welcome email failed after retries, falling back to SMTP. error=${error?.message || error}`,
+        );
+        await sendSmtpEmail({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          username: EMAIL_USER,
+          password: EMAIL_PASS,
+          from: OTP_FROM_EMAIL,
+          to,
+          subject,
+          html,
+        });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
+
+  if (appConfig.env !== "production") {
+    console.warn(`Welcome email provider '${EMAIL_PROVIDER}' not configured. No welcome email sent to ${to}.`);
+    return;
+  }
+
+  throw new Error(`Unsupported EMAIL_PROVIDER '${EMAIL_PROVIDER}'`);
+};
+
+export const sendSignupWelcomeEmail = async (to: string, fullName: string) => {
+  const subject = "Welcome to TaskTracker";
+  const html = buildSignupWelcomeHtml(fullName, UI_APP_URL);
+
+  if (EMAIL_PROVIDER === "smtp") {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
+    }
+    await sendSmtpEmail({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      username: EMAIL_USER,
+      password: EMAIL_PASS,
+      from: OTP_FROM_EMAIL,
+      to,
+      subject,
+      html,
+    });
+    return;
+  }
+
+  if (EMAIL_PROVIDER === "resend") {
+    try {
+      await sendResendEmail({
+        to,
+        subject,
+        html,
+      });
+    } catch (error: any) {
+      if (EMAIL_USER && EMAIL_PASS) {
+        console.warn(
+          `[email] Resend signup welcome failed after retries, falling back to SMTP. error=${error?.message || error}`,
         );
         await sendSmtpEmail({
           host: SMTP_HOST,
