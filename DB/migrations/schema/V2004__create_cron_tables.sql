@@ -38,12 +38,6 @@ CREATE TABLE IF NOT EXISTS cron_retries (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-
--- Core performance index
-CREATE INDEX idx_active_next_run ON crons (is_active, next_run_at);
-
--- Lookup
-CREATE UNIQUE INDEX idx_cron_name ON crons (cron_name);
-
--- Execution tracking
-CREATE INDEX idx_execution_cron_id ON cron_executions (cron_id);
+CREATE INDEX IF NOT EXISTS idx_active_next_run ON crons (is_active, next_run_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cron_name ON crons (cron_name);
+CREATE INDEX IF NOT EXISTS idx_execution_cron_id ON cron_executions (cron_id);
