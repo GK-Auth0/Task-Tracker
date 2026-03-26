@@ -33,9 +33,9 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   }).length;
 
   return (
-    <div className="flex flex-col gap-4 mb-6">
+    <div className="mb-6 flex flex-col gap-4">
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-col">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
               {calendarType === "personal" ? "My Calendar" : "Team Calendar"}
@@ -47,10 +47,10 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             </p>
           </div>
           <div className="hidden sm:block h-10 w-px bg-slate-200"></div>
-          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg w-fit">
+          <div className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-slate-100 p-1 sm:w-fit">
             <button
               onClick={() => onCalendarTypeChange("personal")}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
+              className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-all sm:flex-none ${
                 calendarType === "personal"
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
@@ -60,7 +60,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             </button>
             <button
               onClick={() => onCalendarTypeChange("team")}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
+              className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-all sm:flex-none ${
                 calendarType === "team"
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
@@ -71,8 +71,8 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex gap-1 pr-0 sm:pr-3 sm:mr-3 sm:border-r border-slate-200">
+        <div className="flex w-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center justify-between gap-1 sm:justify-start sm:pr-3 sm:mr-3 sm:border-r border-slate-200">
             <button
               onClick={() => onNavigateMonth("prev")}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"
@@ -92,12 +92,12 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
               <span className="material-symbols-outlined">chevron_right</span>
             </button>
           </div>
-          <div className="flex gap-1">
+          <div className="grid grid-cols-3 gap-1">
             {(["month", "week", "day"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => onViewModeChange(mode)}
-                className={`px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium capitalize ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${
                   viewMode === mode
                     ? "bg-blue-600 text-white shadow-sm"
                     : "text-slate-500 hover:bg-slate-100"

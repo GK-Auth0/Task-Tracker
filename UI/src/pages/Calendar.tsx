@@ -197,7 +197,7 @@ const Calendar: React.FC = () => {
 
   return (
     <div className="flex min-h-0 flex-col xl:flex-row">
-      <div className="flex-1 min-h-0 min-w-0 flex flex-col p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-10">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-10">
         <CalendarHeader
           calendarType={calendarType}
           currentDate={currentDate}
@@ -211,16 +211,16 @@ const Calendar: React.FC = () => {
         />
 
         <section className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-indigo-900 flex items-center gap-2">
+              <p className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
                 <span className="material-symbols-outlined text-[18px]">
                   auto_awesome
                 </span>
                 AI Calendar Insights
               </p>
               {aiInsights && (
-                <p className="text-xs text-indigo-900/80 mt-1">
+                <p className="mt-1 text-xs text-indigo-900/80">
                   {aiInsights.summary}
                 </p>
               )}
@@ -229,7 +229,7 @@ const Calendar: React.FC = () => {
               type="button"
               onClick={fetchCalendarInsights}
               disabled={aiInsightsLoading || tasks.length === 0}
-              className="h-9 px-4 rounded-lg bg-indigo-700 text-white text-sm font-semibold hover:bg-indigo-800 disabled:opacity-50"
+              className="h-9 w-full rounded-lg bg-indigo-700 px-4 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-50 sm:w-auto"
             >
               {aiInsightsLoading ? "Analyzing..." : "Refresh AI"}
             </button>
@@ -242,7 +242,7 @@ const Calendar: React.FC = () => {
           )}
 
           {aiInsights && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="rounded-lg border border-indigo-200 bg-white p-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Risk
