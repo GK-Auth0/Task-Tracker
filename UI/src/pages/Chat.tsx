@@ -11,6 +11,11 @@ type SearchPerson = {
   avatar_url?: string;
 };
 
+const isImageAttachment = (attachmentUrl?: string, attachmentName?: string) => {
+  const source = String(attachmentName || attachmentUrl || "").toLowerCase();
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?|#|$)/i.test(source);
+};
+
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -812,6 +817,10 @@ const Chat: React.FC = () => {
                 ) : (
                   messages.map((msg) => {
                     const isCurrentUser = msg.user_id === user?.id;
+                    const hasImageAttachment = isImageAttachment(
+                      msg.attachment_url,
+                      msg.attachment_name,
+                    );
                     return (
                       <div key={msg.id} className={`flex gap-3 lg:gap-4 ${isCurrentUser ? "flex-row-reverse" : ""}`}>
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white lg:h-10 lg:w-10">
@@ -838,8 +847,18 @@ const Chat: React.FC = () => {
                                 : "rounded-tl-md bg-slate-100 text-slate-900"
                             }`}
                           >
-                            {msg.content}
-                            {msg.attachment_url && (
+                            {msg.content && <p>{msg.content}</p>}
+                            {msg.attachment_url && hasImageAttachment && (
+                              <div className={msg.content ? "mt-3" : ""}>
+                                <img
+                                  src={msg.attachment_url}
+                                  alt={msg.attachment_name || "Shared image"}
+                                  className="max-h-[320px] w-full max-w-[280px] rounded-xl object-cover sm:max-w-[340px] lg:max-w-[420px]"
+                                  loading="lazy"
+                                />
+                              </div>
+                            )}
+                            {msg.attachment_url && !hasImageAttachment && (
                               <a
                                 href={msg.attachment_url}
                                 target="_blank"
