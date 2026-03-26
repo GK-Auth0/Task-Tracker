@@ -1,11 +1,14 @@
 import axios from "axios";
 import { AI_BASE_URL } from "../config/api";
 
+const aiApiKey = String(import.meta.env.VITE_AI_API_KEY || "").trim();
+
 const aiApi = axios.create({
   baseURL: AI_BASE_URL,
   timeout: 5000,
   headers: {
     "Content-Type": "application/json",
+    ...(aiApiKey ? { "X-API-Key": aiApiKey } : {}),
   },
 });
 
