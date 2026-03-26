@@ -2,6 +2,7 @@ services:
   - type: web
     name: task-tracker-ai
     env: python
+    rootDir: AI
     buildCommand: pip install -r requirements.txt
     startCommand: python assistant_server.py
     envVars:

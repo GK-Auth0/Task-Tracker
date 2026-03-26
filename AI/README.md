@@ -188,3 +188,6 @@ cd AI && python assistant_server.py
 - `AI_ENV=production`
 - `AI_ALLOWED_ORIGINS=https://your-frontend-domain`
 - `AI_API_KEY=<optional shared secret>`
+
+If you deploy from the repo root with a Render blueprint, set the service `rootDir` to `AI`.
+If `python assistant_server.py` is entered as the build command, Render will fail before the service starts.
