@@ -25,7 +25,7 @@ const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
   );
 
   return (
-    <aside className="w-full xl:w-80 border-l-0 xl:border-l border-t xl:border-t-0 border-slate-200 bg-slate-50 flex flex-col shrink-0 overflow-y-auto pb-24 xl:pb-6">
+    <aside className="w-full 2xl:w-80 border-l-0 2xl:border-l border-t 2xl:border-t-0 border-slate-200 bg-slate-50 flex flex-col shrink-0 overflow-y-auto pb-24 2xl:pb-6">
       <div className="p-4 sm:p-6 border-b border-slate-200">
         <h3 className="text-sm font-bold text-slate-900 mb-4">Quick Tasks</h3>
         <div className="relative">

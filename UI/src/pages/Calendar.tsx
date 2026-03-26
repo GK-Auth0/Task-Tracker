@@ -196,7 +196,7 @@ const Calendar: React.FC = () => {
   });
 
   return (
-    <div className="flex min-h-0 flex-col xl:flex-row">
+    <div className="flex min-h-0 flex-col 2xl:flex-row">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-10">
         <CalendarHeader
           calendarType={calendarType}

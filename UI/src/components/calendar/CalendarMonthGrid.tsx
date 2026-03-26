@@ -102,22 +102,23 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
         </div>
       </div>
 
-      <div className="hidden overflow-x-auto sm:block">
-        <div className="min-w-[640px] lg:min-w-0">
+      <div className="hidden sm:block">
+        <div className="w-full">
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
               <div
                 key={day}
-                className="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider"
+                className="px-1 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500 lg:text-xs"
               >
-                {day}
+                <span className="md:hidden">{day.slice(0, 1)}</span>
+                <span className="hidden md:inline">{day}</span>
               </div>
             ))}
           </div>
 
           <div
             className="grid grid-cols-7 divide-x divide-y divide-slate-200"
-            style={{ gridAutoRows: "minmax(72px, 1fr)" }}
+            style={{ gridAutoRows: "minmax(88px, 1fr)" }}
           >
             {days.map((day, index) => {
               const dayTasks = onGetTasksForDate(day.date);
@@ -126,7 +127,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
               return (
                 <div
                   key={index}
-                  className={`p-2 ${
+                  className={`min-w-0 p-1.5 lg:p-2 ${
                     day.isCurrentMonth
                       ? isCurrentDay
                         ? "bg-blue-50 ring-1 ring-inset ring-blue-600"
@@ -135,7 +136,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                   }`}
                 >
                   <div
-                    className={`text-right text-xs sm:text-sm font-bold ${
+                    className={`text-right text-[11px] font-bold sm:text-xs lg:text-sm ${
                       day.isCurrentMonth
                         ? isCurrentDay
                           ? "text-blue-600"
@@ -144,7 +145,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                     }`}
                   >
                     {isCurrentDay ? (
-                      <span className="bg-blue-600 text-white size-6 inline-flex items-center justify-center rounded-full -mr-1">
+                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-blue-600 text-[11px] text-white sm:size-6 sm:text-xs lg:text-sm -mr-1">
                         {day.date.getDate()}
                       </span>
                     ) : (
@@ -159,7 +160,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                         return (
                           <div
                             key={task.id}
-                            className={`${TASK_COLOR_CLASSES[taskColor as keyof typeof TASK_COLOR_CLASSES] || TASK_COLOR_CLASSES.blue} text-[11px] px-2 py-1 rounded border-l-2 font-medium truncate cursor-pointer hover:opacity-80`}
+                            className={`${TASK_COLOR_CLASSES[taskColor as keyof typeof TASK_COLOR_CLASSES] || TASK_COLOR_CLASSES.blue} cursor-pointer truncate rounded border-l-2 px-1.5 py-1 text-[10px] font-medium hover:opacity-80 lg:px-2 lg:text-[11px]`}
                             title={
                               calendarType === "team" && task.assignee
                                 ? `${task.assignee.full_name}: ${task.title}`
@@ -173,7 +174,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                         );
                       })}
                       {dayTasks.length > 2 && (
-                        <div className="text-[10px] text-slate-500 font-medium">
+                        <div className="text-[10px] font-medium text-slate-500">
                           +{dayTasks.length - 2} more
                         </div>
                       )}
