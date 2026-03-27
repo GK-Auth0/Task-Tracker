@@ -61,7 +61,7 @@ export default class Cron extends Model {
     @UpdatedAt
     updatedAt?: Date;
 
-    @BelongsTo(() => Cron_type, "cron_type")
+    @BelongsTo(() => Cron_type, "type_id")
     cron_type!: Cron_type;
 
 }

@@ -6,7 +6,10 @@ import {
     PrimaryKey,
     Table,
     Model,
-    ForeignKey
+    ForeignKey,
+    CreatedAt,
+    UpdatedAt,
+    BelongsTo
 } from "sequelize-typescript"
 import Cron from "./crons"
 
@@ -23,7 +26,7 @@ export enum cron_executions_status {
     timestamps: true,
 })
 
-export default class cron_execution extends Model {
+export default class Cron_execution extends Model {
     @PrimaryKey
     @Default(DataType.UUIDV4)
     @Column({ type: DataType.UUIDV4, allowNull: false })
@@ -47,9 +50,23 @@ export default class cron_execution extends Model {
     @Column({ type: DataType.NUMBER, allowNull: false })
     retry_count!: Number
 
-    
+    @Column({ type: DataType.DATE, allowNull: false })
+    started_at!: Date
 
+    @Column({ type: DataType.DATE, allowNull: false })
+    ended_at!: Date
 
+    @Column({ type: DataType.TEXT })
+    error_message!: string
+
+    @CreatedAt
+    created_at!: Date
+
+    @UpdatedAt
+    updatedAt!: Date
+
+    @BelongsTo(() => Cron, "cron_id")
+    cron!: Cron
 
 }
 
