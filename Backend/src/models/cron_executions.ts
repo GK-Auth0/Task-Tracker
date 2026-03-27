@@ -10,9 +10,12 @@ import {
 } from "sequelize-typescript"
 import Cron from "./crons"
 
-export enum cron_executions {
+export enum cron_executions_status {
+    PENDING = "pending",
+    RUNNING = "running",
     SUCCESS = "success",
-    FAILED = "failed"
+    FAILED = "failed",
+    RETRYING = "retrying"
 }
 
 @Table({
@@ -33,9 +36,18 @@ export default class cron_execution extends Model {
     })
     cron_id!: string
 
+    @Default(cron_executions_status.PENDING)
+    @Column({
+        type: DataType.ENUM(...Object.values(cron_executions_status)),
+        allowNull: false,
+    })
+    status!: cron_executions_status
+
     @Default(0)
-    @Column({type:DataType.NUMBER,allowNull:false})
-    retry_count!:Number
+    @Column({ type: DataType.NUMBER, allowNull: false })
+    retry_count!: Number
+
+    
 
 
 
