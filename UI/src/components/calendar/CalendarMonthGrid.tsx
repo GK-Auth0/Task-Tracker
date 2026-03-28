@@ -22,7 +22,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
   const mobileDays = days.filter((day) => day.isCurrentMonth);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex-1 flex flex-col min-h-[420px] sm:min-h-[520px]">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col min-h-[380px] sm:min-h-[460px]">
       <div className="sm:hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
@@ -118,7 +118,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
 
           <div
             className="grid grid-cols-7 divide-x divide-y divide-slate-200"
-            style={{ gridAutoRows: "minmax(88px, 1fr)" }}
+            style={{ gridAutoRows: "minmax(84px, auto)" }}
           >
             {days.map((day, index) => {
               const dayTasks = onGetTasksForDate(day.date);
@@ -127,7 +127,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
               return (
                 <div
                   key={index}
-                  className={`min-w-0 p-1.5 lg:p-2 ${
+                  className={`min-w-0 p-1 lg:p-1.5 ${
                     day.isCurrentMonth
                       ? isCurrentDay
                         ? "bg-blue-50 ring-1 ring-inset ring-blue-600"
@@ -154,13 +154,13 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                   </div>
 
                   {!loading && dayTasks.length > 0 && (
-                    <div className="mt-2 space-y-1">
+                    <div className="mt-1.5 space-y-1">
                       {dayTasks.slice(0, 2).map((task) => {
                         const taskColor = onGetTaskColor(task);
                         return (
                           <div
                             key={task.id}
-                            className={`${TASK_COLOR_CLASSES[taskColor as keyof typeof TASK_COLOR_CLASSES] || TASK_COLOR_CLASSES.blue} cursor-pointer truncate rounded border-l-2 px-1.5 py-1 text-[10px] font-medium hover:opacity-80 lg:px-2 lg:text-[11px]`}
+                            className={`${TASK_COLOR_CLASSES[taskColor as keyof typeof TASK_COLOR_CLASSES] || TASK_COLOR_CLASSES.blue} cursor-pointer truncate rounded border-l-2 px-1.5 py-0.5 text-[10px] font-medium hover:opacity-80 lg:px-2`}
                             title={
                               calendarType === "team" && task.assignee
                                 ? `${task.assignee.full_name}: ${task.title}`
