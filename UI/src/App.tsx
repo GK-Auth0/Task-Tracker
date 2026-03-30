@@ -12,6 +12,16 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Profile from "./pages/Profile";
 import Calendar from "./pages/Calendar";
+import TestCases from "./pages/TestCases";
+import CreateTestCase from "./pages/CreateTestCase";
+import SprintBoards from "./pages/SprintBoards";
+import TestPlans from "./pages/TestPlans";
+import TestRuns from "./pages/TestRuns";
+import TestReports from "./pages/TestReports";
+import TestTraceability from "./pages/TestTraceability";
+import TestDefects from "./pages/TestDefects";
+import RaiseDefect from "./pages/RaiseDefect";
+import Analytics from "./pages/Analytics";
 import ActivityLog from "./pages/ActivityLog";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
@@ -154,6 +164,18 @@ function AppRoutes() {
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="calendar" element={<Calendar />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="sprint-board" element={<SprintBoards />} />
+        <Route path="test-cases" element={<TestCases />} />
+        <Route path="test-cases/create" element={<CreateTestCase />} />
+        <Route path="sprint-dev-board" element={<Navigate to="/sprint-board" replace />} />
+        <Route path="sprint-qa-board" element={<Navigate to="/sprint-board" replace />} />
+        <Route path="test-plans" element={<TestPlans />} />
+        <Route path="test-runs" element={<TestRuns />} />
+        <Route path="test-traceability" element={<TestTraceability />} />
+        <Route path="test-defects" element={<TestDefects />} />
+        <Route path="test-defects/raise" element={<RaiseDefect />} />
+        <Route path="test-reports" element={<TestReports />} />
         <Route path="activity" element={<ActivityLog />} />
         <Route path="chat" element={<Chat />} />
         <Route path="ai-monitoring" element={<AiMonitoring />} />

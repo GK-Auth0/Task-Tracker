@@ -26,6 +26,10 @@ const NAV_ITEMS: NavItem[] = [
   { path: "/tasks", title: "Tasks", icon: "check_box" },
   { path: "/projects", title: "Projects", icon: "folder_open" },
   { path: "/calendar", title: "Calendar", icon: "calendar_month" },
+  { path: "/analytics", title: "Analytics", icon: "analytics" },
+  { path: "/sprint-board", title: "Sprint Boards", icon: "view_kanban" },
+  { path: "/test-cases", title: "Test Cases", icon: "fact_check" },
+  { path: "/test-defects", title: "Defects", icon: "bug_report" },
   { path: "/activity", title: "Activity Log", icon: "list_alt" },
   { path: "/chat", title: "Chat", icon: "chat_bubble" },
   { path: "/ai-monitoring", title: "AI Monitoring", icon: "monitoring" },
@@ -48,7 +52,7 @@ export default function Sidebar({
     item.minRole ? hasMinimumWorkspaceRole(user?.role, item.minRole) : true,
   );
 
-  const isActive = (path: string, title: string) => {
+  const isActive = (path: string) => {
     return location.pathname === path;
   };
 
@@ -144,9 +148,9 @@ export default function Sidebar({
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                   isCollapsed ? "justify-center" : ""
                 } ${
-                  isActive(item.path, item.title)
-                    ? "bg-blue-600/10 text-blue-600"
-                    : "text-slate-600 hover:bg-slate-50"
+                    isActive(item.path)
+                      ? "bg-blue-600/10 text-blue-600"
+                      : "text-slate-600 hover:bg-slate-50"
                 }`}
                 to={item.path}
                 title={item.title}
@@ -157,7 +161,7 @@ export default function Sidebar({
                 <span
                   className="material-symbols-outlined"
                   style={{
-                    fontVariationSettings: isActive(item.path, item.title)
+                    fontVariationSettings: isActive(item.path)
                       ? "'FILL' 1"
                       : "'FILL' 0",
                   }}
@@ -167,7 +171,7 @@ export default function Sidebar({
                 {!isCollapsed && (
                   <p
                     className={`text-sm ${
-                      isActive(item.path, item.title)
+                      isActive(item.path)
                         ? "font-semibold"
                         : "font-medium"
                     }`}

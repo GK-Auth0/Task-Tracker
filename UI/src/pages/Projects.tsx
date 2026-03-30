@@ -246,24 +246,11 @@ const Projects: React.FC = () => {
         <ProjectsFilters
           searchTerm={searchTerm}
           statusFilter={statusFilter}
+          showPinnedOnly={showPinnedOnly}
           onSearchChange={setSearchTerm}
           onStatusChange={setStatusFilter}
+          onTogglePinnedOnly={() => setShowPinnedOnly((previous) => !previous)}
         />
-        <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            className={`h-9 rounded-lg border px-3 text-sm font-semibold ${
-              showPinnedOnly
-                ? "border-amber-400 bg-amber-50 text-amber-800"
-                : "border-slate-300 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowPinnedOnly((previous) => !previous)}
-          >
-            {showPinnedOnly
-              ? "Showing Pinned Projects"
-              : "Show Pinned Projects Only"}
-          </button>
-        </div>
 
         <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

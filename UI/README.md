@@ -31,6 +31,7 @@ Update `.env` with your configuration:
 VITE_API_BASE_URL=http://localhost:3000
 VITE_WS_BASE_URL=ws://localhost:3000
 VITE_AI_ASSISTANT_URL=http://127.0.0.1:8787
+VITE_AI_API_KEY=
 ```
 
 ### 3. Start Development Server

@@ -23,7 +23,7 @@ export default class Comment extends Model {
 
   @ForeignKey(() => Task)
   @Column({
-    type: DataType.UUID,
+    type: DataType.UUIDV4,
     allowNull: false,
   })
   task_id!: string;

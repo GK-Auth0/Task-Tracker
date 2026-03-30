@@ -27,23 +27,32 @@ export const createTaskSchema = {
   },
   priority: {
     optional: true,
-    customSanitizer: {
-      options: (value: unknown) => {
-        if (value === null || value === undefined) return value;
-        const normalized = String(value).trim().toLowerCase();
-        if (normalized === "low") return "Low";
-        if (normalized === "medium") return "Medium";
-        if (normalized === "high") return "High";
-        return value;
-      },
-    },
+
+    // 1. Validate first (strict check)
     custom: {
       options: (value: unknown) => {
-        if (value === null || value === undefined) return true;
-        const normalized = String(value).trim().toLowerCase();
-        return ["low", "medium", "high"].includes(normalized);
+        if (value == null) return true;
+
+        return ["Low", "Medium", "High"].includes(String(value));
       },
       errorMessage: "Priority must be one of: Low, Medium, High",
+    },
+
+    // 2. Sanitize (normalize input)
+    customSanitizer: {
+      options: (value: unknown) => {
+        if (value == null) return value;
+
+        const normalized = String(value).trim().toLowerCase();
+
+        const map: Record<string, string> = {
+          low: "Low",
+          medium: "Medium",
+          high: "High",
+        };
+
+        return map[normalized] ?? value;
+      },
     },
   },
   project_id: {
@@ -116,23 +125,32 @@ export const updateTaskSchema = {
   },
   priority: {
     optional: true,
-    customSanitizer: {
-      options: (value: unknown) => {
-        if (value === null || value === undefined) return value;
-        const normalized = String(value).trim().toLowerCase();
-        if (normalized === "low") return "Low";
-        if (normalized === "medium") return "Medium";
-        if (normalized === "high") return "High";
-        return value;
-      },
-    },
+
+    // 1. Validate first (strict check)
     custom: {
       options: (value: unknown) => {
-        if (value === null || value === undefined) return true;
-        const normalized = String(value).trim().toLowerCase();
-        return ["low", "medium", "high"].includes(normalized);
+        if (value == null) return true;
+
+        return ["Low", "Medium", "High"].includes(String(value));
       },
       errorMessage: "Priority must be one of: Low, Medium, High",
+    },
+
+    // 2. Sanitize (normalize input)
+    customSanitizer: {
+      options: (value: unknown) => {
+        if (value == null) return value;
+
+        const normalized = String(value).trim().toLowerCase();
+
+        const map: Record<string, string> = {
+          low: "Low",
+          medium: "Medium",
+          high: "High",
+        };
+
+        return map[normalized] ?? value;
+      },
     },
   },
   assignee_id: {

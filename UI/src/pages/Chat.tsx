@@ -11,6 +11,30 @@ type SearchPerson = {
   avatar_url?: string;
 };
 
+const isImageAttachment = (attachmentUrl?: string, attachmentName?: string) => {
+  const source = String(attachmentName || attachmentUrl || "").toLowerCase();
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?|#|$)/i.test(source);
+};
+
+const EMOJI_OPTIONS = [
+  "😀",
+  "😂",
+  "😍",
+  "😎",
+  "🤝",
+  "🙏",
+  "👍",
+  "🎉",
+  "🔥",
+  "✅",
+  "🚀",
+  "💡",
+  "📌",
+  "📎",
+  "👀",
+  "💬",
+];
+
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -40,13 +64,18 @@ const Chat: React.FC = () => {
     attachment_url: string;
     attachment_name: string;
   } | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const [userSearchResults, setUserSearchResults] = useState<SearchPerson[]>([]);
-  const [showMobileSidebar, setShowMobileSidebar] = useState(true);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : true,
+  );
   const [unreadByGroup, setUnreadByGroup] = useState<Record<string, number>>({});
 
   const selectedGroupRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const subscribedGroupIdsRef = useRef<Set<string>>(new Set());
 
   const directChats = useMemo(
@@ -268,6 +297,46 @@ const Chat: React.FC = () => {
     });
   }, [chatGroups, ws]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const syncLayout = (matches: boolean) => {
+      setShowMobileSidebar(matches ? true : !selectedGroupRef.current);
+    };
+
+    syncLayout(mediaQuery.matches);
+
+    const handleMediaChange = (event: MediaQueryListEvent) => {
+      syncLayout(event.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleMediaChange);
+    return () => mediaQuery.removeEventListener("change", handleMediaChange);
+  }, []);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (emojiPickerRef.current?.contains(target)) return;
+      if (target.closest("[data-emoji-toggle]")) return;
+      setShowEmojiPicker(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [showEmojiPicker]);
+
   const fetchChatGroups = async () => {
     try {
       setLoading(true);
@@ -353,6 +422,7 @@ const Chat: React.FC = () => {
         });
         setMessage("");
         setPendingAttachment(null);
+        setShowEmojiPicker(false);
       }
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -427,12 +497,36 @@ const Chat: React.FC = () => {
 
   const onSelectConversation = (groupId: string) => {
     setSelectedGroup(groupId);
-    if (window.innerWidth < 1024) {
+    setShowEmojiPicker(false);
+    if (window.innerWidth < 768) {
       setShowMobileSidebar(false);
     }
   };
 
   const openSidebarMobile = () => setShowMobileSidebar(true);
+
+  const insertEmoji = (emoji: string) => {
+    const input = messageInputRef.current;
+    if (!input) {
+      setMessage((prev) => `${prev}${emoji}`);
+      setShowEmojiPicker(false);
+      return;
+    }
+
+    const selectionStart = input.selectionStart ?? message.length;
+    const selectionEnd = input.selectionEnd ?? message.length;
+    const nextMessage =
+      message.slice(0, selectionStart) + emoji + message.slice(selectionEnd);
+
+    setMessage(nextMessage);
+    setShowEmojiPicker(false);
+
+    requestAnimationFrame(() => {
+      const nextCursor = selectionStart + emoji.length;
+      input.focus();
+      input.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
 
   const directSearchResults = useMemo(() => {
     if (activeTab !== "direct") return [];
@@ -441,12 +535,13 @@ const Chat: React.FC = () => {
   }, [activeTab, userSearchResults, directChats, user?.id]);
 
   return (
-    <div className="relative h-full overflow-hidden bg-slate-100 lg:flex">
+    <div className="relative flex h-full min-h-0 flex-1 overflow-hidden bg-slate-100 md:flex-row">
       <aside
         className={`
           ${showMobileSidebar ? "flex" : "hidden"}
           absolute inset-0 z-20 w-full flex-col border-r border-slate-200 bg-white/95 backdrop-blur-sm
-          lg:relative lg:z-0 lg:flex lg:w-[360px] lg:bg-white lg:backdrop-blur-none
+          md:relative md:z-0 md:flex md:w-[320px] md:bg-white md:backdrop-blur-none
+          lg:w-[360px]
         `}
       >
         <div className="border-b border-slate-200 px-4 py-4">
@@ -728,15 +823,16 @@ const Chat: React.FC = () => {
         className={`
           ${showMobileSidebar ? "hidden" : "flex"}
           min-w-0 flex-1 flex-col overflow-hidden bg-white lg:flex
+          md:flex
         `}
       >
         {selectedChat ? (
           <>
-            <header className="flex h-16 items-center justify-between border-b border-slate-200 px-4 lg:px-6">
+            <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 md:flex-nowrap md:px-5 lg:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
-                  className="rounded-md p-1 text-slate-600 hover:bg-slate-100 lg:hidden"
+                  className="rounded-md p-1 text-slate-600 hover:bg-slate-100 md:hidden"
                   onClick={openSidebarMobile}
                 >
                   <span className="material-symbols-outlined">arrow_back</span>
@@ -786,7 +882,7 @@ const Chat: React.FC = () => {
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4 md:px-5 lg:px-6 lg:py-6">
               <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
                 {hasMoreMessages && messages.length > 0 && (
                   <div className="flex justify-center">
@@ -812,14 +908,29 @@ const Chat: React.FC = () => {
                 ) : (
                   messages.map((msg) => {
                     const isCurrentUser = msg.user_id === user?.id;
+                    const hasImageAttachment = isImageAttachment(
+                      msg.attachment_url,
+                      msg.attachment_name,
+                    );
                     return (
-                      <div key={msg.id} className={`flex gap-3 lg:gap-4 ${isCurrentUser ? "flex-row-reverse" : ""}`}>
+                      <div
+                        key={msg.id}
+                        className={`flex gap-2.5 sm:gap-3 lg:gap-4 ${isCurrentUser ? "flex-row-reverse" : ""}`}
+                      >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white lg:h-10 lg:w-10">
                           {msg.user?.full_name?.charAt(0).toUpperCase() || "U"}
                         </div>
 
-                        <div className={`min-w-0 max-w-[85%] ${isCurrentUser ? "items-end" : "items-start"} flex flex-col`}>
-                          <div className={`mb-1 flex items-baseline gap-2 ${isCurrentUser ? "flex-row-reverse" : ""}`}>
+                        <div
+                          className={`flex max-w-[calc(100vw-5.5rem)] min-w-0 flex-col sm:max-w-[85%] ${
+                            isCurrentUser ? "items-end" : "items-start"
+                          }`}
+                        >
+                          <div
+                            className={`mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 ${
+                              isCurrentUser ? "flex-row-reverse" : ""
+                            }`}
+                          >
                             <span className="text-sm font-bold text-slate-900">
                               {isCurrentUser ? "You" : msg.user?.full_name || "Unknown User"}
                             </span>
@@ -838,8 +949,18 @@ const Chat: React.FC = () => {
                                 : "rounded-tl-md bg-slate-100 text-slate-900"
                             }`}
                           >
-                            {msg.content}
-                            {msg.attachment_url && (
+                            {msg.content && <p>{msg.content}</p>}
+                            {msg.attachment_url && hasImageAttachment && (
+                              <div className={msg.content ? "mt-3" : ""}>
+                                <img
+                                  src={msg.attachment_url}
+                                  alt={msg.attachment_name || "Shared image"}
+                                  className="max-h-[320px] w-full max-w-[220px] rounded-xl object-cover sm:max-w-[340px] lg:max-w-[420px]"
+                                  loading="lazy"
+                                />
+                              </div>
+                            )}
+                            {msg.attachment_url && !hasImageAttachment && (
                               <a
                                 href={msg.attachment_url}
                                 target="_blank"
@@ -865,7 +986,7 @@ const Chat: React.FC = () => {
               </div>
             </div>
 
-            <footer className="border-t border-slate-200 bg-white px-4 py-3 lg:px-6 lg:py-4">
+            <footer className="border-t border-slate-200 bg-white px-3 py-3 sm:px-4 md:px-5 lg:px-6 lg:py-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -873,7 +994,7 @@ const Chat: React.FC = () => {
                 onChange={handleAttachmentSelected}
               />
 
-              <div className="mx-auto w-full max-w-4xl rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <div className="relative mx-auto w-full max-w-4xl rounded-xl border border-slate-200 bg-slate-50 p-2">
                 {(pendingAttachment || uploadingAttachment) && (
                   <div className="px-2 pb-1 pt-1">
                     <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
@@ -899,6 +1020,7 @@ const Chat: React.FC = () => {
                 )}
 
                 <textarea
+                  ref={messageInputRef}
                   className="min-h-[56px] w-full resize-none border-none bg-transparent px-3 pt-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none"
                   placeholder={`Message ${selectedChat.name}...`}
                   value={message}
@@ -906,9 +1028,36 @@ const Chat: React.FC = () => {
                   onKeyDown={handleKeyPress}
                 />
 
-                <div className="flex items-center justify-between px-2 pb-1">
+                {showEmojiPicker && (
+                  <div
+                    ref={emojiPickerRef}
+                    className="absolute bottom-[calc(100%+0.5rem)] left-2 right-2 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl sm:left-auto sm:right-2 sm:w-72"
+                  >
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Insert emoji
+                    </p>
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-4">
+                      {EMOJI_OPTIONS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xl transition hover:border-blue-200 hover:bg-blue-50"
+                          onClick={() => insertEmoji(emoji)}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-1">
                   <div className="flex items-center gap-1 text-slate-500">
-                    <button type="button" className="rounded p-1.5 transition-colors hover:bg-slate-200">
+                    <button
+                      type="button"
+                      className="rounded p-1.5 transition-colors hover:bg-slate-200"
+                      title="Formatting coming soon"
+                    >
                       <span className="material-symbols-outlined text-xl">format_bold</span>
                     </button>
                     <button
@@ -919,7 +1068,15 @@ const Chat: React.FC = () => {
                     >
                       <span className="material-symbols-outlined text-xl">attach_file</span>
                     </button>
-                    <button type="button" className="rounded p-1.5 transition-colors hover:bg-slate-200">
+                    <button
+                      type="button"
+                      data-emoji-toggle
+                      className={`rounded p-1.5 transition-colors hover:bg-slate-200 ${
+                        showEmojiPicker ? "bg-slate-200 text-blue-600" : ""
+                      }`}
+                      onClick={() => setShowEmojiPicker((prev) => !prev)}
+                      title="Insert emoji"
+                    >
                       <span className="material-symbols-outlined text-xl">mood</span>
                     </button>
                   </div>
@@ -928,7 +1085,7 @@ const Chat: React.FC = () => {
                     type="button"
                     onClick={handleSendMessage}
                     disabled={(!message.trim() && !pendingAttachment) || uploadingAttachment || !selectedGroup}
-                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     <span>Send</span>
                     <span className="material-symbols-outlined text-sm">send</span>
@@ -948,7 +1105,7 @@ const Chat: React.FC = () => {
             </p>
             <button
               type="button"
-              className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 lg:hidden"
+              className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:hidden"
               onClick={openSidebarMobile}
             >
               Open chat list
