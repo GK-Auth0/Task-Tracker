@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import StaticDataBanner from "../components/StaticDataBanner";
+import SprintTabs from "../components/sprint/SprintTabs";
+import TestCaseSummaryStrip from "../components/testcases/TestCaseSummaryStrip";
+import WorkspacePageHeader from "../components/WorkspacePageHeader";
 import {
   TEST_CASES,
   TEST_FOLDERS,
@@ -12,6 +14,8 @@ import {
   type TestCaseStatus,
 } from "../data/testManagement";
 
+type DetailTab = "overview" | "steps" | "links" | "history";
+
 export default function TestCases() {
   const navigate = useNavigate();
   const [selectedCaseId, setSelectedCaseId] = useState(TEST_CASES[0].id);
@@ -20,6 +24,7 @@ export default function TestCases() {
   const [automationFilter, setAutomationFilter] = useState<
     "All" | TestAutomation
   >("All");
+  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
 
   const filteredCases = useMemo(() => {
     return TEST_CASES.filter((testCase) => {
@@ -46,40 +51,58 @@ export default function TestCases() {
   const automatedCount = TEST_CASES.filter(
     (item) => item.automation === "Automated",
   ).length;
+  const summaryItems = [
+    {
+      label: "Total cases",
+      value: TEST_CASES.length,
+      note: "Across all available suites",
+      icon: "fact_check",
+    },
+    {
+      label: "Ready to run",
+      value: readyCount,
+      note: "Prepared for this release cycle",
+      icon: "verified",
+    },
+    {
+      label: "Failed recently",
+      value: failedCount,
+      note: "Needs follow-up from QA or engineering",
+      icon: "warning",
+    },
+    {
+      label: "Automated coverage",
+      value: `${Math.round((automatedCount / TEST_CASES.length) * 100)}%`,
+      note: "Cases already covered by automation",
+      icon: "smart_toy",
+    },
+  ];
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="min-h-full p-4 sm:p-6 lg:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
-              Quality
-            </p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2">
-              Test Cases
-            </h1>
-            <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-              Manage reusable test cases, execution history, and linked issues in
-              a layout that stays consistent with the rest of the workspace.
-            </p>
-          </div>
-          <div className="flex flex-col items-start gap-3 sm:items-end">
-            <StaticDataBanner />
+        <WorkspacePageHeader
+          eyebrow="Quality"
+          title="Test Cases"
+          description="Manage reusable cases with smaller, clearer sections and a tabbed detail view that matches the cleaner sprint workspace."
+          metaLabel="Active cycle"
+          metaValue="Sprint 24 Regression"
+          actions={
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => navigate("/test-cases/create")}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700"
               >
                 <span className="material-symbols-outlined text-lg">add_task</span>
                 <span>New Test Case</span>
               </button>
-              <button className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+              <button className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">
                 <span className="material-symbols-outlined text-lg">upload</span>
                 <span>Import</span>
               </button>
             </div>
-          </div>
-        </div>
+          }
+        />
 
         <div className="rounded-xl border border-slate-200 bg-white p-2 mb-6">
           <div className="flex flex-wrap gap-2">
@@ -104,56 +127,11 @@ export default function TestCases() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          {[
-            {
-              label: "Total cases",
-              value: TEST_CASES.length,
-              note: "Across all available suites",
-              icon: "fact_check",
-            },
-            {
-              label: "Ready to run",
-              value: readyCount,
-              note: "Prepared for this release cycle",
-              icon: "verified",
-            },
-            {
-              label: "Failed recently",
-              value: failedCount,
-              note: "Needs follow-up from QA or engineering",
-              icon: "warning",
-            },
-            {
-              label: "Automated coverage",
-              value: `${Math.round((automatedCount / TEST_CASES.length) * 100)}%`,
-              note: "Cases already covered by automation",
-              icon: "smart_toy",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-xl border border-slate-200 bg-white p-5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    {item.label}
-                  </p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-                    {item.value}
-                  </p>
-                </div>
-                <span className="material-symbols-outlined rounded-lg bg-blue-50 p-2 text-blue-600">
-                  {item.icon}
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">{item.note}</p>
-            </div>
-          ))}
+        <div className="mb-5">
+          <TestCaseSummaryStrip items={summaryItems} />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1.2fr)_minmax(320px,0.95fr)] gap-6">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[220px_minmax(0,1.2fr)_minmax(320px,0.95fr)]">
           <aside className="space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
@@ -172,7 +150,7 @@ export default function TestCases() {
                         : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <span className="flex items-center gap-3 text-sm font-medium">
+                    <span className="flex items-center gap-3 text-xs font-medium sm:text-sm">
                       <span className="material-symbols-outlined text-[18px]">
                         {folder.icon}
                       </span>
@@ -198,11 +176,11 @@ export default function TestCases() {
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
                   Sprint 24 Regression
                 </p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">68% complete</p>
+                <p className="mt-2 text-lg font-bold text-slate-900">68% complete</p>
                 <div className="mt-4 h-2 rounded-full bg-slate-200">
                   <div className="h-2 w-[68%] rounded-full bg-blue-600" />
                 </div>
-                <p className="mt-3 text-sm text-slate-500">
+                <p className="mt-3 text-xs leading-5 text-slate-500">
                   41 passed, 6 failed, 13 pending, 2 blocked
                 </p>
               </div>
@@ -280,7 +258,7 @@ export default function TestCases() {
                   >
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{testCase.id}</p>
-                      <p className="mt-1 text-xs text-slate-500">{testCase.module}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">{testCase.module}</p>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
@@ -318,10 +296,10 @@ export default function TestCases() {
 
                 {!filteredCases.length && (
                   <div className="px-6 py-12 text-center">
-                    <p className="text-base font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-slate-900">
                       No test cases match the current filters.
                     </p>
-                    <p className="mt-2 text-sm text-slate-500">
+                    <p className="mt-2 text-xs text-slate-500">
                       Try another status or search phrase to broaden the result.
                     </p>
                   </div>
@@ -339,7 +317,7 @@ export default function TestCases() {
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                         {selectedCase.id}
                       </p>
-                      <h2 className="mt-2 text-xl font-bold text-slate-900">
+                      <h2 className="mt-2 text-lg font-bold text-slate-900">
                         {selectedCase.title}
                       </h2>
                     </div>
@@ -372,6 +350,22 @@ export default function TestCases() {
                   </div>
 
                   <div className="mt-5">
+                    <SprintTabs
+                      items={[
+                        { key: "overview", label: "Overview" },
+                        { key: "steps", label: "Steps" },
+                        { key: "links", label: "Links" },
+                        { key: "history", label: "History" },
+                      ]}
+                      value={detailTab}
+                      onChange={(value) => setDetailTab(value as DetailTab)}
+                      compact
+                    />
+                  </div>
+                </div>
+
+                {detailTab === "overview" && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-5">
                     <h3 className="text-sm font-semibold text-slate-900">
                       Preconditions
                     </h3>
@@ -379,59 +373,55 @@ export default function TestCases() {
                       {selectedCase.preconditions.map((item) => (
                         <div
                           key={item}
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600"
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600"
                         >
                           {item}
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="rounded-xl border border-slate-200 bg-white p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-slate-900">Steps</h3>
-                    <p className="text-xs text-slate-500">
-                      Expected results aligned with each action
-                    </p>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {selectedCase.steps.map((step) => (
-                      <div
-                        key={step.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-                            {step.id}
-                          </div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {step.action}
-                          </p>
-                        </div>
-                        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
-                          <span className="font-semibold text-slate-800">
-                            Expected:
-                          </span>{" "}
-                          {step.expected}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-2">
+                {detailTab === "steps" && (
                   <div className="rounded-xl border border-slate-200 bg-white p-5">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Linked work items
-                    </h3>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-slate-900">Steps</h3>
+                      <p className="text-[11px] text-slate-500">Actions and expected results</p>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {selectedCase.steps.map((step) => (
+                        <div
+                          key={step.id}
+                          className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+                              {step.id}
+                            </div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {step.action}
+                            </p>
+                          </div>
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-600">
+                            <span className="font-semibold text-slate-800">Expected:</span>{" "}
+                            {step.expected}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detailTab === "links" && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-5">
+                    <h3 className="text-sm font-semibold text-slate-900">Linked work items</h3>
                     <div className="mt-4 space-y-3">
                       {selectedCase.linkedItems.map((item) => (
                         <div
                           key={item.id}
                           className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
                         >
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                             {item.type} • {item.id}
                           </p>
                           <p className="mt-1 text-sm font-medium text-slate-800">
@@ -441,11 +431,11 @@ export default function TestCases() {
                       ))}
                     </div>
                   </div>
+                )}
 
+                {detailTab === "history" && (
                   <div className="rounded-xl border border-slate-200 bg-white p-5">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Recent execution history
-                    </h3>
+                    <h3 className="text-sm font-semibold text-slate-900">Recent execution history</h3>
                     <div className="mt-4 space-y-3">
                       {selectedCase.executionHistory.map((item) => (
                         <div
@@ -457,7 +447,7 @@ export default function TestCases() {
                               <p className="text-sm font-semibold text-slate-900">
                                 {item.cycle}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500">
+                              <p className="mt-1 text-[11px] text-slate-500">
                                 {item.tester} • {item.executedAt}
                               </p>
                             </div>
@@ -467,19 +457,19 @@ export default function TestCases() {
                               {item.status}
                             </span>
                           </div>
-                          <p className="mt-3 text-sm text-slate-600">{item.note}</p>
+                          <p className="mt-3 text-xs leading-5 text-slate-600">{item.note}</p>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
+                )}
               </>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-                <p className="text-base font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-slate-900">
                   Select a test case to review details
                 </p>
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-xs text-slate-500">
                   The detail panel shows steps, linked items, and execution
                   history for the selected case.
                 </p>
