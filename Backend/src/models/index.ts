@@ -22,9 +22,10 @@ import UserSavedView from "./userSavedView";
 import UserInvitation from "./userInvitation";
 import ProjectConfidentialAccessRequest from "./projectConfidentialAccessRequest";
 import Invite from "./invite";
+import Organization from "./organization";
 
-const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite];
+const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization];
 
 export default models;
 
-export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite };
+export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization };

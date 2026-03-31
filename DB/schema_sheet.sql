@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS organization (
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     logo_url VARCHAR(500),
+    admin UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     capacity INTEGER NOT NULL DEFAULT 1 CHECK (capacity > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     industry VARCHAR(100),

@@ -19,6 +19,7 @@ Table organization {
   slug varchar(255) [not null, unique]
   description text
   logo_url varchar(500)
+  admin uuid [not null]
   capacity integer [not null, default: 1, note: 'Maximum active users allowed for the organization']
   status varchar(20) [not null, default: 'active', note: 'active, inactive']
   industry varchar(100)
@@ -351,6 +352,7 @@ Table cron_retries {
 
 Ref: users.organization_id > organization.id
 Ref: organization.created_by > users.id
+Ref: organization.admin > users.id
 Ref: projects.owner_id > users.id
 Ref: tasks.project_id > projects.id
 Ref: tasks.creator_id > users.id
