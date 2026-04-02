@@ -27,6 +27,21 @@ const logoCandidates = [
   path.join(process.cwd(), "public/favicon.png"),
 ];
 
+const getPublicBaseUrl = () => {
+  const configuredUrl =
+    process.env.BACKEND_PUBLIC_URL ||
+    process.env.API_BASE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    process.env.PUBLIC_URL;
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  const port = process.env.PORT || "3000";
+  return `http://localhost:${port}`;
+};
+
 const findDocsDirectory = () => {
   for (const directory of docsDirectories) {
     try {
@@ -65,6 +80,7 @@ const loadYamlDocument = (filePath: string): OpenApiDocument | null => {
 };
 
 const mergeDocuments = (documents: OpenApiDocument[]) => {
+  const publicBaseUrl = getPublicBaseUrl();
   const merged: OpenApiDocument = {
     openapi: "3.0.3",
     info: {
@@ -72,7 +88,12 @@ const mergeDocuments = (documents: OpenApiDocument[]) => {
       version: "1.0.0",
       description: "API documentation for the Task Tracker backend.",
     },
-    servers: [{ url: "http://localhost:3000", description: "Local server" }],
+    servers: [
+      {
+        url: publicBaseUrl,
+        description: publicBaseUrl.includes("localhost") ? "Local server" : "Public server",
+      },
+    ],
     tags: [],
     paths: {},
     components: {
