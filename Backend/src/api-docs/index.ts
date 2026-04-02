@@ -80,7 +80,6 @@ const loadYamlDocument = (filePath: string): OpenApiDocument | null => {
 };
 
 const mergeDocuments = (documents: OpenApiDocument[]) => {
-  const publicBaseUrl = getPublicBaseUrl();
   const merged: OpenApiDocument = {
     openapi: "3.0.3",
     info: {
@@ -90,8 +89,8 @@ const mergeDocuments = (documents: OpenApiDocument[]) => {
     },
     servers: [
       {
-        url: publicBaseUrl,
-        description: publicBaseUrl.includes("localhost") ? "Local server" : "Public server",
+        url: "/",
+        description: "Current server",
       },
     ],
     tags: [],
