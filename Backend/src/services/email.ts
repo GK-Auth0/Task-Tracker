@@ -474,9 +474,14 @@ const getSmtpTransporter = (options: {
   return smtpTransporter;
 };
 
-export const sendWelcomeEmail = async (to: string, temporaryPassword: string, fullName: string) => {
+export const sendWelcomeEmail = async (
+  to: string,
+  temporaryPassword: string,
+  fullName: string,
+  orgCode?: string,
+) => {
   const subject = "Welcome to TaskTracker - Your Account Details";
-  const html = buildWelcomeHtml(fullName, temporaryPassword, UI_APP_URL);
+  const html = buildWelcomeHtml(fullName, temporaryPassword, UI_APP_URL, orgCode);
 
   if (EMAIL_PROVIDER === "smtp") {
     if (!EMAIL_USER || !EMAIL_PASS) {

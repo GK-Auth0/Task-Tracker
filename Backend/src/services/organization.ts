@@ -1,4 +1,5 @@
-import { Organization } from "../models";
+import { Op } from "sequelize";
+import { Invite, Organization, User } from "../models";
 import {
   CreateOrganization,
   GetOrganizationsOptions,
@@ -16,6 +17,8 @@ const ORGANIZATION_ATTRIBUTES: string[] = [
 ];
 
 const MAX_SLUG_LENGTH = 255;
+const ORG_CODE_PREFIX = "TT";
+const ORG_CODE_DIGITS = 4;
 
 const normalizeSlug = (value: string) => {
   const normalizedValue = value
@@ -61,9 +64,37 @@ export async function generateOrganizationSlug(name: string) {
   }
 }
 
+const buildOrgCodeCandidate = (value: number) =>
+  `${ORG_CODE_PREFIX}${String(value).padStart(ORG_CODE_DIGITS, "0")}`;
+
+export async function generateOrganizationCode() {
+  const maxCodeValue = 10 ** ORG_CODE_DIGITS - 1;
+
+  for (let attempt = 0; attempt < maxCodeValue; attempt += 1) {
+    const candidate = buildOrgCodeCandidate(Math.floor(Math.random() * maxCodeValue) + 1);
+    const existingOrganization = await Organization.findOne({
+      where: { org_code: candidate },
+      attributes: ["id"],
+    });
+
+    if (!existingOrganization) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Unable to generate a unique organization code");
+}
+
 export async function getOrganization(id: string) {
   return Organization.findOne({
     where: { id },
+    attributes: ORGANIZATION_ATTRIBUTES,
+  });
+}
+
+export async function getOrganizationByCode(orgCode: string) {
+  return Organization.findOne({
+    where: { org_code: orgCode.trim().toUpperCase() },
     attributes: ORGANIZATION_ATTRIBUTES,
   });
 }
@@ -103,18 +134,95 @@ export async function createOrganization(
     throw new Error("created_by is required");
   }
 
+  const creator = await User.findByPk(createdBy, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!creator) {
+    throw new Error("Creator not found");
+  }
+
+  if (creator.organization_id) {
+    throw new Error("User is already linked to an organization");
+  }
+
   const slug = await generateOrganizationSlug(name);
+  const orgCode = await generateOrganizationCode();
 
   const organization = await Organization.create({
     ...dto,
     name,
+    org_code: orgCode,
     slug,
     admin,
     created_by: createdBy,
   });
 
+  creator.organization_id = organization.id;
+  await creator.save();
+
   return {
     statusCode: 201,
     data: await getOrganization(organization.id),
   };
+}
+
+export async function joinOrganizationByCode(userId: string, orgCode: string) {
+  const normalizedCode = orgCode.trim().toUpperCase();
+
+  if (!normalizedCode) {
+    throw new Error("Organization code is required");
+  }
+
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "email", "organization_id"],
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (user.organization_id) {
+    throw new Error("User is already linked to an organization");
+  }
+
+  const invite = await Invite.findOne({
+    where: {
+      org_code: normalizedCode,
+      status: "pending",
+      [Op.or]: [
+        { invitee_id: user.id },
+        { invitee_email: user.email },
+      ],
+    },
+    attributes: ["id", "inviter_id", "invitee_id", "expires_at"],
+  });
+
+  if (!invite) {
+    throw new Error("Invitation code not found for this user");
+  }
+
+  if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
+    await invite.update({ status: "expired" });
+    throw new Error("Invitation code has expired");
+  }
+
+  const inviter = await User.findByPk(invite.inviter_id, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!inviter?.organization_id) {
+    throw new Error("Inviter organization not found");
+  }
+
+  user.organization_id = inviter.organization_id;
+  await user.save();
+
+  await invite.update({
+    invitee_id: invite.invitee_id || user.id,
+    status: "accepted",
+    accepted_at: new Date(),
+  });
+
+  return getOrganization(inviter.organization_id);
 }

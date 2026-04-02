@@ -5,6 +5,7 @@ interface InviteCreationAttributes {
   inviter_id: string;
   invitee_email: string;
   invite_code: string;
+  org_code?: string;
   temporary_password?: string;
   expires_at?: Date;
 }
@@ -45,6 +46,12 @@ export default class Invite extends Model<Invite, InviteCreationAttributes> {
     unique: true,
   })
   invite_code!: string;
+
+  @Column({
+    type: DataType.STRING(12),
+    allowNull: true,
+  })
+  org_code?: string;
 
   @Column({
     type: DataType.STRING(255),

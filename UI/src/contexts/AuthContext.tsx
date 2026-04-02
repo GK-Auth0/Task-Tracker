@@ -6,17 +6,17 @@ import {
   ReactNode,
 } from "react";
 import { authAPI } from "../services/auth";
-import type { OtpChallenge } from "../services/auth";
+import type {
+  AuthenticatedUser,
+  OtpChallenge,
+  OrganizationSummary,
+} from "../services/auth";
 import {
   normalizeWorkspaceRole,
   type WorkspaceRole,
 } from "../types/roles";
-import RingLoader from "../components/RingLoader";
 
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
+interface User extends Omit<AuthenticatedUser, "role"> {
   role: WorkspaceRole;
 }
 
@@ -26,16 +26,17 @@ const normalizeUserRole = (role: unknown): WorkspaceRole =>
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithAuth0: (accessToken: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  loginWithAuth0: (accessToken: string) => Promise<User>;
   register: (
     email: string,
     password: string,
     firstName: string,
     lastName: string,
   ) => Promise<OtpChallenge>;
-  verifyOtp: (otpSessionId: string, otp: string) => Promise<void>;
+  verifyOtp: (otpSessionId: string, otp: string) => Promise<User>;
   resendOtp: (otpSessionId: string) => Promise<OtpChallenge>;
+  setOrganization: (organization: OrganizationSummary) => void;
   logout: () => void;
   loading: boolean;
 }
@@ -58,11 +59,17 @@ const defaultAuthContext: AuthContextType = {
   resendOtp: async () => {
     throw new Error("AuthProvider is not ready yet");
   },
+  setOrganization: () => {},
   logout: () => {},
   loading: true,
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext);
+
+const normalizeUser = (user: AuthenticatedUser): User => ({
+  ...user,
+  role: normalizeUserRole(user.role),
+});
 
 export const useAuth = () => {
   return useContext(AuthContext);
@@ -84,10 +91,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (token) {
         try {
           const response = await authAPI.getCurrentUser();
-          setUser({
-            ...response.data,
-            role: normalizeUserRole(response.data.role),
-          });
+          setUser(normalizeUser(response.data));
         } catch (error) {
           localStorage.removeItem("token");
           setToken(null);
@@ -99,7 +103,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     initAuth();
   }, [token]);
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string): Promise<User> => {
     const response = await authAPI.login({ email, password });
     const data: any = response.data;
 
@@ -114,18 +118,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       throw err;
     }
 
-    const { user, token } = data;
+    const authenticatedData = data as Extract<
+      typeof data,
+      { user: AuthenticatedUser; token: string }
+    >;
+    const { user, token } = authenticatedData;
     localStorage.setItem("token", token);
     setToken(token);
-    setUser({ ...user, role: normalizeUserRole(user.role) });
+    const normalizedUser = normalizeUser(user);
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
-  const loginWithAuth0 = async (accessToken: string): Promise<void> => {
+  const loginWithAuth0 = async (accessToken: string): Promise<User> => {
     const response = await authAPI.loginWithAuth0(accessToken);
-    const { user, token } = response.data;
+    const authenticatedData = response.data as Extract<
+      typeof response.data,
+      { user: AuthenticatedUser; token: string }
+    >;
+    const { user, token } = authenticatedData;
     localStorage.setItem("token", token);
     setToken(token);
-    setUser({ ...user, role: normalizeUserRole(user.role) });
+    const normalizedUser = normalizeUser(user);
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
   const register = async (
@@ -143,18 +159,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return response.data;
   };
 
-  const verifyOtp = async (otpSessionId: string, otp: string) => {
+  const verifyOtp = async (otpSessionId: string, otp: string): Promise<User> => {
     const response = await authAPI.verifyOtp(otpSessionId, otp);
-    const { user, token } = response.data;
+    const authenticatedData = response.data as Extract<
+      typeof response.data,
+      { user: AuthenticatedUser; token: string }
+    >;
+    const { user, token } = authenticatedData;
 
     localStorage.setItem("token", token);
     setToken(token);
-    setUser({ ...user, role: normalizeUserRole(user.role) });
+    const normalizedUser = normalizeUser(user);
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
   const resendOtp = async (otpSessionId: string): Promise<OtpChallenge> => {
     const response = await authAPI.resendOtp(otpSessionId);
     return response.data;
+  };
+
+  const setOrganization = (organization: OrganizationSummary) => {
+    setUser((currentUser) =>
+      currentUser
+        ? {
+            ...currentUser,
+            organization_id: organization.id,
+            organization,
+            onboardingRequired: false,
+          }
+        : currentUser,
+    );
   };
 
   const logout = () => {
@@ -171,6 +206,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     register,
     verifyOtp,
     resendOtp,
+    setOrganization,
     logout,
     loading,
   };

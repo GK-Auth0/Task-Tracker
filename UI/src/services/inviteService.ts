@@ -11,6 +11,7 @@ export interface Invite {
   invitee_email: string;
   invitee_id?: string;
   invite_code: string;
+  org_code?: string | null;
   status: 'pending' | 'accepted' | 'expired';
   sent_at: string;
   accepted_at?: string;
@@ -28,6 +29,7 @@ export interface Invite {
 
 export interface InviteDetails {
   inviteCode: string;
+  orgCode?: string | null;
   inviterName: string;
   inviteeEmail: string;
   status: string;
@@ -39,6 +41,7 @@ export const inviteAPI = {
     success: boolean;
     data?: {
       inviteCode: string;
+      orgCode?: string | null;
       email: string;
       role: string;
     };

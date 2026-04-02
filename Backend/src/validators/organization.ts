@@ -126,3 +126,16 @@ export const createOrganizationSchema = {
     },
   },
 };
+
+export const joinOrganizationByCodeSchema = {
+  org_code: {
+    notEmpty: {
+      errorMessage: "Organization code is required",
+    },
+    trim: true,
+    isLength: {
+      options: { min: 6, max: 12 },
+      errorMessage: "Organization code must be between 6 and 12 characters",
+    },
+  },
+};

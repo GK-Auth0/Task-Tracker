@@ -8,6 +8,7 @@ import { API_BASE_URL } from "../config/api";
 
 const Profile: React.FC = () => {
   const { user } = useAuth();
+  const organization = user?.organization;
   const [stats, setStats] = useState({
     tasksCompleted: 0,
     projectsLead: 0,
@@ -177,8 +178,9 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto h-screen overflow-auto flex flex-col gap-8 px-4 py-6 sm:px-6 lg:flex-row lg:px-10 lg:py-8">
-      <main className="flex-1 min-w-0">
+    <div className="max-w-[1680px] mx-auto min-h-screen overflow-auto flex flex-col gap-8 px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1.55fr)_360px]">
+      <main className="min-w-0">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-8 py-6 border-b border-slate-100">
             <h1 className="text-xl font-bold text-slate-900">User Summary</h1>
@@ -216,7 +218,7 @@ const Profile: React.FC = () => {
               <h3 className="text-sm font-semibold text-slate-900 mb-6 uppercase tracking-wider">
                 Personal Details
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-y-8 gap-x-10">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-slate-400 uppercase tracking-tight">
                     Full Name
@@ -291,6 +293,61 @@ const Profile: React.FC = () => {
                     Active
                   </span>
                 </div>
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                  Organization Details
+                </h3>
+                {organization?.status && (
+                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {organization.status}
+                  </span>
+                )}
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-y-6 gap-x-10">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-tight">
+                      Organization Name
+                    </span>
+                    <span className="text-base font-medium text-slate-900">
+                      {organization?.name || "Not linked yet"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-tight">
+                      Organization Code
+                    </span>
+                    <span className="text-base font-medium text-slate-900">
+                      {organization?.org_code || "Pending"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-tight">
+                      Workspace Slug
+                    </span>
+                    <span className="text-base font-medium text-slate-900">
+                      {organization?.slug || "Pending"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-tight">
+                      Access State
+                    </span>
+                    <span className="text-base font-medium text-slate-900">
+                      {organization ? "Organization linked" : "Awaiting organization setup"}
+                    </span>
+                  </div>
+                </div>
+                {!organization && (
+                  <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    This account is not linked to an organization yet. Complete onboarding with your
+                    personal invite code to finish workspace setup.
+                  </div>
+                )}
               </div>
             </section>
 
@@ -397,7 +454,7 @@ const Profile: React.FC = () => {
         </div>
       </main>
 
-      <aside className="w-full lg:w-80 shrink-0 space-y-6">
+      <aside className="w-full shrink-0 space-y-6">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-6">Quick Stats</h3>
           <div className="space-y-6">
@@ -450,6 +507,42 @@ const Profile: React.FC = () => {
             </div>
           </div>
         </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-5">Organization Snapshot</h3>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Organization
+              </p>
+              <p className="mt-1 text-base font-semibold text-slate-900">
+                {organization?.name || "No organization linked"}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-blue-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">
+                  Code
+                </p>
+                <p className="mt-1 text-sm font-bold text-slate-900">
+                  {organization?.org_code || "Pending"}
+                </p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">
+                  Status
+                </p>
+                <p className="mt-1 text-sm font-bold text-slate-900">
+                  {organization?.status || "Setup pending"}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm leading-6 text-slate-500">
+              {organization
+                ? "Your workspace access is active and connected to your current organization."
+                : "Link an organization during onboarding to unlock your full workspace access."}
+            </p>
+          </div>
+        </div>
         <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg">
           <h4 className="font-bold mb-2">Enterprise Plan</h4>
           <p className="text-blue-100 text-sm mb-4">
@@ -461,6 +554,7 @@ const Profile: React.FC = () => {
           </button>
         </div>
       </aside>
+      </div>
     </div>
   );
 };

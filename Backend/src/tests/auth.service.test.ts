@@ -42,6 +42,7 @@ jest.mock("../models", () => ({
     findByPk: jest.fn(),
     create: jest.fn(),
   },
+  Organization: {},
   UserMetadata: {
     create: jest.fn(),
   },
@@ -90,6 +91,7 @@ describe("auth service", () => {
   it("loginUser returns auth success when credentials are valid", async () => {
     const user = buildUser();
     mockedUser.findOne.mockResolvedValue(user as never);
+    mockedUser.findByPk.mockResolvedValue(user as never);
     mockedBcrypt.compare.mockResolvedValue(true as never);
     mockedAuthOtp.findAll.mockResolvedValue([] as never);
 
@@ -106,6 +108,8 @@ describe("auth service", () => {
         full_name: "John Doe",
         role: "Member",
         password_reset_required: false,
+        organization: null,
+        onboardingRequired: true,
       },
     });
   });
@@ -168,6 +172,8 @@ describe("auth service", () => {
       full_name: "John Doe",
       role: "Member",
       password_reset_required: false,
+      organization: null,
+      onboardingRequired: true,
     });
   });
 

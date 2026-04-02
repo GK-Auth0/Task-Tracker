@@ -75,6 +75,7 @@ export const buildWelcomeHtml = (
   fullName: string,
   temporaryPassword: string,
   appUrl: string,
+  orgCode?: string,
 ) => `
   <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
     <h2 style="margin: 0 0 12px;">Welcome to TaskTracker!</h2>
@@ -85,6 +86,12 @@ export const buildWelcomeHtml = (
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
       <p style="margin: 0 0 8px; font-weight: 600;">Temporary Password:</p>
       <p style="margin: 0; font-family: monospace; font-size: 16px; color: #2563eb; font-weight: 700;">${temporaryPassword}</p>
+      ${
+        orgCode
+          ? `<p style="margin: 16px 0 8px; font-weight: 600;">Your organization access code:</p>
+      <p style="margin: 0; font-family: monospace; font-size: 16px; color: #0f172a; font-weight: 700; letter-spacing: 2px;">${orgCode}</p>`
+          : ""
+      }
     </div>
     <p style="margin: 16px 0 12px; color: #dc2626; font-weight: 600;">
       ⚠️ Important: You must change this password on your first login for security.

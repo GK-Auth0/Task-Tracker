@@ -61,6 +61,25 @@ export interface AuthResponse {
   data: LoginResponseData;
 }
 
+export interface OrganizationSummary {
+  id: string;
+  name: string;
+  org_code: string;
+  slug: string;
+  status: string;
+  logo_url?: string;
+}
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  organization_id?: string | null;
+  organization: OrganizationSummary | null;
+  onboardingRequired: boolean;
+}
+
 export interface OtpChallenge {
   requiresOtp: true;
   otpSessionId: string;
@@ -78,12 +97,7 @@ export interface OtpChallengeResponse {
 
 export type LoginResponseData =
   | {
-      user: {
-        id: string;
-        email: string;
-        full_name: string;
-        role: string;
-      };
+      user: AuthenticatedUser;
       token: string;
     }
   | { requiresPasswordChange: true; email: string }

@@ -4,7 +4,7 @@ import { createHash, createPublicKey, randomBytes, randomInt, randomUUID } from 
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import { appConfig } from "../config/app";
-import { AuthOtp, AuthPasswordReset, User, UserMetadata } from "../models";
+import { AuthOtp, AuthPasswordReset, Organization, User, UserMetadata } from "../models";
 import type { LoginDto, RegisterDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
 import { sendOtpEmail, sendPasswordResetEmail, sendSignupWelcomeEmail } from "./email";
@@ -88,7 +88,20 @@ const getAuth0Config = () => {
 
 const getUserWithoutPassword = (user: User) => {
   const { password_hash, ...userWithoutPassword } = user.get({ plain: true });
-  return userWithoutPassword;
+  return {
+    ...userWithoutPassword,
+    organization: user.organization
+      ? {
+          id: user.organization.id,
+          name: user.organization.name,
+          org_code: user.organization.org_code,
+          slug: user.organization.slug,
+          status: user.organization.status,
+          logo_url: user.organization.logo_url,
+        }
+      : null,
+    onboardingRequired: !user.organization_id,
+  };
 };
 
 const issueJwtForUser = (user: User) => {
@@ -393,6 +406,25 @@ const buildAuthSuccessResult = (user: User): AuthSuccessResult => {
   };
 };
 
+const getAuthUserById = async (userId: string) => {
+  const user = await User.findByPk(userId, {
+    include: [
+      {
+        model: Organization,
+        as: "organization",
+        attributes: ["id", "name", "org_code", "slug", "status", "logo_url"],
+        required: false,
+      },
+    ],
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user;
+};
+
 const createOtpChallengeForUser = async (
   user: User,
   purpose: OtpPurpose,
@@ -562,7 +594,8 @@ export async function loginUser(
     return createOtpChallengeForUser(user, "register");
   }
 
-  return buildAuthSuccessResult(user);
+  const hydratedUser = await getAuthUserById(user.id);
+  return buildAuthSuccessResult(hydratedUser);
 }
 
 export async function loginWithAuth0AccessToken(
@@ -592,7 +625,8 @@ export async function loginWithAuth0AccessToken(
     });
   }
 
-  return buildAuthSuccessResult(user);
+  const hydratedUser = await getAuthUserById(user.id);
+  return buildAuthSuccessResult(hydratedUser);
 }
 
 export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
@@ -608,7 +642,8 @@ export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
     );
   }
 
-  return buildAuthSuccessResult(user);
+  const hydratedUser = await getAuthUserById(user.id);
+  return buildAuthSuccessResult(hydratedUser);
 }
 
 export async function resendOtp(sessionId: string): Promise<OtpChallengeResult> {
@@ -733,12 +768,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 }
 
 export async function getCurrentUser(userId: string) {
-  const user = await User.findByPk(userId);
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
+  const user = await getAuthUserById(userId);
   return getUserWithoutPassword(user);
 }
 

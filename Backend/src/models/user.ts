@@ -10,11 +10,14 @@ import {
   UpdatedAt,
   HasMany,
   HasOne,
+  ForeignKey,
+  BelongsTo,
 } from "sequelize-typescript";
 import { Project } from "./index";
 import { Task } from "./index";
 import { Comment } from "./index";
 import UserMetadata from "./userMetadata";
+import Organization from "./organization";
 
 @Table({
   tableName: "users",
@@ -72,6 +75,13 @@ export default class User extends Model {
   })
   is_invited_user!: boolean;
 
+  @ForeignKey(() => Organization)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  organization_id?: string;
+
   @CreatedAt
   created_at!: Date;
 
@@ -92,4 +102,7 @@ export default class User extends Model {
 
   @HasOne(() => UserMetadata, "user_id")
   metadata!: UserMetadata;
+
+  @BelongsTo(() => Organization, "organization_id")
+  organization?: Organization;
 }

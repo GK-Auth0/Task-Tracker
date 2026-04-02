@@ -46,6 +46,11 @@ export interface CreateOrganization {
   postal_code?: string;
 }
 
+export interface JoinOrganizationByCode {
+  user_id: string;
+  org_code: string;
+}
+
 export interface ServiceResponse<T> {
   statusCode: number;
   data: T;

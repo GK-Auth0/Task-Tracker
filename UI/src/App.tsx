@@ -40,6 +40,7 @@ import Settings from "./pages/Settings";
 import Help from "./pages/Help";
 import RingLoader from "./components/RingLoader";
 import { hasMinimumWorkspaceRole, type WorkspaceRole } from "./types/roles";
+import OrganizationOnboarding from "./pages/OrganizationOnboarding";
 
 const queryClient = new QueryClient();
 
@@ -54,7 +55,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!user.organization) {
+    return <Navigate to="/organization/onboarding" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -68,7 +77,33 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return user ? <Navigate to="/dashboard" /> : <>{children}</>;
+  if (!user) {
+    return <>{children}</>;
+  }
+
+  return <Navigate to={user.organization ? "/dashboard" : "/organization/onboarding"} replace />;
+}
+
+function OrganizationOnboardingRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <RingLoader size="lg" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.organization) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function RoleProtectedRoute({
@@ -151,6 +186,14 @@ function AppRoutes() {
         }
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route
+        path="/organization/onboarding"
+        element={
+          <OrganizationOnboardingRoute>
+            <OrganizationOnboarding />
+          </OrganizationOnboardingRoute>
+        }
+      />
       <Route
         path="/"
         element={

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { handleValidationErrors } from "../helpers/validation";
-import { createOrganization } from "../services/organization";
+import { createOrganization, joinOrganizationByCode } from "../services/organization";
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -70,6 +70,44 @@ export const createOrg = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to create organization",
+      error: (error as Error).message,
+    });
+  }
+};
+
+export const joinOrgByCode = async (req: AuthenticatedRequest, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const orgCode = String(req.body.org_code || "").trim();
+
+    if (!orgCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization code is required",
+      });
+    }
+
+    const organization = await joinOrganizationByCode(userId, orgCode);
+
+    return res.status(200).json({
+      success: true,
+      message: "Organization joined successfully",
+      data: organization,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to join organization",
       error: (error as Error).message,
     });
   }

@@ -10,6 +10,7 @@ import aiRoutes from "./routes/ai";
 import preferencesRoutes from "./routes/preferences";
 import webhookRoutes from "./routes/webhook";
 import inviteRoutes from "./routes/invite";
+import organizationRoutes from "./routes/organization";
 
 const router = express.Router();
 
@@ -24,6 +25,7 @@ router.use("/api/ai", aiRoutes);
 router.use("/api/preferences", preferencesRoutes);
 router.use("/api/webhook", webhookRoutes);
 router.use("/api/invites", inviteRoutes);
+router.use("/api/organizations", organizationRoutes);
 
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {

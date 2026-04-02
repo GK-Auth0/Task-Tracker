@@ -1,10 +1,28 @@
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
-import { User, Invite } from '../models';
+import { User, Invite, Organization } from '../models';
 import { sendWelcomeEmail } from './email';
 
 const generateInviteCode = (): string => {
   return randomBytes(16).toString('hex');
+};
+
+const generateOrgAccessCode = (): string => {
+  return randomBytes(4).toString('hex').toUpperCase();
+};
+
+const createUniqueOrgAccessCode = async (): Promise<string> => {
+  while (true) {
+    const candidate = generateOrgAccessCode();
+    const existingInvite = await Invite.findOne({
+      where: { org_code: candidate },
+      attributes: ['id'],
+    });
+
+    if (!existingInvite) {
+      return candidate;
+    }
+  }
 };
 
 const generateTemporaryPassword = (): string => {
@@ -23,9 +41,22 @@ export const createInvite = async (
   role: 'Admin' | 'Member' | 'Viewer' = 'Member'
 ) => {
   // Check if inviter is admin
-  const inviter = await User.findByPk(inviterId);
+  const inviter = await User.findByPk(inviterId, {
+    include: [
+      {
+        model: Organization,
+        as: "organization",
+        attributes: ["id", "org_code"],
+        required: false,
+      },
+    ],
+  });
   if (!inviter || inviter.role !== 'Admin') {
     throw new Error('Only administrators can send invites');
+  }
+
+  if (!inviter.organization_id) {
+    throw new Error('Administrator must belong to an organization before inviting users');
   }
 
   // Check if user already exists
@@ -46,6 +77,7 @@ export const createInvite = async (
   }
 
   const inviteCode = generateInviteCode();
+  const orgAccessCode = await createUniqueOrgAccessCode();
   const temporaryPassword = generateTemporaryPassword();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -54,6 +86,7 @@ export const createInvite = async (
     inviter_id: inviterId,
     invitee_email: inviteeEmail,
     invite_code: inviteCode,
+    org_code: orgAccessCode,
     temporary_password: temporaryPassword,
     expires_at: expiresAt,
   });
@@ -67,10 +100,11 @@ export const createInvite = async (
     role: role,
     password_reset_required: true,
     is_invited_user: true,
+    organization_id: inviter.organization_id,
   });
 
   // Update invite with the created user ID
-  await invite.update({ invitee_id: newUser.id });
+  await invite.update({ invitee_id: newUser.id, org_code: orgAccessCode });
 
   // Send welcome email with temporary password
   try {
@@ -83,6 +117,7 @@ export const createInvite = async (
   return {
     invite,
     user: newUser,
+    orgCode: orgAccessCode,
     temporaryPassword, // Return for testing purposes
   };
 };

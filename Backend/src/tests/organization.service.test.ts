@@ -1,9 +1,10 @@
 import {
   createOrganization,
+  generateOrganizationCode,
   generateOrganizationSlug,
   getOrganizations,
 } from "../services/organization";
-import { Organization } from "../models";
+import { Organization, User } from "../models";
 
 jest.mock("../models", () => ({
   Organization: {
@@ -11,9 +12,13 @@ jest.mock("../models", () => ({
     findAndCountAll: jest.fn(),
     create: jest.fn(),
   },
+  User: {
+    findByPk: jest.fn(),
+  },
 }));
 
 const mockedOrganization = Organization as jest.Mocked<typeof Organization>;
+const mockedUser = User as jest.Mocked<typeof User>;
 
 describe("organization service", () => {
   beforeEach(() => {
@@ -52,6 +57,20 @@ describe("organization service", () => {
     });
   });
 
+  describe("generateOrganizationCode", () => {
+    it("returns a TT-prefixed code when available", async () => {
+      mockedOrganization.findOne.mockResolvedValueOnce(null as never);
+
+      const code = await generateOrganizationCode();
+
+      expect(code).toMatch(/^TT\d{4}$/);
+      expect(mockedOrganization.findOne).toHaveBeenCalledWith({
+        where: { org_code: code },
+        attributes: ["id"],
+      });
+    });
+  });
+
   describe("getOrganizations", () => {
     it("sanitizes pagination values and returns metadata", async () => {
       mockedOrganization.findAndCountAll.mockResolvedValueOnce({
@@ -79,7 +98,14 @@ describe("organization service", () => {
 
   describe("createOrganization", () => {
     it("creates an organization, defaults admin, and returns service response", async () => {
+      const creator = {
+        id: "user-123",
+        organization_id: null,
+        save: jest.fn().mockResolvedValue(undefined),
+      };
+      mockedUser.findByPk.mockResolvedValueOnce(creator as never);
       mockedOrganization.findOne
+        .mockResolvedValueOnce(null as never)
         .mockResolvedValueOnce(null as never)
         .mockResolvedValueOnce({
           id: "org-123",
@@ -96,11 +122,14 @@ describe("organization service", () => {
 
       expect(mockedOrganization.create).toHaveBeenCalledWith({
         name: "Task Tracker Labs",
+        org_code: expect.stringMatching(/^TT\d{4}$/),
         created_by: "user-123",
         admin: "user-123",
         description: "Workspace",
         slug: "task-tracker-labs",
       });
+      expect(creator.organization_id).toBe("org-123");
+      expect(creator.save).toHaveBeenCalled();
       expect(result).toEqual({
         statusCode: 201,
         data: {
@@ -127,6 +156,20 @@ describe("organization service", () => {
           created_by: "   ",
         }),
       ).rejects.toThrow("created_by is required");
+    });
+
+    it("throws when creator already belongs to an organization", async () => {
+      mockedUser.findByPk.mockResolvedValueOnce({
+        id: "user-123",
+        organization_id: "org-999",
+      } as never);
+
+      await expect(
+        createOrganization({
+          name: "Task Tracker Labs",
+          created_by: "user-123",
+        }),
+      ).rejects.toThrow("User is already linked to an organization");
     });
   });
 });
