@@ -60,7 +60,7 @@ const startServer = async () => {
     server.listen(appConfig.port, () => {
       console.log(`Server running on port ${appConfig.port}`);
       console.log(`Environment: ${appConfig.env}`);
-      console.log(`Swagger docs: http://localhost:${appConfig.port}/api-docs`);
+      console.log(`API docs: http://localhost:${appConfig.port}/api-docs`);
       console.log(`Chat websocket: ws://localhost:${appConfig.port}/ws/chat`);
     });
   } catch (error) {

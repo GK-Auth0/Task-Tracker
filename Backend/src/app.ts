@@ -6,7 +6,7 @@ import { corsOptionsDelegate } from "./middleware/cors";
 import { errorHandler404 } from "./middleware/errorHandler404";
 import { errorHandler } from "./middleware/errorHandler";
 import { responseHandler } from "./middleware/responseHandler";
-import { setupSwagger } from "./swagger";
+import { setupApiDocs } from "./api-docs";
 import { globalRateLimiter } from "./middleware/rateLimit";
 import { requestTimeoutGuard } from "./middleware/requestGuard";
 import { database, appConfig } from "./config";
@@ -31,27 +31,8 @@ app.use(globalRateLimiter);
 // Trust proxy for accurate IP addresses
 app.set("trust proxy", appConfig.security.trustProxy as any);
 
-// Swagger documentation
-setupSwagger(app);
+setupApiDocs(app);
 
-/**
- * @swagger
- * /health:
- *   get:
- *     summary: Health check endpoint
- *     tags: [Health]
- *     responses:
- *       200:
- *         description: Service is healthy
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: ok
- */
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok" });
 });

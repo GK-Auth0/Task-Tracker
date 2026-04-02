@@ -1,0 +1,373 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker Auth API
+  version: 1.0.0
+  description: Authentication endpoints for registration, login, OTP verification, password reset, and current user lookup.
+tags:
+  - name: Auth
+    description: Authentication operations
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: Creates a new account and starts OTP verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              default:
+                value:
+                  email: john@example.com
+                  password: secret123
+                  firstName: John
+                  lastName: Doe
+      responses:
+        "201":
+          description: Registration initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterSuccessResponse"
+        "400":
+          description: Validation failure or registration error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login a user
+      description: Logs a user in or returns an OTP verification requirement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              default:
+                value:
+                  email: john@example.com
+                  password: secret123
+      responses:
+        "200":
+          description: Login successful or OTP required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSuccessResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/verify-otp:
+    post:
+      tags:
+        - Auth
+      summary: Verify OTP
+      description: Verifies the OTP and issues the final authenticated response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtpRequest"
+            examples:
+              default:
+                value:
+                  otpSessionId: 8de4f54f-53eb-43ca-b8de-f2f1658d51f7
+                  otp: "123456"
+      responses:
+        "200":
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyOtpSuccessResponse"
+        "400":
+          description: OTP verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/forgot-password:
+    post:
+      tags:
+        - Auth
+      summary: Request password reset OTP
+      description: Sends a password reset OTP to the provided email if the account exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+            examples:
+              default:
+                value:
+                  email: john@example.com
+      responses:
+        "200":
+          description: Password reset OTP flow initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForgotPasswordSuccessResponse"
+        "400":
+          description: Forgot password request failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/reset-password:
+    post:
+      tags:
+        - Auth
+      summary: Reset password with OTP
+      description: Resets the user password after validating the OTP session and code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+            examples:
+              default:
+                value:
+                  otpSessionId: 8de4f54f-53eb-43ca-b8de-f2f1658d51f7
+                  otp: "123456"
+                  newPassword: newSecret123
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageSuccessResponse"
+        "400":
+          description: Password reset failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Get current user profile
+      description: Returns the authenticated user's profile.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          minLength: 6
+          example: secret123
+        firstName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: John
+        lastName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: Doe
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          example: secret123
+    VerifyOtpRequest:
+      type: object
+      required:
+        - otpSessionId
+        - otp
+      properties:
+        otpSessionId:
+          type: string
+          format: uuid
+          example: 8de4f54f-53eb-43ca-b8de-f2f1658d51f7
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
+          example: "123456"
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+    ResetPasswordRequest:
+      type: object
+      required:
+        - otpSessionId
+        - otp
+        - newPassword
+      properties:
+        otpSessionId:
+          type: string
+          format: uuid
+          example: 8de4f54f-53eb-43ca-b8de-f2f1658d51f7
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
+          example: "123456"
+        newPassword:
+          type: string
+          minLength: 6
+          example: newSecret123
+    RegisterSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Registration initiated. OTP verification required
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            otpSessionId: 8de4f54f-53eb-43ca-b8de-f2f1658d51f7
+            email: john@example.com
+    LoginSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Login successful
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            token: jwt-token
+            user:
+              id: user-id
+              email: john@example.com
+    VerifyOtpSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: OTP verified successfully
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            token: jwt-token
+            user:
+              id: user-id
+              email: john@example.com
+    ForgotPasswordSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: OTP sent to the provided email if it exists.
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            otpSessionId: 8de4f54f-53eb-43ca-b8de-f2f1658d51f7
+    MessageSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Password reset successful
+    MeSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User profile retrieved
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            id: user-id
+            email: john@example.com
+            first_name: John
+            last_name: Doe
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Login failed
+        error:
+          type: string
+          example: Invalid credentials
