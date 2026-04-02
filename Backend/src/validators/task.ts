@@ -27,18 +27,14 @@ export const createTaskSchema = {
   },
   priority: {
     optional: true,
-
-    // 1. Validate first (strict check)
     custom: {
       options: (value: unknown) => {
         if (value == null) return true;
-
-        return ["Low", "Medium", "High"].includes(String(value));
+        const normalized = String(value).trim().toLowerCase();
+        return ["low", "medium", "high"].includes(normalized);
       },
       errorMessage: "Priority must be one of: Low, Medium, High",
     },
-
-    // 2. Sanitize (normalize input)
     customSanitizer: {
       options: (value: unknown) => {
         if (value == null) return value;
@@ -125,18 +121,14 @@ export const updateTaskSchema = {
   },
   priority: {
     optional: true,
-
-    // 1. Validate first (strict check)
     custom: {
       options: (value: unknown) => {
         if (value == null) return true;
-
-        return ["Low", "Medium", "High"].includes(String(value));
+        const normalized = String(value).trim().toLowerCase();
+        return ["low", "medium", "high"].includes(normalized);
       },
       errorMessage: "Priority must be one of: Low, Medium, High",
     },
-
-    // 2. Sanitize (normalize input)
     customSanitizer: {
       options: (value: unknown) => {
         if (value == null) return value;
