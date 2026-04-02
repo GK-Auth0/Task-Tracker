@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { tasksAPI, usersAPI } from "../services/dashboard";
+import { projectsAPI, tasksAPI, usersAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
 import CalendarHeader from "../components/calendar/CalendarHeader";
 import CalendarMonthGrid from "../components/calendar/CalendarMonthGrid";
@@ -25,10 +25,35 @@ const Calendar: React.FC = () => {
     "calendar" | "insights" | "agenda" | "workload" | "deadlines"
   >("calendar");
 
+  const assignMemberColors = (members: Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  }>) => {
+    const colors = [
+      "emerald",
+      "indigo",
+      "rose",
+      "amber",
+      "purple",
+      "green",
+      "blue",
+      "orange",
+    ];
+
+    return members.map((member, index) => ({
+      ...member,
+      color: colors[index % colors.length],
+    }));
+  };
+
   useEffect(() => {
     fetchTasks();
     if (calendarType === "team") {
       fetchTeamMembers();
+    } else {
+      setTeamMembers([]);
     }
   }, [user, calendarType]);
 
@@ -45,21 +70,7 @@ const Calendar: React.FC = () => {
     try {
       const response = await usersAPI.getUsers({ limit: 100 });
       if (response.success) {
-        const colors = [
-          "emerald",
-          "indigo",
-          "rose",
-          "amber",
-          "purple",
-          "green",
-          "blue",
-          "orange",
-        ];
-        const membersWithColors = response.data.map((member, index) => ({
-          ...member,
-          color: colors[index % colors.length],
-        }));
-        setTeamMembers(membersWithColors);
+        setTeamMembers(assignMemberColors(response.data));
       }
     } catch (error) {
       console.error("Error fetching team members:", error);
@@ -71,6 +82,52 @@ const Calendar: React.FC = () => {
 
     try {
       setLoading(true);
+      if (calendarType === "team") {
+        const [projectsResponse, membersResponse] = await Promise.all([
+          projectsAPI.getProjects({ limit: 100 }),
+          usersAPI.getUsers({ limit: 100 }),
+        ]);
+
+        const coloredMembers = membersResponse.success
+          ? assignMemberColors(membersResponse.data)
+          : [];
+        setTeamMembers(coloredMembers);
+
+        if (!projectsResponse.success || projectsResponse.data.length === 0) {
+          setTasks([]);
+          return;
+        }
+
+        const taskResponses = await Promise.all(
+          projectsResponse.data.map((project) =>
+            tasksAPI.getTasks({ project_id: project.id, limit: 100 }),
+          ),
+        );
+
+        const mergedTasks = taskResponses
+          .filter((response) => response.success)
+          .flatMap((response) => response.data);
+
+        const orgMemberIds = new Set(coloredMembers.map((member) => member.id));
+        const uniqueTasks = Array.from(
+          new Map(mergedTasks.map((task) => [task.id, task])).values(),
+        )
+          .map((task) => ({
+            ...task,
+            assignee:
+              task.assignee && orgMemberIds.has(task.assignee.id)
+                ? task.assignee
+                : undefined,
+          }))
+          .filter(
+            (task) =>
+              !task.assignee || orgMemberIds.has(task.assignee.id),
+          );
+
+        setTasks(uniqueTasks);
+        return;
+      }
+
       const response = await tasksAPI.getTasks({ limit: 100 });
       if (response.success) {
         setTasks(response.data);
@@ -193,10 +250,12 @@ const Calendar: React.FC = () => {
       (assignee, index, arr) => arr.findIndex((a) => a.id === assignee.id) === index,
     );
 
-  const membersWithTasks = visibleAssignees.map((assignee) => {
+  const membersWithTasks = visibleAssignees
+    .filter((assignee) => teamMembers.some((member) => member.id === assignee.id))
+    .map((assignee) => {
     const member = teamMembers.find((m) => m.id === assignee.id);
     return member ? { ...assignee, color: member.color } : { ...assignee, color: "blue" };
-  });
+    });
 
   const sortedTasks = [...tasks]
     .filter((task) => task.due_date)

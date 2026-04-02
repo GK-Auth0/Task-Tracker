@@ -1,7 +1,31 @@
 import { AuditLog, Project, Task, User } from "../models";
 import { Op } from "sequelize";
 
+const getUserOrganizationId = async (userId: string) => {
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user.organization_id || null;
+};
+
 export async function getDashboardSummary(userId: string) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return {
+      total_tasks: 0,
+      completed_tasks: 0,
+      in_progress_tasks: 0,
+      todo_tasks: 0,
+      overdue_tasks: 0,
+      completion_rate: 0,
+    };
+  }
+
   const now = new Date();
 
   // Get all tasks for the user (created or assigned)
@@ -9,6 +33,21 @@ export async function getDashboardSummary(userId: string) {
     where: {
       [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
     },
+    include: [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+    ],
     attributes: ["status", "due_date"],
   });
 
@@ -66,6 +105,21 @@ export async function getDashboardOverview(
   userId: string,
   options: DashboardOverviewOptions = {},
 ) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return {
+      summary: await getDashboardSummary(userId),
+      metrics: {
+        open_tasks: 0,
+        high_priority_upcoming: 0,
+        due_today: 0,
+        due_this_week: 0,
+      },
+      upcoming_tasks: [],
+      recent_activity: [],
+    };
+  }
+
   const upcomingLimit = Math.min(Math.max(options.upcomingLimit || 12, 1), 50);
   const activityLimit = Math.min(Math.max(options.activityLimit || 10, 1), 50);
 
@@ -90,6 +144,14 @@ export async function getDashboardOverview(
         model: Project,
         as: "project",
         attributes: ["id", "name"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
       },
       {
         model: User,
@@ -104,6 +166,21 @@ export async function getDashboardOverview(
 
   const relevantTasks = await Task.findAll({
     where: taskScope,
+    include: [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+    ],
     attributes: ["id", "project_id"],
   });
 
@@ -227,12 +304,50 @@ const normalizeProjectStatus = (status: string | null | undefined) => {
 };
 
 export async function getDashboardInsights(userId: string) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return {
+      task_status_breakdown: { todo: 0, in_progress: 0, done: 0 },
+      task_priority_breakdown: { high: 0, medium: 0, low: 0 },
+      due_date_breakdown: {
+        overdue: 0,
+        today: 0,
+        this_week: 0,
+        later: 0,
+        no_due_date: 0,
+      },
+      project_status_breakdown: {
+        planning: 0,
+        active: 0,
+        on_hold: 0,
+        completed: 0,
+        cancelled: 0,
+      },
+      project_health: [],
+    };
+  }
+
   const taskScope = {
     [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
   };
 
   const tasks = await Task.findAll({
     where: taskScope,
+    include: [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+    ],
     attributes: ["id", "status", "priority", "due_date", "project_id"],
   });
 
@@ -293,6 +408,14 @@ export async function getDashboardInsights(userId: string) {
     where: {
       owner_id: userId,
     },
+    include: [
+      {
+        model: User,
+        as: "owner",
+        attributes: ["id", "organization_id"],
+        where: { organization_id: organizationId },
+      },
+    ],
     attributes: ["id", "name", "status"],
   });
 
@@ -307,6 +430,14 @@ export async function getDashboardInsights(userId: string) {
               [Op.in]: relevantProjectIds,
             },
           },
+          include: [
+            {
+              model: User,
+              as: "owner",
+              attributes: ["id", "organization_id"],
+              where: { organization_id: organizationId },
+            },
+          ],
           attributes: ["id", "name", "status"],
         })
       : [];

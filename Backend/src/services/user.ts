@@ -3,10 +3,33 @@ import { Op } from "sequelize";
 import type { GetUsersOptions } from "../types/user";
 
 export async function getAllUsers(options: GetUsersOptions) {
-  const { page, limit, search, role } = options;
+  const { requesterId, page, limit, search, role } = options;
   const offset = (page - 1) * limit;
+
+  const requester = await User.findByPk(requesterId, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!requester) {
+    throw new Error("Requester not found");
+  }
+
+  if (!requester.organization_id) {
+    return {
+      users: [],
+      pagination: {
+        page,
+        limit,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrev: false,
+      },
+    };
+  }
   
   const whereClause: any = {};
+  whereClause.organization_id = requester.organization_id;
   
   if (search) {
     whereClause[Op.or] = [
@@ -42,7 +65,15 @@ export async function getAllUsers(options: GetUsersOptions) {
   };
 }
 
-export async function getUserById(userId: string) {
+export async function getUserById(userId: string, requesterId: string) {
+  const requester = await User.findByPk(requesterId, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!requester) {
+    throw new Error("Requester not found");
+  }
+
   const user = await User.findByPk(userId, {
     attributes: [
       "id",
@@ -51,6 +82,7 @@ export async function getUserById(userId: string) {
       "role",
       "avatar_url",
       "created_at",
+      "organization_id",
     ],
     include: [
       {
@@ -65,6 +97,13 @@ export async function getUserById(userId: string) {
 
   if (!user) {
     throw new Error("User not found");
+  }
+
+  if (
+    requester.organization_id !== user.organization_id &&
+    requester.id !== user.id
+  ) {
+    throw new Error("Access denied");
   }
 
   return user.get({ plain: true });

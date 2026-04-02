@@ -2,12 +2,43 @@ import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Comm
 import { Op } from "sequelize";
 import type { CreateTaskDto, TaskFilters, UpdateTaskDto } from "../types/task";
 
+const getUserOrganizationId = async (userId: string) => {
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user.organization_id || null;
+};
+
+const getProjectInOrganization = async (projectId: string, organizationId: string) =>
+  Project.findOne({
+    where: { id: projectId },
+    include: [
+      {
+        model: User,
+        as: "owner",
+        attributes: ["id", "organization_id"],
+        where: { organization_id: organizationId },
+      },
+    ],
+    attributes: ["id", "owner_id"],
+  });
+
 export async function getAllTasks(
   userId: string,
   filters: TaskFilters,
   page: number = 1,
   limit: number = 5,
 ) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return { tasks: [], total: 0 };
+  }
+
   const whereClause: any = {};
 
   if (filters.status) {
@@ -25,6 +56,14 @@ export async function getAllTasks(
           id: filters.project_id,
           owner_id: userId,
         },
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
         attributes: ["id"],
       }),
       ProjectMember.findOne({
@@ -32,6 +71,21 @@ export async function getAllTasks(
           project_id: filters.project_id,
           user_id: userId,
         },
+        include: [
+          {
+            model: Project,
+            as: "project",
+            attributes: ["id"],
+            include: [
+              {
+                model: User,
+                as: "owner",
+                attributes: ["id", "organization_id"],
+                where: { organization_id: organizationId },
+              },
+            ],
+          },
+        ],
         attributes: ["id"],
       }),
     ]);
@@ -69,6 +123,14 @@ export async function getAllTasks(
         model: Project,
         as: "project",
         attributes: ["id", "name"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
       },
       {
         model: User,
@@ -93,6 +155,30 @@ export async function getAllTasks(
 }
 
 export async function createTask(dto: CreateTaskDto) {
+  const organizationId = await getUserOrganizationId(dto.creator_id);
+  if (!organizationId) {
+    throw new Error("User must belong to an organization before creating tasks");
+  }
+
+  const project = await getProjectInOrganization(dto.project_id, organizationId);
+  if (!project) {
+    throw new Error("Access denied to this project");
+  }
+
+  if (dto.assignee_id) {
+    const assignee = await User.findOne({
+      where: {
+        id: dto.assignee_id,
+        organization_id: organizationId,
+      },
+      attributes: ["id"],
+    });
+
+    if (!assignee) {
+      throw new Error("Assignee must belong to the same organization");
+    }
+  }
+
   const task = await Task.create({
     title: dto.title,
     description: dto.description,
@@ -128,6 +214,11 @@ export async function createTask(dto: CreateTaskDto) {
 }
 
 export async function getTaskById(taskId: string, userId: string) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
   const task = await Task.findOne({
     where: {
       id: taskId,
@@ -138,6 +229,14 @@ export async function getTaskById(taskId: string, userId: string) {
         model: Project,
         as: "project",
         attributes: ["id", "name"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
       },
       {
         model: User,
@@ -181,11 +280,31 @@ export async function updateTask(
   dto: UpdateTaskDto,
   userId: string,
 ) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
   const task = await Task.findOne({
     where: {
       id: taskId,
       [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
     },
+    include: [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+    ],
   });
 
   if (!task) {
@@ -200,6 +319,20 @@ export async function updateTask(
   if (dto.assignee_id !== undefined) updateData.assignee_id = dto.assignee_id;
   if (dto.due_date !== undefined)
     updateData.due_date = dto.due_date ? new Date(dto.due_date) : null;
+
+  if (dto.assignee_id) {
+    const assignee = await User.findOne({
+      where: {
+        id: dto.assignee_id,
+        organization_id: organizationId,
+      },
+      attributes: ["id"],
+    });
+
+    if (!assignee) {
+      throw new Error("Assignee must belong to the same organization");
+    }
+  }
 
   await task.update(updateData);
 
@@ -227,11 +360,31 @@ export async function updateTask(
 }
 
 export async function deleteTask(taskId: string, userId: string) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
   const task = await Task.findOne({
     where: {
       id: taskId,
       [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
     },
+    include: [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+    ],
   });
 
   if (!task) {

@@ -13,6 +13,7 @@ import ChatGroupMember from "../models/chatGroupMember";
 import { broadcastChatMessage } from "../realtime/chatSocket";
 import cloudinary from "../config/cloudinary";
 import { parseBoundedInt } from "../helpers/query";
+import User from "../models/user";
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -63,15 +64,48 @@ export const createGroup = async (req: Request, res: Response) => {
         message: "Group name is required",
       });
     }
+
+    const requester = await User.findByPk(userId, {
+      attributes: ["id", "organization_id"],
+    });
+
+    if (!requester?.organization_id) {
+      return res.status(403).json({
+        success: false,
+        message: "User must belong to an organization",
+      });
+    }
+
+    const requestedMemberIds = Array.isArray(member_ids) ? member_ids : [];
+    if (requestedMemberIds.length > 0) {
+      const orgUsers = await User.findAll({
+        where: {
+          id: requestedMemberIds,
+          organization_id: requester.organization_id,
+        },
+        attributes: ["id"],
+      });
+      const orgUserIds = new Set(orgUsers.map((member) => member.id));
+      const hasOutsideOrgMember = requestedMemberIds.some(
+        (memberId: string) => !orgUserIds.has(memberId),
+      );
+
+      if (hasOutsideOrgMember) {
+        return res.status(400).json({
+          success: false,
+          message: "All chat members must belong to the same organization",
+        });
+      }
+    }
     
     const group = await createChatGroup({
       name,
       description,
       created_by: userId,
-      member_ids: Array.isArray(member_ids) ? member_ids : [],
+      member_ids: requestedMemberIds,
     });
 
-    await addUsersToChatGroup(group.id, Array.isArray(member_ids) ? member_ids : []);
+    await addUsersToChatGroup(group.id, requestedMemberIds);
 
     const groups = await getChatGroups(userId);
     const created = groups.find((g: any) => g.id === group.id) || group;

@@ -62,7 +62,15 @@ export class ProjectController {
     this.getConfidentialAccessRequests =
       this.getConfidentialAccessRequests.bind(this);
     this.reviewConfidentialAccessRequest =
-      this.reviewConfidentialAccessRequest.bind(this);
+    this.reviewConfidentialAccessRequest.bind(this);
+  }
+
+  private async getRequesterOrganizationId(userId: string): Promise<string | null> {
+    const requester = await User.findByPk(userId, {
+      attributes: ["id", "organization_id"],
+    });
+
+    return requester?.organization_id || null;
   }
 
   private async getProjectAccessContext(
@@ -121,12 +129,28 @@ export class ProjectController {
   }
 
   private async ensureProjectMemberOrOwner(projectId: string, userId: string) {
+    const requester = await User.findByPk(userId, {
+      attributes: ["id", "organization_id"],
+    });
+
+    if (!requester?.organization_id) {
+      return false;
+    }
+
     const [ownedProject, member] = await Promise.all([
       Project.findOne({
         where: {
           id: projectId,
           owner_id: userId,
         },
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requester.organization_id },
+          },
+        ],
         attributes: ["id"],
       }),
       ProjectMember.findOne({
@@ -134,6 +158,21 @@ export class ProjectController {
           project_id: projectId,
           user_id: userId,
         },
+        include: [
+          {
+            model: Project,
+            as: "project",
+            attributes: ["id"],
+            include: [
+              {
+                model: User,
+                as: "owner",
+                attributes: ["id", "organization_id"],
+                where: { organization_id: requester.organization_id },
+              },
+            ],
+          },
+        ],
         attributes: ["id"],
       }),
     ]);
@@ -166,6 +205,23 @@ export class ProjectController {
         });
       }
 
+      const requester = await User.findByPk(userId, {
+        attributes: ["id", "organization_id"],
+      });
+
+      if (!requester?.organization_id) {
+        return res.json({
+          success: true,
+          data: [],
+          pagination: {
+            page: safePage,
+            limit: safeLimit,
+            total: 0,
+            totalPages: 0
+          }
+        });
+      }
+
       // Get projects where user is owner or member
       const userProjectIds = await ProjectMember.findAll({
         where: { user_id: userId },
@@ -177,6 +233,14 @@ export class ProjectController {
       // Also include projects owned by the user
       const ownedProjects = await Project.findAll({
         where: { owner_id: userId },
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requester.organization_id },
+          },
+        ],
         attributes: ['id']
       });
       
@@ -222,7 +286,8 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url']
+            attributes: ['id', 'full_name', 'email', 'avatar_url'],
+            where: { organization_id: requester.organization_id },
           }
         ],
         limit: safeLimit,
@@ -302,12 +367,24 @@ export class ProjectController {
         });
       }
 
+      const requester = await User.findByPk(userId, {
+        attributes: ["id", "organization_id"],
+      });
+
+      if (!requester?.organization_id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this project'
+        });
+      }
+
       const project = await Project.findByPk(id as string, {
         include: [
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url']
+            attributes: ['id', 'full_name', 'email', 'avatar_url', 'organization_id'],
+            where: { organization_id: requester.organization_id },
           },
           {
             model: ProjectMember,
@@ -407,6 +484,36 @@ export class ProjectController {
         });
       }
 
+      const requester = await User.findByPk(userId, {
+        attributes: ["id", "organization_id"],
+      });
+
+      if (!requester?.organization_id) {
+        return res.status(403).json({
+          success: false,
+          message: 'User must belong to an organization before creating projects'
+        });
+      }
+
+      if (safeMemberIds.length > 0) {
+        const orgUsers = await User.findAll({
+          where: {
+            id: { [Op.in]: safeMemberIds },
+            organization_id: requester.organization_id,
+          },
+          attributes: ["id"],
+        });
+        const orgUserIds = new Set(orgUsers.map((member) => member.id));
+        const hasOutsideOrgMember = safeMemberIds.some((memberId: string) => !orgUserIds.has(memberId));
+
+        if (hasOutsideOrgMember) {
+          return res.status(400).json({
+            success: false,
+            message: 'All project members must belong to the same organization'
+          });
+        }
+      }
+
       // Create project
       const project = await Project.create({
         name,
@@ -463,7 +570,8 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url']
+            attributes: ['id', 'full_name', 'email', 'avatar_url'],
+            where: { organization_id: requester.organization_id },
           }
         ]
       });
@@ -501,7 +609,32 @@ export class ProjectController {
         endDate
       } = req.body;
 
-      const project = await Project.findByPk(id as string);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this project'
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -510,7 +643,6 @@ export class ProjectController {
       }
 
       // Check if user has permission to update
-      const userId = req.user?.id;
       const member = await ProjectMember.findOne({
         where: {
           project_id: id,
@@ -542,7 +674,8 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url']
+            attributes: ['id', 'full_name', 'email', 'avatar_url'],
+            where: { organization_id: requesterOrgId },
           }
         ]
       });
@@ -567,7 +700,32 @@ export class ProjectController {
     try {
       const { id } = req.params;
 
-      const project = await Project.findByPk(id as string);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this project'
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -576,7 +734,6 @@ export class ProjectController {
       }
 
       // Check if user has permission to delete
-      const userId = req.user?.id;
       if (project.owner_id !== userId && !isWorkspaceAdmin(req.user?.role)) {
         return res.status(403).json({
           success: false,
@@ -610,11 +767,44 @@ export class ProjectController {
     try {
       const { id } = req.params;
 
-      const project = await Project.findByPk(id as string);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
           message: 'Project not found'
+        });
+      }
+
+      const hasAccess = await this.ensureProjectMemberOrOwner(id as string, userId);
+      if (!hasAccess && !isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
         });
       }
 
@@ -662,7 +852,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -723,7 +930,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -751,13 +975,13 @@ export class ProjectController {
         });
       }
       
-      const { ProjectFile, User } = require('../models');
+      const { ProjectFile, User: ProjectFileUser } = require('../models');
       
       const files = await ProjectFile.findAll({
         where: { project_id: id },
         include: [
           {
-            model: User,
+            model: ProjectFileUser,
             as: 'uploader',
             attributes: ['id', 'full_name', 'email']
           }
@@ -800,7 +1024,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -836,7 +1077,7 @@ export class ProjectController {
       });
 
       // Save file metadata to database
-      const { ProjectFile, User } = require('../models');
+      const { ProjectFile, User: ProjectFileUser } = require('../models');
       const projectFile = await ProjectFile.create({
         project_id: id,
         filename: result.public_id,
@@ -851,7 +1092,7 @@ export class ProjectController {
       const fileWithUploader = await ProjectFile.findByPk(projectFile.id, {
         include: [
           {
-            model: User,
+            model: ProjectFileUser,
             as: 'uploader',
             attributes: ['id', 'full_name', 'email']
           }
@@ -877,7 +1118,28 @@ export class ProjectController {
   async getUsers(req: AuthenticatedRequest, res: Response) {
     try {
       const { search } = req.query;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const requester = await User.findByPk(userId, {
+        attributes: ["id", "organization_id"],
+      });
+
+      if (!requester?.organization_id) {
+        return res.json({
+          success: true,
+          data: []
+        });
+      }
+
       const whereClause: any = {};
+      whereClause.organization_id = requester.organization_id;
 
       if (search) {
         whereClause[Op.or] = [
@@ -927,6 +1189,17 @@ export class ProjectController {
         });
       }
 
+      const actor = await User.findByPk(actorId, {
+        attributes: ["id", "organization_id"],
+      });
+
+      if (!actor?.organization_id) {
+        return res.status(403).json({
+          success: false,
+          message: "User must belong to an organization",
+        });
+      }
+
       const project = await Project.findByPk(id as string);
       if (!project) {
         return res.status(404).json({
@@ -950,7 +1223,12 @@ export class ProjectController {
         });
       }
 
-      const user = await User.findByPk(String(userId));
+      const user = await User.findOne({
+        where: {
+          id: String(userId),
+          organization_id: actor.organization_id,
+        },
+      });
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -1019,7 +1297,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(actorId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -1039,6 +1334,21 @@ export class ProjectController {
         return res.status(403).json({
           success: false,
           message: "Only project owner/admin can update member role",
+        });
+      }
+
+      const targetUser = await User.findOne({
+        where: {
+          id: String(userId),
+          organization_id: requesterOrgId,
+        },
+        attributes: ["id"],
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({
+          success: false,
+          message: "Project member not found",
         });
       }
 
@@ -1093,7 +1403,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(actorId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -1113,6 +1440,21 @@ export class ProjectController {
         return res.status(403).json({
           success: false,
           message: "Only project owner/admin can remove members",
+        });
+      }
+
+      const targetUser = await User.findOne({
+        where: {
+          id: String(userId),
+          organization_id: requesterOrgId,
+        },
+        attributes: ["id"],
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({
+          success: false,
+          message: "Project member not found",
         });
       }
 
@@ -1165,7 +1507,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -1223,7 +1582,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -1309,7 +1685,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -1382,7 +1775,24 @@ export class ProjectController {
         });
       }
 
-      const project = await Project.findByPk(id as string);
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
       if (!project) {
         return res.status(404).json({
           success: false,

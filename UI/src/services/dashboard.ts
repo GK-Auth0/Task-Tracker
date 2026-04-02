@@ -263,11 +263,20 @@ export const usersAPI = {
 };
 
 export const projectsAPI = {
-  getProjects: async (): Promise<{
+  getProjects: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{
     success: boolean;
     data: { id: string; name: string }[];
   }> => {
-    const response = await api.get("/api/projects");
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+
+    const response = await api.get(
+      `/api/projects${queryParams.toString() ? `?${queryParams.toString()}` : ""}`,
+    );
     return response.data;
   },
 
