@@ -1,3 +1,6 @@
+import { NotEmpty } from "sequelize-typescript";
+import { TaskPriority } from "../enums";
+
 export const createTaskSchema = {
   title: {
     notEmpty: {
@@ -24,6 +27,15 @@ export const createTaskSchema = {
       options: [["To Do", "In Progress", "Done"]],
       errorMessage: "Status must be one of: To Do, In Progress, Done",
     },
+  },
+  priority:{
+    notEmpty: {
+      errorMessage: "priority required",
+    },
+    isIn:{
+      options:[[TaskPriority.HIGH,TaskPriority.LOW,TaskPriority.MEDIUM]],
+      errorMessage: `priority must be one of:${TaskPriority.HIGH,TaskPriority.LOW,TaskPriority.MEDIUM}`,
+    }
   },
   // priority: {
   //   optional: true,
