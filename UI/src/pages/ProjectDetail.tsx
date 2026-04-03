@@ -15,6 +15,7 @@ import { taskService } from "../services/taskService";
 import { Project } from "../types/project";
 import { isWorkspaceAdmin } from "../types/roles";
 import { Task } from "../types/task";
+import { ProjectStatus, ProjectPriority } from "../enums";
 
 type ProjectTab = "tasks" | "roadmap" | "files" | "activity";
 
@@ -255,17 +256,17 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = async (newStatus: string) => {
+  const handleStatusUpdate = async (newStatus: ProjectStatus) => {
     if (!project) return;
     try {
       await projectService.updateProject(project.id, {
-        status: newStatus as "planning" | "active" | "on_hold" | "completed" | "cancelled",
+        status: newStatus,
       });
       setProject((prev) =>
         prev
           ? {
               ...prev,
-              status: newStatus as "planning" | "active" | "on_hold" | "completed" | "cancelled",
+              status: newStatus,
             }
           : prev,
       );
@@ -383,7 +384,7 @@ const ProjectDetail: React.FC = () => {
   const handleProjectUpdate = async (payload: {
     name: string;
     description: string;
-    priority: "low" | "medium" | "high";
+    priority: ProjectPriority;
     startDate?: string;
     endDate?: string;
   }) => {

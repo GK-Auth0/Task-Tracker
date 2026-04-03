@@ -13,8 +13,9 @@ import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
 import SavedViewsBar from "../components/preferences/SavedViewsBar";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWorkspaceContent } from "../types/roles";
+import { ProjectStatus } from "../enums";
 
-type ProjectStatusFilter = "all" | Project["status"];
+type ProjectStatusFilter = "all" | ProjectStatus;
 
 const Projects: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -170,13 +171,13 @@ const Projects: React.FC = () => {
     const status = String(filters.statusFilter ?? "all");
     if (
       status === "all" ||
-      status === "planning" ||
-      status === "active" ||
-      status === "on_hold" ||
-      status === "completed" ||
-      status === "cancelled"
+      status === ProjectStatus.PLANNING ||
+      status === ProjectStatus.ACTIVE ||
+      status === ProjectStatus.ON_HOLD ||
+      status === ProjectStatus.COMPLETED ||
+      status === ProjectStatus.CANCELLED
     ) {
-      setStatusFilter(status);
+      setStatusFilter(status as ProjectStatusFilter);
     }
     setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
   };

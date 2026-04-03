@@ -10,6 +10,7 @@ import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
 import { parseBoundedInt } from "../helpers/query";
 import { isWorkspaceAdmin } from "../middleware/rbac";
 import { getAuditLogs } from "../services/auditService";
+import { ProjectRole, ConfidentialAccessState } from '../enums';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -111,12 +112,12 @@ export class ProjectController {
       latestRequest = null;
     }
 
-    const hasApprovedRequest = latestRequest?.status === "approved";
+    const hasApprovedRequest = latestRequest?.status === ConfidentialAccessState.APPROVED;
     const canViewConfidential =
       workspaceAdmin ||
       isOwner ||
-      memberRole === "owner" ||
-      memberRole === "admin" ||
+      memberRole === ProjectRole.OWNER ||
+      memberRole === ProjectRole.ADMIN ||
       hasApprovedRequest;
 
     return {
@@ -445,7 +446,7 @@ export class ProjectController {
           confidential_access: {
             can_view: accessContext.canViewConfidential,
             role: accessContext.memberRole,
-            request_status: accessContext.latestRequest?.status || "none",
+            request_status: accessContext.latestRequest?.status || ConfidentialAccessState.NONE,
             requested_at: accessContext.latestRequest?.requested_at || null,
             decision_note: accessContext.latestRequest?.decision_note || null,
           },
@@ -529,7 +530,7 @@ export class ProjectController {
       await ProjectMember.create({
         project_id: project.id,
         user_id: userId,
-        role: 'owner'
+        role: ProjectRole.OWNER
       });
 
       // Add additional members if provided (excluding the owner)
@@ -540,7 +541,7 @@ export class ProjectController {
             ProjectMember.create({
               project_id: project.id,
               user_id: memberId,
-              role: 'member'
+              role: ProjectRole.MEMBER
             })
           );
           await Promise.all(memberPromises);
@@ -647,7 +648,7 @@ export class ProjectController {
         where: {
           project_id: id,
           user_id: userId,
-          role: { [Op.in]: ['owner', 'admin'] }
+          role: { [Op.in]: [ProjectRole.OWNER, ProjectRole.ADMIN] }
         }
       });
 
@@ -1212,7 +1213,7 @@ export class ProjectController {
         where: {
           project_id: id as string,
           user_id: actorId,
-          role: { [Op.in]: ["owner", "admin"] },
+          role: { [Op.in]: [ProjectRole.OWNER, ProjectRole.ADMIN] },
         },
       });
 
@@ -1252,14 +1253,14 @@ export class ProjectController {
       }
 
       const normalizedRole =
-        ["owner", "admin", "member", "viewer"].includes(String(role))
-          ? String(role)
-          : "member";
+        [ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.MEMBER, ProjectRole.VIEWER].includes(String(role) as ProjectRole)
+          ? String(role) as ProjectRole
+          : ProjectRole.MEMBER;
 
       const created = await ProjectMember.create({
         project_id: id as string,
         user_id: String(userId),
-        role: normalizedRole as "owner" | "admin" | "member" | "viewer",
+        role: normalizedRole,
       });
 
       return res.status(201).json({
@@ -1290,7 +1291,7 @@ export class ProjectController {
         });
       }
 
-      if (!["owner", "admin", "member", "viewer"].includes(role)) {
+      if (![ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.MEMBER, ProjectRole.VIEWER].includes(role as ProjectRole)) {
         return res.status(400).json({
           success: false,
           message: "role must be one of: owner, admin, member, viewer",
@@ -1326,7 +1327,7 @@ export class ProjectController {
         where: {
           project_id: id as string,
           user_id: actorId,
-          role: { [Op.in]: ["owner", "admin"] },
+          role: { [Op.in]: [ProjectRole.OWNER, ProjectRole.ADMIN] },
         },
       });
 
@@ -1366,14 +1367,14 @@ export class ProjectController {
         });
       }
 
-      if (membership.role === "owner" && role !== "owner") {
+      if (membership.role === ProjectRole.OWNER && role !== ProjectRole.OWNER) {
         return res.status(400).json({
           success: false,
           message: "Project owner role cannot be changed",
         });
       }
 
-      membership.role = role as "owner" | "admin" | "member" | "viewer";
+      membership.role = role as ProjectRole;
       await membership.save();
 
       return res.status(200).json({
@@ -1432,7 +1433,7 @@ export class ProjectController {
         where: {
           project_id: id as string,
           user_id: actorId,
-          role: { [Op.in]: ["owner", "admin"] },
+          role: { [Op.in]: [ProjectRole.OWNER, ProjectRole.ADMIN] },
         },
       });
 
@@ -1472,7 +1473,7 @@ export class ProjectController {
         });
       }
 
-      if (membership.role === "owner") {
+      if (membership.role === ProjectRole.OWNER) {
         return res.status(400).json({
           success: false,
           message: "Project owner cannot be removed",
@@ -1624,7 +1625,7 @@ export class ProjectController {
         return res.status(200).json({
           success: true,
           message: "You already have confidential access",
-          data: { status: "approved" },
+          data: { status: ConfidentialAccessState.APPROVED },
         });
       }
 
@@ -1632,7 +1633,7 @@ export class ProjectController {
         where: {
           project_id: id as string,
           requester_id: userId,
-          status: "pending",
+          status: ConfidentialAccessState.PENDING,
         },
       });
       if (pending) {
@@ -1646,7 +1647,7 @@ export class ProjectController {
       const created = await ProjectConfidentialAccessRequest.create({
         project_id: id as string,
         requester_id: userId,
-        status: "pending",
+        status: ConfidentialAccessState.PENDING,
         reason: reason || undefined,
         requested_at: new Date(),
       });
@@ -1812,7 +1813,7 @@ export class ProjectController {
         where: {
           id: requestId as string,
           project_id: id as string,
-          status: "pending",
+          status: ConfidentialAccessState.PENDING,
         },
       });
 
@@ -1823,7 +1824,7 @@ export class ProjectController {
         });
       }
 
-      request.status = action === "approve" ? "approved" : "rejected";
+      request.status = action === "approve" ? ConfidentialAccessState.APPROVED : ConfidentialAccessState.REJECTED;
       request.decided_by = userId;
       request.decided_at = new Date();
       request.decision_note = decisionNote || undefined;

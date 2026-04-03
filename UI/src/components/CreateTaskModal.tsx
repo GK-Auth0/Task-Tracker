@@ -3,7 +3,7 @@ import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
-import { TaskPriority, TaskStatus } from "../enums";
+import { TaskPriority } from "../enums";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
 
 interface User {

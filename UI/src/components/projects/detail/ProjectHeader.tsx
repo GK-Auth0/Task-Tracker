@@ -1,11 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Project } from "../../../types/project";
+import { ProjectStatus } from "../../../enums";
 
 interface ProjectHeaderProps {
   project: Project;
   isOwnerOrAdmin: boolean;
-  onStatusChange: (status: string) => void;
+  onStatusChange: (status: ProjectStatus) => void;
   onCreateTask: () => void;
 }
 
@@ -37,16 +38,16 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             </h1>
             <select
               value={project.status}
-              onChange={(event) => onStatusChange(event.target.value)}
+              onChange={(event) => onStatusChange(event.target.value as ProjectStatus)}
               disabled={!isOwnerOrAdmin}
               className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700 disabled:opacity-60"
               aria-label="Project status"
             >
-              <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="on_hold">On Hold</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value={ProjectStatus.PLANNING}>Planning</option>
+              <option value={ProjectStatus.ACTIVE}>Active</option>
+              <option value={ProjectStatus.ON_HOLD}>On Hold</option>
+              <option value={ProjectStatus.COMPLETED}>Completed</option>
+              <option value={ProjectStatus.CANCELLED}>Cancelled</option>
             </select>
           </div>
 

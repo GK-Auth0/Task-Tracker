@@ -1,5 +1,4 @@
 import React from "react";
-import { Project } from "../../types/project";
 import { ProjectStatus } from "../../enums";
 
 type ProjectStatusFilter = "all" | ProjectStatus;
