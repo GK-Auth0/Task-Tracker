@@ -44,6 +44,7 @@ export default function CreateTaskModal({
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() => {
     const local = getTaskAiSuggestion("", "");
@@ -65,6 +66,8 @@ export default function CreateTaskModal({
 
   useEffect(() => {
     if (isOpen) {
+      setSubmitError("");
+      setDescriptionError("");
       // Fetch users and projects when modal opens
       fetchUsersAndProjects();
     }
@@ -164,6 +167,7 @@ export default function CreateTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError("");
     if (!title.trim() || (projects.length > 0 && !projectId)) return;
     if (!description.trim()) {
       setDescriptionError("Description is required");
@@ -199,6 +203,21 @@ export default function CreateTaskModal({
       onClose();
     } catch (error) {
       console.error("Failed to create task:", error);
+      const responseData = (error as any)?.response?.data;
+      const validationMessage = Array.isArray(responseData?.errors)
+        ? responseData.errors
+            .map((item: { field?: string; message?: string }) =>
+              item?.field ? `${item.field}: ${item.message}` : item?.message,
+            )
+            .filter(Boolean)
+            .join(", ")
+        : "";
+      setSubmitError(
+        validationMessage ||
+          responseData?.error ||
+          responseData?.message ||
+          "Failed to create task",
+      );
     } finally {
       setLoading(false);
     }
@@ -296,6 +315,12 @@ export default function CreateTaskModal({
                   </span>
               </div>
             </div>
+
+            {submitError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            ) : null}
 
             {/* Task Name */}
             <div className="flex flex-col gap-2">
@@ -658,6 +683,7 @@ export default function CreateTaskModal({
                 onChange={(e) => {
                   setDescription(e.target.value);
                   if (descriptionError) setDescriptionError("");
+                  if (submitError) setSubmitError("");
                 }}
               ></textarea>
               <div className="flex items-center justify-between">
