@@ -335,7 +335,7 @@ export const tasksAPI = {
     project_id: string;
     assignee_id?: string;
     due_date?: string;
-    // priority: "Low" | "Medium" | "High";
+    priority: "Low" | "Medium" | "High";
     invitees?: Array<{
       full_name: string;
       email: string;

@@ -25,32 +25,32 @@ export const createTaskSchema = {
       errorMessage: "Status must be one of: To Do, In Progress, Done",
     },
   },
-  priority: {
-    optional: true,
-    custom: {
-      options: (value: unknown) => {
-        if (value == null) return true;
-        const normalized = String(value).trim().toLowerCase();
-        return ["low", "medium", "high"].includes(normalized);
-      },
-      errorMessage: "Priority must be one of: Low, Medium, High Giri",
-    },
-    customSanitizer: {
-      options: (value: unknown) => {
-        if (value == null) return value;
+  // priority: {
+  //   optional: true,
+  //   custom: {
+  //     options: (value: unknown) => {
+  //       if (value == null) return true;
+  //       const normalized = String(value).trim().toLowerCase();
+  //       return ["low", "medium", "high"].includes(normalized);
+  //     },
+  //     errorMessage: "Priority must be one of: Low, Medium, High Giri",
+  //   },
+  //   customSanitizer: {
+  //     options: (value: unknown) => {
+  //       if (value == null) return value;
 
-        const normalized = String(value).trim().toLowerCase();
+  //       const normalized = String(value).trim().toLowerCase();
 
-        const map: Record<string, string> = {
-          low: "Low",
-          medium: "Medium",
-          high: "High",
-        };
+  //       const map: Record<string, string> = {
+  //         low: "Low",
+  //         medium: "Medium",
+  //         high: "High",
+  //       };
 
-        return map[normalized] ?? value;
-      },
-    },
-  },
+  //       return map[normalized] ?? value;
+  //     },
+  //   },
+  // },
   project_id: {
     notEmpty: {
       errorMessage: "Project ID is required",

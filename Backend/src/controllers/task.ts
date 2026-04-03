@@ -67,7 +67,21 @@ export const createNewTask = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
 
+    // Log the complete payload for debugging
+    console.log('=== CREATE TASK PAYLOAD ===');
+    console.log('User ID:', userId);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    console.log('Request Headers:', {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers.authorization ? '[PRESENT]' : '[MISSING]',
+      'user-agent': req.headers['user-agent']
+    });
+    console.log('Request Method:', req.method);
+    console.log('Request URL:', req.url);
+    console.log('========================');
+
     if (!userId) {
+      console.log('ERROR: No user ID found in request');
       return res.status(401).json({
         success: false,
         message: "User ID required",
@@ -86,7 +100,11 @@ export const createNewTask = async (req: Request, res: Response) => {
       due_date: req.body.due_date,
     };
 
+    console.log('Processed Task Data:', JSON.stringify(taskData, null, 2));
+
     const task = await createTask(taskData);
+    console.log('Created Task:', JSON.stringify(task, null, 2));
+    
     const inviteSummary = await processInvites({
       contextType: "task",
       projectId: task.project?.id || task.project_id,
@@ -94,6 +112,7 @@ export const createNewTask = async (req: Request, res: Response) => {
       invitedBy: userId,
       invitees: Array.isArray(req.body.invitees) ? req.body.invitees : [],
     });
+    console.log('Invite Summary:', JSON.stringify(inviteSummary, null, 2));
     
     // Log task creation
     await createAuditLog({
@@ -108,15 +127,26 @@ export const createNewTask = async (req: Request, res: Response) => {
       },
     });
     
-    return res.status(201).json({
+    const response = {
       success: true,
       message: "Task created successfully",
       data: {
         ...task,
         invite_summary: inviteSummary,
       },
-    });
+    };
+    
+    console.log('Final Response:', JSON.stringify(response, null, 2));
+    console.log('=== END CREATE TASK ===');
+    
+    return res.status(201).json(response);
   } catch (error) {
+    console.error('=== CREATE TASK ERROR ===');
+    console.error('Error:', error);
+    console.error('Error Message:', (error as any).message);
+    console.error('Error Stack:', (error as any).stack);
+    console.error('========================');
+    
     return res.status(400).json({
       success: false,
       message: "Failed to create task",

@@ -332,6 +332,8 @@ export default function CreateTaskModal({
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
                   required
+                  title="Select a project for this task"
+                  aria-label="Project selection"
                 >
                   <option value="">Select a project</option>
                   {projects.map((project) => (
@@ -419,6 +421,8 @@ export default function CreateTaskModal({
                     className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 pl-10 pr-4 appearance-none"
                     value={assigneeId}
                     onChange={(e) => setAssigneeId(e.target.value)}
+                    title="Select a team member to assign this task"
+                    aria-label="Assignee selection"
                   >
                     <option value="">Select a team member</option>
                     {users.map((user) => (
@@ -683,6 +687,14 @@ export default function CreateTaskModal({
               <span className="text-sm font-medium">
                 Drop files to attach or click to browse
               </span>
+              <input 
+                type="file" 
+                className="sr-only" 
+                multiple 
+                title="Attach files to this task"
+                aria-label="File attachment"
+                placeholder="Select files to attach"
+              />
             </div>
           </form>
         </div>
