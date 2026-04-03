@@ -23,7 +23,7 @@ export const createTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [[TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE]],
+      options: [Object.values(TaskStatus)],
       errorMessage: `Status must be one of: ${Object.values(TaskStatus).join(', ')}`,
     },
   },
@@ -32,7 +32,7 @@ export const createTaskSchema = {
       errorMessage: "Priority is required",
     },
     isIn: {
-      options: [[TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]],
+      options: [Object.values(TaskPriority)],
       errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
     },
   },
@@ -100,14 +100,14 @@ export const updateTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [[TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE]],
+      options: [Object.values(TaskStatus)],
       errorMessage: `Status must be one of: ${Object.values(TaskStatus).join(', ')}`,
     },
   },
   priority: {
     optional: true,
     isIn: {
-      options: [[TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]],
+      options: [Object.values(TaskPriority)],
       errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
     },
   },
