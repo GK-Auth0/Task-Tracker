@@ -33,7 +33,7 @@ export const createTaskSchema = {
         const normalized = String(value).trim().toLowerCase();
         return ["low", "medium", "high"].includes(normalized);
       },
-      errorMessage: "Priority must be one of: Low, Medium, High",
+      errorMessage: "Priority must be one of: Low, Medium, High Giri",
     },
     customSanitizer: {
       options: (value: unknown) => {
@@ -127,7 +127,7 @@ export const updateTaskSchema = {
         const normalized = String(value).trim().toLowerCase();
         return ["low", "medium", "high"].includes(normalized);
       },
-      errorMessage: "Priority must be one of: Low, Medium, High",
+      errorMessage: "Priority must be one of: Low, Medium, High Giri",
     },
     customSanitizer: {
       options: (value: unknown) => {

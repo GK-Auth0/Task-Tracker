@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import router from ".";
 import helmet from "helmet";
 import { setupCors } from "./middleware/cors";
+import { disableCache } from "./middleware/cacheControl";
 import { errorHandler404 } from "./middleware/errorHandler404";
 import { errorHandler } from "./middleware/errorHandler";
 import { responseHandler } from "./middleware/responseHandler";
@@ -14,6 +15,9 @@ const app = express();
 
 // Setup CORS
 setupCors(app);
+
+// Disable cache for all API routes
+app.use("/api", disableCache);
 
 // Global middlewares
 app.use(express.json({ limit: "1mb" }));
