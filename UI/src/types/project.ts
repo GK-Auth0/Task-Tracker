@@ -1,9 +1,11 @@
+import { ProjectStatus, ProjectPriority, ProjectRole, ConfidentialAccessState } from "../enums";
+
 export interface Project {
   id: string;
   name: string;
   description?: string;
-  status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
-  priority: "low" | "medium" | "high";
+  status: ProjectStatus;
+  priority: ProjectPriority;
   startDate?: string;
   endDate?: string;
   ownerId: string;
@@ -22,7 +24,7 @@ export interface Project {
   confidential_access?: {
     can_view: boolean;
     role: string | null;
-    request_status: "none" | "pending" | "approved" | "rejected";
+    request_status: ConfidentialAccessState;
     requested_at?: string | null;
     decision_note?: string | null;
   };
@@ -32,7 +34,7 @@ export interface ProjectMember {
   id: string;
   projectId: string;
   userId: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: ProjectRole;
   joinedAt: string;
   user: {
     id: string;
@@ -57,8 +59,8 @@ export interface ProjectTask {
 export interface CreateProjectRequest {
   name: string;
   description: string;
-  status?: "planning" | "active" | "on_hold";
-  priority?: "low" | "medium" | "high";
+  status?: ProjectStatus;
+  priority?: ProjectPriority;
   startDate?: string;
   endDate?: string;
   memberIds?: string[];
@@ -71,8 +73,8 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
-  status?: "planning" | "active" | "on_hold" | "completed" | "cancelled";
-  priority?: "low" | "medium" | "high";
+  status?: ProjectStatus;
+  priority?: ProjectPriority;
   startDate?: string;
   endDate?: string;
 }

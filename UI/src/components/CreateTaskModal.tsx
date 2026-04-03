@@ -3,6 +3,7 @@ import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
+import { TaskPriority, TaskStatus } from "../enums";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
 
 interface User {
@@ -22,16 +23,6 @@ interface CreateTaskModalProps {
   onTaskCreated: () => void;
 }
 
-const normalizePriority = (
-  value: string | undefined,
-): "Low" | "Medium" | "High" => {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "low") return "Low";
-  if (normalized === "medium") return "Medium";
-  if (normalized === "high") return "High";
-  return "Medium";
-};
-
 export default function CreateTaskModal({
   isOpen,
   onClose,
@@ -42,7 +33,7 @@ export default function CreateTaskModal({
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium");
+  const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [projectId, setProjectId] = useState("");
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -191,7 +182,7 @@ export default function CreateTaskModal({
         project_id: projectId,
         assignee_id: assigneeId || undefined,
         due_date: dueDate || undefined,
-        priority: normalizePriority(priority), // Ensure priority is valid
+        priority: priority,
         invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
       });
 
@@ -200,7 +191,7 @@ export default function CreateTaskModal({
       setDescription("");
       setAssigneeId("");
       setDueDate("");
-      setPriority("Medium");
+      setPriority(TaskPriority.MEDIUM);
       setProjectId("");
       setInvitees([]);
 
@@ -292,17 +283,17 @@ export default function CreateTaskModal({
                     {priority} Priority {projectId ? "• Project Selected" : ""}
                   </p>
                 </div>
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    priority === "High"
-                      ? "bg-rose-100 text-rose-700"
-                      : priority === "Medium"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-sky-100 text-sky-700"
-                  }`}
-                >
-                  {priority}
-                </span>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      priority === TaskPriority.HIGH
+                        ? "bg-rose-100 text-rose-700"
+                        : priority === TaskPriority.MEDIUM
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-sky-100 text-sky-700"
+                    }`}
+                  >
+                    {priority}
+                  </span>
               </div>
             </div>
 
@@ -505,39 +496,39 @@ export default function CreateTaskModal({
               <div className="flex gap-2">
                 <button
                   className={`flex-1 py-2 px-3 rounded-lg border transition-all flex items-center justify-center gap-2 text-sm font-medium ${
-                    priority === "Low"
+                    priority === TaskPriority.LOW
                       ? "border-2 border-blue-600/40 bg-blue-600/5 text-blue-600 font-bold shadow-sm"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                   type="button"
-                  onClick={() => setPriority("Low")}
+                  onClick={() => setPriority(TaskPriority.LOW)}
                 >
                   <span className="size-2 rounded-full bg-emerald-500"></span>
-                  Low
+                  {TaskPriority.LOW}
                 </button>
                 <button
                   className={`flex-1 py-2 px-3 rounded-lg border transition-all flex items-center justify-center gap-2 text-sm font-medium ${
-                    priority === "Medium"
+                    priority === TaskPriority.MEDIUM
                       ? "border-2 border-blue-600/40 bg-blue-600/5 text-blue-600 font-bold shadow-sm"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                   type="button"
-                  onClick={() => setPriority("Medium")}
+                  onClick={() => setPriority(TaskPriority.MEDIUM)}
                 >
                   <span className="size-2 rounded-full bg-amber-500"></span>
-                  Medium
+                  {TaskPriority.MEDIUM}
                 </button>
                 <button
                   className={`flex-1 py-2 px-3 rounded-lg border transition-all flex items-center justify-center gap-2 text-sm font-medium ${
-                    priority === "High"
+                    priority === TaskPriority.HIGH
                       ? "border-2 border-blue-600/40 bg-blue-600/5 text-blue-600 font-bold shadow-sm"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                   type="button"
-                  onClick={() => setPriority("High")}
+                  onClick={() => setPriority(TaskPriority.HIGH)}
                 >
                   <span className="size-2 rounded-full bg-rose-500"></span>
-                  High
+                  {TaskPriority.HIGH}
                 </button>
               </div>
             </div>
@@ -569,7 +560,7 @@ export default function CreateTaskModal({
                 <button
                   type="button"
                   className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
-                  onClick={() => setPriority(normalizePriority(aiSuggestion.priority))}
+                  onClick={() => setPriority(aiSuggestion.priority as TaskPriority)}
                 >
                   Apply Priority: {aiSuggestion.priority}
                 </button>

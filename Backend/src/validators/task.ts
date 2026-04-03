@@ -1,5 +1,4 @@
-import { NotEmpty } from "sequelize-typescript";
-import { TaskPriority } from "../enums";
+import { TaskPriority, TaskStatus } from "../enums";
 
 export const createTaskSchema = {
   title: {
@@ -24,45 +23,19 @@ export const createTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [["To Do", "In Progress", "Done"]],
-      errorMessage: "Status must be one of: To Do, In Progress, Done",
+      options: [[TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE]],
+      errorMessage: `Status must be one of: ${Object.values(TaskStatus).join(', ')}`,
     },
   },
-  priority:{
+  priority: {
     notEmpty: {
-      errorMessage: "priority required",
+      errorMessage: "Priority is required",
     },
-    isIn:{
-      options:[[TaskPriority.HIGH,TaskPriority.LOW,TaskPriority.MEDIUM]],
-      errorMessage: `priority must be one of:${TaskPriority.HIGH,TaskPriority.LOW,TaskPriority.MEDIUM}`,
-    }
+    isIn: {
+      options: [[TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]],
+      errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
+    },
   },
-  // priority: {
-  //   optional: true,
-  //   custom: {
-  //     options: (value: unknown) => {
-  //       if (value == null) return true;
-  //       const normalized = String(value).trim().toLowerCase();
-  //       return ["low", "medium", "high"].includes(normalized);
-  //     },
-  //     errorMessage: "Priority must be one of: Low, Medium, High Giri",
-  //   },
-  //   customSanitizer: {
-  //     options: (value: unknown) => {
-  //       if (value == null) return value;
-
-  //       const normalized = String(value).trim().toLowerCase();
-
-  //       const map: Record<string, string> = {
-  //         low: "Low",
-  //         medium: "Medium",
-  //         high: "High",
-  //       };
-
-  //       return map[normalized] ?? value;
-  //     },
-  //   },
-  // },
   project_id: {
     notEmpty: {
       errorMessage: "Project ID is required",
@@ -127,34 +100,15 @@ export const updateTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [["To Do", "In Progress", "Done"]],
-      errorMessage: "Status must be one of: To Do, In Progress, Done",
+      options: [[TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE]],
+      errorMessage: `Status must be one of: ${Object.values(TaskStatus).join(', ')}`,
     },
   },
   priority: {
     optional: true,
-    custom: {
-      options: (value: unknown) => {
-        if (value == null) return true;
-        const normalized = String(value).trim().toLowerCase();
-        return ["low", "medium", "high"].includes(normalized);
-      },
-      errorMessage: "Priority must be one of: Low, Medium, High Giri",
-    },
-    customSanitizer: {
-      options: (value: unknown) => {
-        if (value == null) return value;
-
-        const normalized = String(value).trim().toLowerCase();
-
-        const map: Record<string, string> = {
-          low: "Low",
-          medium: "Medium",
-          high: "High",
-        };
-
-        return map[normalized] ?? value;
-      },
+    isIn: {
+      options: [[TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]],
+      errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
     },
   },
   assignee_id: {

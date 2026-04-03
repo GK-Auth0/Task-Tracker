@@ -12,6 +12,7 @@ import {
 import { createAuditLog, getAuditLogs } from "../services/auditService";
 import { processInvites } from "../services/invitation";
 import { parseBoundedInt, parseIsoDate } from "../helpers/query";
+import { TaskPriority, TaskStatus } from "../enums";
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -78,8 +79,8 @@ export const createNewTask = async (req: Request, res: Response) => {
     const taskData = {
       title: req.body.title,
       description: String(req.body.description || "").trim(),
-      status: req.body.status || "To Do",
-      priority: req.body.priority || "Medium",
+      status: req.body.status || TaskStatus.TODO,
+      priority: req.body.priority || TaskPriority.MEDIUM,
       project_id: req.body.project_id,
       assignee_id: req.body.assignee_id,
       creator_id: userId,

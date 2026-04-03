@@ -1,7 +1,8 @@
 import React from "react";
 import { Project } from "../../types/project";
+import { ProjectStatus } from "../../enums";
 
-type ProjectStatusFilter = "all" | Project["status"];
+type ProjectStatusFilter = "all" | ProjectStatus;
 
 interface ProjectsFiltersProps {
   searchTerm: string;
@@ -14,11 +15,11 @@ interface ProjectsFiltersProps {
 
 const STATUS_FILTERS: ProjectStatusFilter[] = [
   "all",
-  "planning",
-  "active",
-  "on_hold",
-  "completed",
-  "cancelled",
+  ProjectStatus.PLANNING,
+  ProjectStatus.ACTIVE,
+  ProjectStatus.ON_HOLD,
+  ProjectStatus.COMPLETED,
+  ProjectStatus.CANCELLED,
 ];
 
 const formatStatusLabel = (status: ProjectStatusFilter) => {

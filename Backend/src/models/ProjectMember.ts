@@ -12,6 +12,7 @@ import {
 } from "sequelize-typescript";
 import User from "./user";
 import Project from "./project";
+import { ProjectRole } from "../enums";
 
 @Table({
   tableName: "project_members",
@@ -38,11 +39,11 @@ export default class ProjectMember extends Model {
   user_id!: string;
 
   @Column({
-    type: DataType.ENUM('owner', 'admin', 'member', 'viewer'),
+    type: DataType.ENUM(ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.MEMBER, ProjectRole.VIEWER),
     allowNull: false,
-    defaultValue: 'member',
+    defaultValue: ProjectRole.MEMBER,
   })
-  role!: 'owner' | 'admin' | 'member' | 'viewer';
+  role!: ProjectRole;
 
   @Column({
     type: DataType.DATE,

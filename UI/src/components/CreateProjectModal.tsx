@@ -3,6 +3,7 @@ import { CreateProjectRequest } from "../types/project";
 import axios from "axios";
 import aiChatAPI from "../services/aiChat";
 import { buildProjectTemplate } from "../utils/descriptionTemplates";
+import { ProjectStatus, ProjectPriority } from "../enums";
 
 import { API_BASE_URL } from "../config/api";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
@@ -27,8 +28,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [formData, setFormData] = useState<CreateProjectRequest>({
     name: "",
     description: "",
-    status: "planning",
-    priority: "medium",
+    status: ProjectStatus.PLANNING,
+    priority: ProjectPriority.MEDIUM,
     startDate: "",
     endDate: "",
   });

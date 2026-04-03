@@ -1,6 +1,7 @@
 import { Project, Task } from "../models";
 import { Op } from "sequelize";
 import type { CreateProjectDto } from "../types/project";
+import { TaskStatus, ProjectStatus } from "../enums";
 
 export async function getAllProjects(userId: string) {
   const projects = await Project.findAll({
@@ -24,12 +25,12 @@ export async function getAllProjects(userId: string) {
     const tasks = project.tasks || [];
     const stats = {
       total_tasks: tasks.length,
-      completed_tasks: tasks.filter((task: any) => task.status === "Completed")
+      completed_tasks: tasks.filter((task: any) => task.status === TaskStatus.DONE)
         .length,
       in_progress_tasks: tasks.filter(
-        (task: any) => task.status === "In Progress",
+        (task: any) => task.status === TaskStatus.IN_PROGRESS,
       ).length,
-      todo_tasks: tasks.filter((task: any) => task.status === "To Do").length,
+      todo_tasks: tasks.filter((task: any) => task.status === TaskStatus.TODO).length,
     };
 
     return {
@@ -46,7 +47,7 @@ export async function createProject(dto: CreateProjectDto) {
     name: dto.name,
     description: dto.description,
     owner_id: dto.owner_id,
-    status: "Active",
+    status: ProjectStatus.ACTIVE,
   });
 
   return project.get({ plain: true });
@@ -77,12 +78,12 @@ export async function getProjectById(projectId: string, userId: string) {
   const tasks = project.tasks || [];
   const stats = {
     total_tasks: tasks.length,
-    completed_tasks: tasks.filter((task: any) => task.status === "Completed")
+    completed_tasks: tasks.filter((task: any) => task.status === TaskStatus.DONE)
       .length,
     in_progress_tasks: tasks.filter(
-      (task: any) => task.status === "In Progress",
+      (task: any) => task.status === TaskStatus.IN_PROGRESS,
     ).length,
-    todo_tasks: tasks.filter((task: any) => task.status === "To Do").length,
+    todo_tasks: tasks.filter((task: any) => task.status === TaskStatus.TODO).length,
   };
 
   return {
