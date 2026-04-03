@@ -1,73 +1,80 @@
-import { appConfig } from "../config";
+import cors, { CorsOptionsDelegate } from "cors";
 
-const getOriginHost = (value: string) => {
+
+const parseList = (value?: string): string[] => {
+  if (!value) return [];
+  return value.split(",").map((v) => v.trim()).filter(Boolean);
+};
+
+const allowedOrigins = parseList(process.env.CORS_ALLOWED_ORIGINS);
+const allowedPatterns = parseList(process.env.CORS_ALLOWED_ORIGIN_PATTERNS);
+
+/**
+ * Check wildcard patterns like:
+ */
+const matchesPattern = (origin: string) => {
   try {
-    return new URL(value).hostname;
+    const hostname = new URL(origin).hostname;
+
+    return allowedPatterns.some((pattern) => {
+      if (!pattern.startsWith("*.")) return false;
+
+      const domain = pattern.replace("*.", "");
+      return hostname === domain || hostname.endsWith(`.${domain}`);
+    });
   } catch {
-    return null;
+    return false;
   }
 };
-
-const getOriginFromEnv = (...keys: string[]) => {
-  for (const key of keys) {
-    const value = process.env[key]?.trim();
-    if (!value) continue;
-
-    try {
-      return new URL(value).origin;
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
-};
-
-const publicBackendOrigin = getOriginFromEnv(
-  "BACKEND_PUBLIC_URL",
-  "API_BASE_URL",
-  "RENDER_EXTERNAL_URL",
-  "PUBLIC_URL",
-);
 
 const isOriginAllowed = (origin: string) => {
-  if (appConfig.cors.allowedOrigins.includes("*")) return true;
-  return appConfig.cors.allowedOrigins.includes(origin);
+  if (allowedOrigins.includes(origin)) return true;
+  if (matchesPattern(origin)) return true;
+  return false;
 };
 
-const isTrustedProductionOrigin = (origin: string) => {
-  if (appConfig.env !== "production") return false;
+/**
+ * CORS Delegate
+ */
+export const corsOptionsDelegate: CorsOptionsDelegate = (req, callback) => {
+  const origin = req.headers.origin;
 
-  if (publicBackendOrigin && origin === publicBackendOrigin) {
-    return true;
+  // Allow server-to-server / Postman / curl
+  if (!origin) {
+    return callback(null, {
+      origin: true,
+      credentials: true,
+    });
   }
 
-  const host = getOriginHost(origin);
-  if (!host) return false;
+  if (isOriginAllowed(origin)) {
+    return callback(null, {
+      origin: true,
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "x-api-key",
+      ],
+    });
+  }
 
-  return host.endsWith(".vercel.app") || host.endsWith(".onrender.com");
+  console.warn("CORS BLOCKED:", origin);
+
+  // IMPORTANT: Do NOT throw error (breaks preflight)
+  return callback(null, {
+    origin: false,
+  });
 };
 
-export const corsOptionsDelegate = {
-  origin: (
-    origin: string | undefined,
-    callback: (err: Error | null, allow?: boolean) => void,
-  ) => {
-    // Allow non-browser/same-origin requests without Origin header.
-    if (!origin) {
-      return callback(null, true);
-    }
+/**
+ * Middleware setup
+ */
+export const setupCors = (app: any) => {
+  // Main CORS
+  app.use(cors(corsOptionsDelegate));
 
-    if (isOriginAllowed(origin)) {
-      return callback(null, true);
-    }
-
-    // Optional convenience for production preview and hosted docs deployments.
-    if (isTrustedProductionOrigin(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
+  // 🔥 Handle preflight explicitly
+  app.options("*", cors(corsOptionsDelegate));
 };

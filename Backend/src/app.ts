@@ -1,8 +1,7 @@
 import express, { Request, Response } from "express";
 import router from ".";
 import helmet from "helmet";
-import cors from "cors";
-import { corsOptionsDelegate } from "./middleware/cors";
+import { setupCors } from "./middleware/cors";
 import { errorHandler404 } from "./middleware/errorHandler404";
 import { errorHandler } from "./middleware/errorHandler";
 import { responseHandler } from "./middleware/responseHandler";
@@ -13,8 +12,10 @@ import { database, appConfig } from "./config";
 
 const app = express();
 
+// Setup CORS
+setupCors(app);
+
 // Global middlewares
-app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(responseHandler as express.RequestHandler);
