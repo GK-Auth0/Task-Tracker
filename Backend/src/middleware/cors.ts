@@ -72,9 +72,6 @@ export const corsOptionsDelegate: CorsOptionsDelegate = (req, callback) => {
  * Middleware setup
  */
 export const setupCors = (app: any) => {
-  // Main CORS
+  // Main CORS - this already handles preflight OPTIONS requests
   app.use(cors(corsOptionsDelegate));
-
-  // 🔥 Handle preflight explicitly
-  app.options("*", cors(corsOptionsDelegate));
 };
