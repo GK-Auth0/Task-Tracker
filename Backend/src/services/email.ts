@@ -248,7 +248,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       from: OTP_FROM_EMAIL,
       to,
       subject: "Reset your TaskTracker password",
-      html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+      html: buildResetPasswordHtml(resetLink),
     });
     return;
   }
@@ -258,7 +258,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       await sendResendEmail({
         to,
         subject: "Reset your TaskTracker password",
-        html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+        html: buildResetPasswordHtml(resetLink),
       });
     } catch (error: any) {
       if (EMAIL_USER && EMAIL_PASS) {
@@ -273,7 +273,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+          html: buildResetPasswordHtml(resetLink),
         });
         return;
       }
@@ -294,7 +294,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           {
             to,
             subject: "Reset your TaskTracker password",
-            html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+            html: buildResetPasswordHtml(resetLink),
             resetLink,
           },
           {
@@ -318,7 +318,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+          html: buildResetPasswordHtml(resetLink),
         });
         return;
       }
@@ -354,7 +354,6 @@ export const sendWorkspaceInviteEmail = async (options: {
     fullName: options.fullName,
     contextType: options.contextType,
     inviteUrl,
-    appUrl: UI_APP_URL,
   });
 
   if (EMAIL_PROVIDER === "smtp") {
