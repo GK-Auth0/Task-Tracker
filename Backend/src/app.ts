@@ -17,7 +17,7 @@ const app = express();
 setupCors(app);
 
 // Disable cache for all API routes
-app.use("/api", disableCache);
+/**  app.use("/api", disableCache);  **/
 
 // Global middlewares
 app.use(express.json({ limit: "1mb" }));
