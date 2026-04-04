@@ -12,7 +12,6 @@ import {
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "resend").toLowerCase();
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "no-reply@tasktracker.local";
-const UI_APP_URL = process.env.UI_APP_URL || process.env.FRONTEND_URL || "http://localhost:3001";
 const OTP_EMAIL_WEBHOOK_URL = process.env.OTP_EMAIL_WEBHOOK_URL;
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
@@ -33,6 +32,30 @@ const EMAIL_RETRY_BASE_DELAY_MS = parseInt(
   process.env.EMAIL_RETRY_BASE_DELAY_MS || "500",
   10,
 );
+
+const getPrimaryUrl = (...values: Array<string | undefined>) => {
+  for (const value of values) {
+    if (!value) continue;
+
+    const candidates = value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    for (const candidate of candidates) {
+      try {
+        const parsed = new URL(candidate);
+        return parsed.toString().replace(/\/+$/, "");
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return "http://localhost:3001";
+};
+
+const UI_APP_URL = getPrimaryUrl(process.env.UI_APP_URL, process.env.FRONTEND_URL);
 
 let smtpTransporter: any = null;
 let smtpTransporterKey: string | null = null;
