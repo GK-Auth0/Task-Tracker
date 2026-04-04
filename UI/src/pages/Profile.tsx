@@ -225,7 +225,11 @@ const Profile: React.FC = () => {
                   </span>
                   {editingName ? (
                     <div className="flex items-center gap-2">
+                      <label htmlFor="profile-full-name" className="sr-only">
+                        Full name
+                      </label>
                       <input
+                        id="profile-full-name"
                         type="text"
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
@@ -381,29 +385,49 @@ const Profile: React.FC = () => {
                 {resetStep === "otpSent" && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="profile-reset-otp" className="sr-only">
+                          OTP code
+                        </label>
+                        <input
+                          id="profile-reset-otp"
+                          ref={otpInputRef}
+                          value={otp}
+                          onChange={(e) =>
+                            setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+                          }
+                          placeholder="Enter OTP"
+                          className="w-full h-12 rounded-lg border border-slate-300 px-4"
+                          maxLength={6}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="profile-new-password" className="sr-only">
+                          New password
+                        </label>
+                        <input
+                          id="profile-new-password"
+                          value={newPasswordValue}
+                          onChange={(e) => setNewPasswordValue(e.target.value)}
+                          placeholder="New password"
+                          type="password"
+                          className="w-full h-12 rounded-lg border border-slate-300 px-4"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="profile-confirm-password" className="sr-only">
+                        Confirm new password
+                      </label>
                       <input
-                        ref={otpInputRef}
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-                        placeholder="Enter OTP"
-                        className="w-full h-12 rounded-lg border border-slate-300 px-4"
-                        maxLength={6}
-                      />
-                      <input
-                        value={newPasswordValue}
-                        onChange={(e) => setNewPasswordValue(e.target.value)}
-                        placeholder="New password"
+                        id="profile-confirm-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
                         type="password"
                         className="w-full h-12 rounded-lg border border-slate-300 px-4"
                       />
                     </div>
-                    <input
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                      type="password"
-                      className="w-full h-12 rounded-lg border border-slate-300 px-4"
-                    />
                     <div className="flex gap-2">
                       <button
                         type="button"

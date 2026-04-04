@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker Organization API
+  version: 1.0.0
+  description: Organization management endpoints for creating an organization and joining one by invite code.
+tags:
+  - name: Organizations
+    description: Organization operations
+paths:
+  /api/organizations:
+    post:
+      tags:
+        - Organizations
+      summary: Create an organization
+      description: Creates a new organization for the authenticated user and links that user to it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationRequest"
+            examples:
+              default:
+                value:
+                  name: Acme Labs
+                  description: Workspace for product and QA teams
+                  capacity: 50
+                  status: active
+                  industry: Software
+                  website_url: https://acme.example.com
+                  contact_email: admin@acme.example.com
+                  phone_number: "+1-555-123-4567"
+                  address_line_1: 123 Market Street
+                  city: San Francisco
+                  state: California
+                  country: USA
+                  postal_code: "94105"
+      responses:
+        "201":
+          description: Organization created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationSuccessResponse"
+        "400":
+          description: Validation or creation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/organizations/join-by-code:
+    post:
+      tags:
+        - Organizations
+      summary: Join organization by code
+      description: Links the authenticated user to an organization using their invite organization code.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinOrganizationByCodeRequest"
+            examples:
+              default:
+                value:
+                  org_code: TT1234
+      responses:
+        "200":
+          description: Organization joined successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationSuccessResponse"
+        "400":
+          description: Join operation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateOrganizationRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+          example: Acme Labs
+        admin:
+          type: string
+          format: uuid
+          example: 65fd74c8-9830-42ea-a098-b0c58f0d2341
+        description:
+          type: string
+          maxLength: 2000
+          example: Workspace for product and QA teams
+        logo_url:
+          type: string
+          maxLength: 500
+          example: https://cdn.example.com/logo.png
+        capacity:
+          type: integer
+          minimum: 1
+          example: 50
+        status:
+          type: string
+          enum:
+            - active
+            - inactive
+          example: active
+        industry:
+          type: string
+          maxLength: 100
+          example: Software
+        website_url:
+          type: string
+          maxLength: 500
+          example: https://acme.example.com
+        contact_email:
+          type: string
+          format: email
+          example: admin@acme.example.com
+        phone_number:
+          type: string
+          maxLength: 30
+          example: "+1-555-123-4567"
+        address_line_1:
+          type: string
+          maxLength: 255
+          example: 123 Market Street
+        address_line_2:
+          type: string
+          maxLength: 255
+          example: Suite 400
+        city:
+          type: string
+          maxLength: 100
+          example: San Francisco
+        state:
+          type: string
+          maxLength: 100
+          example: California
+        country:
+          type: string
+          maxLength: 100
+          example: USA
+        postal_code:
+          type: string
+          maxLength: 20
+          example: "94105"
+    JoinOrganizationByCodeRequest:
+      type: object
+      required:
+        - org_code
+      properties:
+        org_code:
+          type: string
+          minLength: 6
+          maxLength: 12
+          example: TT1234
+    OrganizationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 15c57716-a0df-4d5d-bf32-74b721d8eb0c
+        name:
+          type: string
+          example: Acme Labs
+        org_code:
+          type: string
+          example: TT1234
+        slug:
+          type: string
+          example: acme-labs
+        capacity:
+          type: integer
+          nullable: true
+          example: 50
+        status:
+          type: string
+          nullable: true
+          example: active
+        logo_url:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/logo.png
+    OrganizationSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Organization created successfully
+        data:
+          $ref: "#/components/schemas/OrganizationSummary"
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Failed to create organization
+        error:
+          type: string
+          example: User is already linked to an organization
