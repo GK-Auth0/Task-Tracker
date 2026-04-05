@@ -64,6 +64,11 @@ export enum ConfidentialAccessState {
   REJECTED = "rejected"
 }
 
+export enum ConfidentialAccessScope {
+  SPECIFIC_USERS = "specific_users",
+  ORGANIZATION = "organization",
+}
+
 export enum ProjectStatus {
   PLANNING = "planning",
   ACTIVE = "active",

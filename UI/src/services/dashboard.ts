@@ -118,6 +118,12 @@ export interface Task {
     full_name: string;
     email: string;
   };
+  defect_id?: string | null;
+  sprint_id?: string | null;
+  sprint?: {
+    id: string;
+    name: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -335,6 +341,8 @@ export const tasksAPI = {
     description: string;
     project_id: string;
     assignee_id?: string;
+    defect_id?: string;
+    sprint_id?: string;
     due_date?: string;
     priority: "Low" | "Medium" | "High";
     invitees?: Array<{
@@ -364,6 +372,16 @@ export const tasksAPI = {
         ? { priority: normalizeTaskPriority(data.priority) || data.priority }
         : {}),
     });
+    return response.data;
+  },
+
+  deleteTask: async (
+    id: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> => {
+    const response = await api.delete(`/api/v1/tasks/${id}`);
     return response.data;
   },
 

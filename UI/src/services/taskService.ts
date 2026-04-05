@@ -58,6 +58,8 @@ export const taskService = {
       ...(data.priority
         ? { priority: normalizeTaskPriority(data.priority) || data.priority }
         : {}),
+      ...(data.defectId ? { defect_id: data.defectId } : {}),
+      ...(data.sprintId ? { sprint_id: data.sprintId } : {}),
     });
     return response.data;
   },
@@ -72,6 +74,8 @@ export const taskService = {
       ...(data.priority
         ? { priority: normalizeTaskPriority(data.priority) || data.priority }
         : {}),
+      ...(data.defectId !== undefined ? { defect_id: data.defectId } : {}),
+      ...(data.sprintId !== undefined ? { sprint_id: data.sprintId } : {}),
     });
     return response.data;
   },

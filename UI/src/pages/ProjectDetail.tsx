@@ -12,10 +12,12 @@ import { API_BASE_URL } from "../config/api";
 import { projectsAPI, ActivityLog } from "../services/dashboard";
 import { projectService } from "../services/projectService";
 import { taskService } from "../services/taskService";
-import { Project } from "../types/project";
+import { sprintsAPI } from "../services/sprints";
+import { Project, ProjectConfidentialAccessConfig } from "../types/project";
 import { isWorkspaceAdmin } from "../types/roles";
 import { Task } from "../types/task";
 import { ProjectStatus, ProjectPriority } from "../enums";
+import type { Sprint } from "../types/sprint";
 
 type ProjectTab = "tasks" | "roadmap" | "files" | "activity";
 
@@ -30,6 +32,7 @@ const ProjectDetail: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [roadmapTasksRaw, setRoadmapTasksRaw] = useState<Task[]>([]);
   const [files, setFiles] = useState<any[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
@@ -45,6 +48,20 @@ const ProjectDetail: React.FC = () => {
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [reviewingRequestId, setReviewingRequestId] = useState("");
+  const [confidentialConfig, setConfidentialConfig] =
+    useState<ProjectConfidentialAccessConfig | null>(null);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configError, setConfigError] = useState("");
+  const [configSearch, setConfigSearch] = useState("");
+  const [configSearchLoading, setConfigSearchLoading] = useState(false);
+  const [configUserOptions, setConfigUserOptions] = useState<
+    Array<{
+      id: string;
+      full_name: string;
+      email: string;
+      role: string;
+    }>
+  >([]);
 
   const [uploading, setUploading] = useState(false);
   const [searchingUsers, setSearchingUsers] = useState(false);
@@ -138,6 +155,8 @@ const ProjectDetail: React.FC = () => {
       priority: priorityMap[rawPriority] || "medium",
       startDate: task.startDate || task.start_date,
       dueDate: task.dueDate || task.due_date,
+      sprintId: task.sprintId || task.sprint_id,
+      sprint: task.sprint || undefined,
       projectId: task.projectId || task.project_id,
       assigneeId: task.assigneeId || task.assignee_id,
       createdAt: task.createdAt || task.created_at || new Date().toISOString(),
@@ -189,6 +208,25 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  const fetchConfidentialAccessConfig = async (projectId: string) => {
+    try {
+      setConfigError("");
+      const response = await projectService.getConfidentialAccessConfig(projectId);
+      if (response.success) {
+        setConfidentialConfig(response.data);
+      }
+    } catch (error: any) {
+      setConfidentialConfig({
+        access_scope: "specific_users",
+        allowed_user_ids: [],
+        allowed_users: [],
+      });
+      setConfigError(
+        error?.response?.data?.message || "Failed to load confidential access config.",
+      );
+    }
+  };
+
   const fetchProjectData = async () => {
     if (!id) return;
 
@@ -205,6 +243,11 @@ const ProjectDetail: React.FC = () => {
 
       const loadedProject = projectResponse.data;
       setProject(loadedProject);
+      const sprintResponse = await sprintsAPI.getSprints({ project_id: id });
+      if (sprintResponse.success) {
+        setSprints(sprintResponse.data);
+      }
+      setConfidentialConfig(loadedProject.confidential_access?.config || null);
 
       await fetchTaskData(id);
 
@@ -219,6 +262,9 @@ const ProjectDetail: React.FC = () => {
         if (canReview) {
           await fetchConfidentialAccessRequests();
         }
+        if (isWorkspaceAdmin(user.role)) {
+          await fetchConfidentialAccessConfig(id);
+        }
       }
     } catch {
       setProject(null);
@@ -226,6 +272,7 @@ const ProjectDetail: React.FC = () => {
       setRoadmapTasksRaw([]);
       setFiles([]);
       setActivityLogs([]);
+      setConfidentialConfig(null);
     } finally {
       setLoading(false);
     }
@@ -351,6 +398,103 @@ const ProjectDetail: React.FC = () => {
       setSearchedUsers([]);
     } finally {
       setSearchingUsers(false);
+    }
+  };
+
+  const handleConfigSearch = async (query: string) => {
+    setConfigSearch(query);
+    const keyword = query.trim();
+    if (!keyword) {
+      setConfigUserOptions([]);
+      return;
+    }
+
+    try {
+      setConfigSearchLoading(true);
+      const response = await projectService.getProjectUsers(keyword);
+      setConfigUserOptions(response.success ? response.data || [] : []);
+    } catch {
+      setConfigUserOptions([]);
+    } finally {
+      setConfigSearchLoading(false);
+    }
+  };
+
+  const handleConfigScopeChange = (access_scope: "specific_users" | "organization") => {
+    setConfigError("");
+    setConfidentialConfig((prev) => ({
+      access_scope,
+      allowed_user_ids:
+        access_scope === "organization" ? [] : prev?.allowed_user_ids || [],
+      allowed_users:
+        access_scope === "organization" ? [] : prev?.allowed_users || [],
+      updated_at: prev?.updated_at || null,
+    }));
+  };
+
+  const handleToggleAllowedUser = (selectedUser: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  }) => {
+    setConfigError("");
+    setConfidentialConfig((prev) => {
+      const base = prev || {
+        access_scope: "specific_users" as const,
+        allowed_user_ids: [],
+        allowed_users: [],
+        updated_at: null,
+      };
+      const exists = base.allowed_user_ids.includes(selectedUser.id);
+      return {
+        ...base,
+        access_scope: "specific_users",
+        allowed_user_ids: exists
+          ? base.allowed_user_ids.filter((userId) => userId !== selectedUser.id)
+          : [...base.allowed_user_ids, selectedUser.id],
+        allowed_users: exists
+          ? base.allowed_users.filter((user) => user.id !== selectedUser.id)
+          : [...base.allowed_users, selectedUser],
+      };
+    });
+  };
+
+  const handleRemoveAllowedUser = (userId: string) => {
+    setConfigError("");
+    setConfidentialConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        allowed_user_ids: prev.allowed_user_ids.filter((value) => value !== userId),
+        allowed_users: prev.allowed_users.filter((user) => user.id !== userId),
+      };
+    });
+  };
+
+  const handleSaveConfidentialConfig = async () => {
+    if (!project || !confidentialConfig) return;
+
+    try {
+      setConfigSaving(true);
+      setConfigError("");
+      const response = await projectService.updateConfidentialAccessConfig(project.id, {
+        access_scope: confidentialConfig.access_scope,
+        allowed_user_ids:
+          confidentialConfig.access_scope === "organization"
+            ? []
+            : confidentialConfig.allowed_user_ids,
+      });
+      if (response.success) {
+        setConfidentialConfig(response.data);
+        await fetchProjectData();
+      }
+    } catch (error: any) {
+      setConfigError(
+        error?.response?.data?.message || "Failed to save confidential access config.",
+      );
+    } finally {
+      setConfigSaving(false);
     }
   };
 
@@ -593,6 +737,7 @@ const ProjectDetail: React.FC = () => {
           isOwnerOrAdmin={isOwnerOrAdmin}
           onStatusChange={handleStatusUpdate}
           onCreateTask={() => setShowCreateTaskModal(true)}
+          sprintLabel={sprints[0]?.name}
         />
 
         <ProjectTabNav
@@ -640,6 +785,7 @@ const ProjectDetail: React.FC = () => {
         {showConfidentialPanel && (
           <ProjectConfidentialAccessPanel
             canViewConfidential={canViewConfidential}
+            hasAdminAccess={Boolean(user && isWorkspaceAdmin(user.role))}
             requestStatus={requestStatus}
             requestReason={requestReason}
             submitting={requestSubmitting}
@@ -649,6 +795,24 @@ const ProjectDetail: React.FC = () => {
             reviewItems={accessRequests}
             reviewing={reviewingRequestId}
             onReview={reviewConfidentialRequest}
+            canManageConfig={false}
+            config={
+              confidentialConfig || {
+                access_scope: "specific_users",
+                allowed_user_ids: [],
+                allowed_users: [],
+              }
+            }
+            configSaving={configSaving}
+            configError={configError}
+            configSearch={configSearch}
+            configSearchLoading={configSearchLoading}
+            configUserOptions={configUserOptions}
+            onConfigSearchChange={handleConfigSearch}
+            onConfigScopeChange={handleConfigScopeChange}
+            onToggleAllowedUser={handleToggleAllowedUser}
+            onRemoveAllowedUser={handleRemoveAllowedUser}
+            onSaveConfig={handleSaveConfidentialConfig}
           />
         )}
 

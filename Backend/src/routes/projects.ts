@@ -155,6 +155,7 @@ router.use(authenticateToken);
  *                       type: integer
  */
 router.get('/', projectController.getProjects);
+router.get('/confidential-access/projects', projectController.getConfidentialAccessProjects);
 
 /**
  * @swagger
@@ -213,6 +214,8 @@ router.delete('/:id/members/:userId', requireWorkspaceRole("Member"), projectCon
 router.post('/:id/confidential-access/request', projectController.requestConfidentialAccess);
 router.get('/:id/confidential-access/requests', projectController.getConfidentialAccessRequests);
 router.patch('/:id/confidential-access/requests/:requestId', projectController.reviewConfidentialAccessRequest);
+router.get('/:id/confidential-access/config', projectController.getConfidentialAccessConfig);
+router.patch('/:id/confidential-access/config', projectController.updateConfidentialAccessConfig);
 router.get('/:id/activity', projectController.getProjectActivity);
 
 /**

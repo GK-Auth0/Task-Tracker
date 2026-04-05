@@ -8,6 +8,7 @@ interface WorkspacePageHeaderProps {
   metaLabel: string;
   metaValue: string;
   actions?: ReactNode;
+  showStaticBanner?: boolean;
 }
 
 export default function WorkspacePageHeader({
@@ -17,6 +18,7 @@ export default function WorkspacePageHeader({
   metaLabel,
   metaValue,
   actions,
+  showStaticBanner = true,
 }: WorkspacePageHeaderProps) {
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -42,7 +44,7 @@ export default function WorkspacePageHeader({
       </div>
 
       <div className="flex flex-col items-start gap-3 sm:items-end">
-        <StaticDataBanner />
+        {showStaticBanner ? <StaticDataBanner /> : null}
         {actions}
       </div>
     </div>

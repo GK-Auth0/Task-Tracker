@@ -30,6 +30,10 @@ interface TaskDetails {
     full_name: string;
     email: string;
   };
+  sprint?: {
+    id: string;
+    name: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +45,52 @@ const isTaskTab = (value: string | null): value is TaskTab =>
   value === "prs" ||
   value === "activity" ||
   value === "attachments";
+
+const ACTIVITY_METADATA_KEYS = new Set(["timestamp", "action_time"]);
+
+const ACTIVITY_FIELD_LABELS: Record<string, string> = {
+  title: "title",
+  description: "description",
+  status: "status",
+  priority: "priority",
+  due_date: "due date",
+  assignee: "assignee",
+  assignee_id: "assignee",
+};
+
+function asValidDate(value?: string | Date | null): Date | null {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getActivityTimestamp(log: ActivityLog): string {
+  const fallbackCandidates = [
+    log.created_at,
+    typeof log.changes?.timestamp === "string" ? log.changes.timestamp : null,
+    log.changes?.action_time instanceof Date
+      ? log.changes.action_time.toISOString()
+      : typeof log.changes?.action_time === "string"
+        ? log.changes.action_time
+        : null,
+  ];
+
+  const validDate = fallbackCandidates
+    .map((value) => asValidDate(value))
+    .find((value): value is Date => value !== null);
+
+  return validDate ? validDate.toLocaleString() : "Time unavailable";
+}
+
+function getVisibleChangeKeys(log: ActivityLog): string[] {
+  return Object.keys(log.changes || {}).filter(
+    (key) => !ACTIVITY_METADATA_KEYS.has(key),
+  );
+}
+
+function formatChangeLabel(key: string): string {
+  return ACTIVITY_FIELD_LABELS[key] || key.replace(/_/g, " ");
+}
 
 export default function TaskDetails() {
   const { id } = useParams<{ id: string }>();
@@ -58,11 +108,13 @@ export default function TaskDetails() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [prioritySaving, setPrioritySaving] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [editAiLoading, setEditAiLoading] = useState(false);
   const [editAiError, setEditAiError] = useState("");
   const [showLinkPRModal, setShowLinkPRModal] = useState(false);
@@ -297,6 +349,41 @@ export default function TaskDetails() {
     }
   };
 
+  const handleStartEditing = () => {
+    setActiveTab("overview");
+    setEditMode(true);
+    setEditError("");
+    setDeleteError("");
+    setEditTitle(task?.title || "");
+    setEditDescription(task?.description || "");
+  };
+
+  const handleDeleteTask = async () => {
+    if (!task || deleteSaving) return;
+
+    const confirmed = window.confirm(
+      `Delete "${task.title}"? This action cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeleteSaving(true);
+      setDeleteError("");
+      const response = await tasksAPI.deleteTask(task.id);
+      if (response.success) {
+        navigate(`/projects/${task.project.id}`);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        "Failed to delete task.";
+      setDeleteError(String(message));
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
   const handleLinkPR = async () => {
     if (!id || !prForm.title || !prForm.repository || !prForm.number) return;
 
@@ -458,6 +545,11 @@ export default function TaskDetails() {
                   {taskError}
                 </div>
               )}
+              {deleteError && (
+                <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {deleteError}
+                </div>
+              )}
 
               <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap justify-between items-start gap-4">
@@ -597,10 +689,15 @@ export default function TaskDetails() {
                         type="button"
                         className="text-blue-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
                         onClick={() => {
-                          setEditMode((prev) => !prev);
-                          setEditError("");
-                          setEditTitle(task.title || "");
-                          setEditDescription(task.description || "");
+                          if (editMode) {
+                            setEditMode(false);
+                            setEditError("");
+                            setEditAiError("");
+                            setEditTitle(task.title || "");
+                            setEditDescription(task.description || "");
+                            return;
+                          }
+                          handleStartEditing();
                         }}
                       >
                         <span className="material-symbols-outlined text-sm">
@@ -1073,14 +1170,15 @@ export default function TaskDetails() {
                               return "assigned this task";
                             case "unassigned":
                               return "unassigned this task";
-                            case "updated":
-                              const changes = Object.keys(
-                                log.changes || {},
-                              ).filter(
-                                (key) =>
-                                  key !== "timestamp" && key !== "action_time",
-                              );
-                              return `updated ${changes.join(", ")}`;
+                            case "updated": {
+                              const visibleChanges = getVisibleChangeKeys(log);
+                              if (visibleChanges.length === 0) {
+                                return "updated this task";
+                              }
+                              return `updated ${visibleChanges
+                                .map(formatChangeLabel)
+                                .join(", ")}`;
+                            }
                             case "deleted":
                               return "deleted this task";
                             default:
@@ -1118,17 +1216,26 @@ export default function TaskDetails() {
                                 </span>
                               </div>
                               <div className="text-xs text-slate-500">
-                                {new Date(log.created_at).toLocaleString()}
+                                {getActivityTimestamp(log)}
                               </div>
                               {log.changes &&
-                                Object.keys(log.changes).length > 2 && (
+                                getVisibleChangeKeys(log).length > 0 && (
                                   <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded">
                                     <details>
                                       <summary className="cursor-pointer font-medium">
                                         View changes
                                       </summary>
                                       <pre className="mt-1 text-[10px] overflow-x-auto">
-                                        {JSON.stringify(log.changes, null, 2)}
+                                        {JSON.stringify(
+                                          Object.fromEntries(
+                                            Object.entries(log.changes).filter(
+                                              ([key]) =>
+                                                !ACTIVITY_METADATA_KEYS.has(key),
+                                            ),
+                                          ),
+                                          null,
+                                          2,
+                                        )}
                                       </pre>
                                     </details>
                                   </div>
@@ -1215,6 +1322,22 @@ export default function TaskDetails() {
                       </span>
                     </div>
                   </div>
+
+                  {task.sprint?.name ? (
+                    <div className="space-y-2">
+                      <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                        Sprint
+                      </label>
+                      <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-2 text-slate-900">
+                        <span className="material-symbols-outlined text-blue-600">
+                          view_kanban
+                        </span>
+                        <span className="text-sm font-semibold">
+                          {task.sprint.name}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {task.due_date && (
                     <div className="space-y-2">
@@ -1309,12 +1432,29 @@ export default function TaskDetails() {
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
                     Actions
                   </p>
-                  <button className="w-full text-slate-500 hover:text-red-500 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-red-200 hover:bg-red-50">
-                    <span className="material-symbols-outlined text-sm">
-                      delete
-                    </span>
-                    Delete Task
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleStartEditing}
+                      className="w-full text-slate-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        edit_square
+                      </span>
+                      Update Task
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteTask}
+                      disabled={deleteSaving}
+                      className="w-full text-slate-500 hover:text-red-500 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        delete
+                      </span>
+                      {deleteSaving ? "Deleting..." : "Delete Task"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

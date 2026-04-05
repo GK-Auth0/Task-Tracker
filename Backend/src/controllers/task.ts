@@ -97,6 +97,8 @@ export const createNewTask = async (req: Request, res: Response) => {
       priority: normalizeTaskPriority(req.body.priority) || TaskPriority.MEDIUM,
       project_id: req.body.project_id,
       assignee_id: req.body.assignee_id,
+      defect_id: req.body.defect_id,
+      sprint_id: req.body.sprint_id,
       creator_id: userId,
       due_date: req.body.due_date,
     };
@@ -201,6 +203,8 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
           ? undefined
           : normalizeTaskPriority(req.body.priority),
       assignee_id: req.body.assignee_id,
+      defect_id: req.body.defect_id,
+      sprint_id: req.body.sprint_id,
       due_date: req.body.due_date,
     };
 

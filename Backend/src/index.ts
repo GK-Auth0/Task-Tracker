@@ -11,6 +11,9 @@ import preferencesRoutes from "./routes/preferences";
 import webhookRoutes from "./routes/webhook";
 import inviteRoutes from "./routes/invite";
 import organizationRoutes from "./routes/organization";
+import defectRoutes from "./routes/defect";
+import testCaseRoutes from "./routes/testCase";
+import sprintRoutes from "./routes/sprint";
 
 const router = express.Router();
 
@@ -27,6 +30,9 @@ router.use("/api/preferences", preferencesRoutes);
 router.use("/api/webhook", webhookRoutes);
 router.use("/api/invites", inviteRoutes);
 router.use("/api/organizations", organizationRoutes);
+router.use("/api/defects", defectRoutes);
+router.use("/api/test-cases", testCaseRoutes);
+router.use("/api/sprints", sprintRoutes);
 
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {

@@ -8,6 +8,7 @@ interface ProjectHeaderProps {
   isOwnerOrAdmin: boolean;
   onStatusChange: (status: ProjectStatus) => void;
   onCreateTask: () => void;
+  sprintLabel?: string;
 }
 
 const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -15,6 +16,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   isOwnerOrAdmin,
   onStatusChange,
   onCreateTask,
+  sprintLabel,
 }) => {
   const members = project.members || [];
   const visibleMembers = members.slice(0, 5);
@@ -56,6 +58,11 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-4">
+            {sprintLabel ? (
+              <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                Sprint: {sprintLabel}
+              </span>
+            ) : null}
             <div className="flex -space-x-2">
               {visibleMembers.map((member) => (
                 <div

@@ -66,6 +66,18 @@ export const createTaskSchema = {
       errorMessage: "Assignee ID must be a valid UUID",
     },
   },
+  defect_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Defect ID must be a valid UUID",
+    },
+  },
+  sprint_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Sprint ID must be a valid UUID",
+    },
+  },
   due_date: {
     optional: true,
     isISO8601: {
@@ -134,6 +146,18 @@ export const updateTaskSchema = {
     optional: true,
     isUUID: {
       errorMessage: "Assignee ID must be a valid UUID",
+    },
+  },
+  defect_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Defect ID must be a valid UUID",
+    },
+  },
+  sprint_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Sprint ID must be a valid UUID",
     },
   },
   due_date: {

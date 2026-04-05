@@ -27,7 +27,34 @@ export interface Project {
     request_status: ConfidentialAccessState;
     requested_at?: string | null;
     decision_note?: string | null;
+    config?: ProjectConfidentialAccessConfig | null;
   };
+}
+
+export interface ProjectConfidentialAccessConfig {
+  access_scope: "specific_users" | "organization";
+  allowed_user_ids: string[];
+  allowed_users: Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  }>;
+  updated_at?: string | null;
+}
+
+export interface ProjectConfidentialAccessProjectSummary {
+  id: string;
+  name: string;
+  status: ProjectStatus;
+  priority: ProjectPriority;
+  updated_at?: string;
+  owner: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
+  config: ProjectConfidentialAccessConfig;
 }
 
 export interface ProjectMember {

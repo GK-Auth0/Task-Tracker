@@ -293,6 +293,83 @@ Table project_confidential_access_requests {
   updated_at timestamp
 }
 
+Table defects {
+  id uuid [pk]
+  reference_code varchar(20) [not null, unique]
+  title varchar(255) [not null]
+  description text [not null]
+  reproduction_steps jsonb [not null]
+  severity varchar(20) [not null, note: 'Critical, High, Medium, Low']
+  priority varchar(20) [not null, note: 'Critical, High, Medium, Low']
+  status varchar(20) [not null, note: 'Open, Approved, Rejected, In Progress, Resolved']
+  project_id uuid [not null]
+  linked_task_id uuid
+  created_task_id uuid
+  creator_id uuid [not null]
+  assignee_id uuid
+  sprint_name varchar(120)
+  linked_run varchar(120)
+  linked_case varchar(120)
+  environment varchar(120)
+  rejection_reason text
+  approved_at timestamp
+  approved_by uuid
+  rejected_at timestamp
+  rejected_by uuid
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table test_cases {
+  id uuid [pk]
+  reference_code varchar(20) [not null, unique]
+  title varchar(255) [not null]
+  project_id uuid [not null]
+  linked_task_id uuid
+  owner_id uuid [not null]
+  suite varchar(120) [not null]
+  module varchar(120) [not null]
+  sprint_name varchar(120)
+  priority varchar(20) [not null, note: 'Critical, High, Medium, Low']
+  status varchar(20) [not null, note: 'Draft, Ready, Blocked, Passed, Failed']
+  automation varchar(20) [not null, note: 'Manual, Automated, Candidate']
+  tags jsonb [not null]
+  preconditions jsonb [not null]
+  steps jsonb [not null]
+  linked_items jsonb [not null]
+  execution_history jsonb [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table sprints {
+  id uuid [pk]
+  name varchar(120) [not null]
+  goal text
+  release varchar(120)
+  squad varchar(120)
+  project_id uuid [not null]
+  owner_id uuid [not null]
+  capacity integer
+  start_date date
+  end_date date
+  status varchar(20) [not null, note: 'Planning, Active, Completed']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table config {
+  id uuid [pk]
+  project_id uuid [not null, unique]
+  organization_id uuid [not null]
+  access_scope varchar(30) [not null, note: 'specific_users, organization']
+  allowed_user_ids jsonb [not null]
+  created_by uuid
+  updated_by uuid
+  created_at timestamp
+  updated_at timestamp
+}
+
 Table invites {
   id uuid [pk]
   inviter_id uuid [not null]
@@ -357,6 +434,8 @@ Ref: projects.owner_id > users.id
 Ref: tasks.project_id > projects.id
 Ref: tasks.creator_id > users.id
 Ref: tasks.assignee_id > users.id
+Ref: tasks.defect_id > defects.id
+Ref: tasks.sprint_id > sprints.id
 Ref: subtasks.task_id > tasks.id
 Ref: comments.task_id > tasks.id
 Ref: comments.user_id > users.id
@@ -388,6 +467,22 @@ Ref: user_invitations.invited_by > users.id
 Ref: project_confidential_access_requests.project_id > projects.id
 Ref: project_confidential_access_requests.requester_id > users.id
 Ref: project_confidential_access_requests.decided_by > users.id
+Ref: defects.project_id > projects.id
+Ref: defects.linked_task_id > tasks.id
+Ref: defects.created_task_id > tasks.id
+Ref: defects.creator_id > users.id
+Ref: defects.assignee_id > users.id
+Ref: defects.approved_by > users.id
+Ref: defects.rejected_by > users.id
+Ref: test_cases.project_id > projects.id
+Ref: test_cases.linked_task_id > tasks.id
+Ref: test_cases.owner_id > users.id
+Ref: sprints.project_id > projects.id
+Ref: sprints.owner_id > users.id
+Ref: config.project_id > projects.id
+Ref: config.organization_id > organization.id
+Ref: config.created_by > users.id
+Ref: config.updated_by > users.id
 Ref: invites.inviter_id > users.id
 Ref: invites.invitee_id > users.id
 Ref: crons.type_id > cron_types.type_id

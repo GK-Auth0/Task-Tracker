@@ -1,34 +1,174 @@
-import { NavLink } from "react-router-dom";
-import { DEFECT_RAISE_CONTEXT, qaSectionLinks } from "../data/testManagement";
-import StaticDataBanner from "../components/StaticDataBanner";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { qaSectionLinks } from "../data/testManagement";
+import { useAuth } from "../contexts/AuthContext";
+import { defectsAPI } from "../services/defects";
+import { projectsAPI, tasksAPI, usersAPI } from "../services/dashboard";
+
+type ProjectOption = {
+  id: string;
+  name: string;
+};
+
+type UserOption = {
+  id: string;
+  full_name: string;
+  email: string;
+};
+
+type TaskOption = {
+  id: string;
+  title: string;
+  project: {
+    id: string;
+    name: string;
+  };
+};
+
+const severityOptions = ["Critical", "High", "Medium", "Low"] as const;
+const priorityOptions = ["Critical", "High", "Medium", "Low"] as const;
 
 export default function RaiseDefect() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [tasks, setTasks] = useState<TaskOption[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [linkedTaskId, setLinkedTaskId] = useState("");
+  const [title, setTitle] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [severity, setSeverity] = useState<(typeof severityOptions)[number]>("Medium");
+  const [priority, setPriority] = useState<(typeof priorityOptions)[number]>("Medium");
+  const [description, setDescription] = useState("");
+  const [reproductionStepsInput, setReproductionStepsInput] = useState("");
+  const [sprintName, setSprintName] = useState("");
+  const [linkedRun, setLinkedRun] = useState("");
+  const [linkedCase, setLinkedCase] = useState("");
+  const [environment, setEnvironment] = useState("");
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const [projectsResponse, usersResponse, tasksResponse] = await Promise.all([
+          projectsAPI.getProjects(),
+          usersAPI.getUsers({ limit: 200 }),
+          tasksAPI.getTasks({ limit: 200 }),
+        ]);
+
+        if (projectsResponse.success) {
+          setProjects(projectsResponse.data);
+          if (projectsResponse.data.length === 1) {
+            setProjectId(projectsResponse.data[0].id);
+          }
+        }
+
+        if (usersResponse.success) {
+          setUsers(usersResponse.data);
+        }
+
+        if (tasksResponse.success) {
+          setTasks(tasksResponse.data as TaskOption[]);
+        }
+      } catch (error) {
+        console.error("Failed to load defect form options:", error);
+        setSubmitError("Failed to load project, task, and user options");
+      }
+    };
+
+    loadOptions();
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) {
+      setLinkedTaskId("");
+      return;
+    }
+
+    if (linkedTaskId && !tasks.some((task) => task.id === linkedTaskId && task.project?.id === projectId)) {
+      setLinkedTaskId("");
+    }
+  }, [projectId, linkedTaskId, tasks]);
+
+  const filteredTasks = useMemo(
+    () => tasks.filter((task) => !projectId || task.project?.id === projectId),
+    [projectId, tasks],
+  );
+
+  const parsedSteps = reproductionStepsInput
+    .split("\n")
+    .map((step) => step.trim())
+    .filter(Boolean);
+
+  const selectedProject = projects.find((project) => project.id === projectId);
+  const selectedTask = filteredTasks.find((task) => task.id === linkedTaskId);
+
+  const handleSubmit = async () => {
+    setSubmitError("");
+
+    if (!projectId || !title.trim() || !description.trim()) {
+      setSubmitError("Project, summary, and description are required");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await defectsAPI.createDefect({
+        title: title.trim(),
+        description: description.trim(),
+        reproduction_steps: parsedSteps,
+        severity,
+        priority,
+        project_id: projectId,
+        assignee_id: assigneeId || undefined,
+        linked_task_id: linkedTaskId || undefined,
+        sprint_name: sprintName.trim() || undefined,
+        linked_run: linkedRun.trim() || undefined,
+        linked_case: linkedCase.trim() || undefined,
+        environment: environment.trim() || undefined,
+      });
+      navigate("/test-defects");
+    } catch (error: any) {
+      console.error("Failed to create defect:", error);
+      setSubmitError(
+        error?.response?.data?.message || "Failed to create defect",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="min-h-full p-4 sm:p-6 lg:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
               Quality
             </p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2">
+            <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
               Raise Defect
             </h1>
-            <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-              Capture a defect with its linked project, task, sprint, test case,
-              and execution run so engineering can triage it quickly.
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              Capture a real defect with its project, assignee, creator, linked
+              task, and reproduction details so review can happen quickly.
             </p>
           </div>
           <div className="flex flex-col items-start gap-3 sm:items-end">
-            <StaticDataBanner />
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all">
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
               <span className="material-symbols-outlined text-lg">send</span>
-              <span>Create Defect</span>
+              <span>{submitting ? "Creating..." : "Create Defect"}</span>
             </button>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-2 mb-6">
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-2">
           <div className="flex flex-wrap gap-2">
             {qaSectionLinks.map((link) => (
               <NavLink
@@ -51,27 +191,76 @@ export default function RaiseDefect() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-6">
+        {submitError ? (
+          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {submitError}
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
           <section className="space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <h2 className="text-sm font-semibold text-slate-900">Defect details</h2>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Summary
                   </span>
                   <input
-                    defaultValue="Expired reset link still accepted after timeout"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
                     className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    placeholder="Describe the defect clearly"
                   />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Project
+                  </span>
+                  <select
+                    value={projectId}
+                    onChange={(event) => setProjectId(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Assignee
                   </span>
-                  <select className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none">
-                    {DEFECT_RAISE_CONTEXT.assigneeOptions.map((item) => (
-                      <option key={item}>{item}</option>
+                  <select
+                    value={assigneeId}
+                    onChange={(event) => setAssigneeId(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Linked task
+                  </span>
+                  <select
+                    value={linkedTaskId}
+                    onChange={(event) => setLinkedTaskId(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+                  >
+                    <option value="">No linked task</option>
+                    {filteredTasks.map((task) => (
+                      <option key={task.id} value={task.id}>
+                        {task.title}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -79,8 +268,14 @@ export default function RaiseDefect() {
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Severity
                   </span>
-                  <select className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none">
-                    {DEFECT_RAISE_CONTEXT.severityOptions.map((item) => (
+                  <select
+                    value={severity}
+                    onChange={(event) =>
+                      setSeverity(event.target.value as (typeof severityOptions)[number])
+                    }
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+                  >
+                    {severityOptions.map((item) => (
                       <option key={item}>{item}</option>
                     ))}
                   </select>
@@ -89,85 +284,125 @@ export default function RaiseDefect() {
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Priority
                   </span>
-                  <select className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none">
-                    {DEFECT_RAISE_CONTEXT.priorityOptions.map((item) => (
+                  <select
+                    value={priority}
+                    onChange={(event) =>
+                      setPriority(event.target.value as (typeof priorityOptions)[number])
+                    }
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+                  >
+                    {priorityOptions.map((item) => (
                       <option key={item}>{item}</option>
                     ))}
                   </select>
                 </label>
               </div>
 
-              <label className="block mt-4">
+              <label className="mt-4 block">
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                   Description
                 </span>
                 <textarea
                   rows={5}
-                  defaultValue="When the reset token has expired, the API still accepts the password update request instead of rejecting it."
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                   className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                  placeholder="What happened and what should have happened instead?"
                 />
               </label>
 
-              <label className="block mt-4">
+              <label className="mt-4 block">
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                   Reproduction steps
                 </span>
-                <div className="mt-2 space-y-2">
-                  {DEFECT_RAISE_CONTEXT.reproductionSteps.map((step, index) => (
-                    <div
-                      key={step}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700"
-                    >
-                      <span className="font-semibold text-slate-900">{index + 1}.</span>{" "}
-                      {step}
-                    </div>
-                  ))}
-                </div>
+                <textarea
+                  rows={5}
+                  value={reproductionStepsInput}
+                  onChange={(event) => setReproductionStepsInput(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                  placeholder={"Enter one step per line\nOpen page\nPerform action\nObserve incorrect result"}
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Enter one step per line. These steps will also be copied into the
+                  auto-created task when the defect is approved.
+                </p>
               </label>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <h2 className="text-sm font-semibold text-slate-900">Linked delivery context</h2>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { label: "Project", value: DEFECT_RAISE_CONTEXT.project },
-                  { label: "Task", value: DEFECT_RAISE_CONTEXT.task },
-                  { label: "Sprint", value: DEFECT_RAISE_CONTEXT.sprint },
-                  { label: "Release", value: DEFECT_RAISE_CONTEXT.release },
-                  { label: "Test Run", value: DEFECT_RAISE_CONTEXT.selectedRun },
-                  { label: "Test Case", value: DEFECT_RAISE_CONTEXT.selectedCase },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      {item.label}
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-slate-800">
-                      {item.value}
-                    </p>
-                  </div>
-                ))}
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Sprint
+                  </span>
+                  <input
+                    value={sprintName}
+                    onChange={(event) => setSprintName(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    placeholder="Sprint 24"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Test Run
+                  </span>
+                  <input
+                    value={linkedRun}
+                    onChange={(event) => setLinkedRun(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    placeholder="Regression Run 9"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Test Case
+                  </span>
+                  <input
+                    value={linkedCase}
+                    onChange={(event) => setLinkedCase(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    placeholder="TC-104"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Environment
+                  </span>
+                  <input
+                    value={environment}
+                    onChange={(event) => setEnvironment(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    placeholder="Staging • Chrome 124 • Build 2026.04.05"
+                  />
+                </label>
               </div>
             </div>
           </section>
 
           <aside className="space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="text-sm font-semibold text-slate-900">Environment snapshot</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Review snapshot</h2>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <p>
-                  <span className="font-semibold text-slate-800">Environment:</span>{" "}
-                  {DEFECT_RAISE_CONTEXT.environment}
+                  <span className="font-semibold text-slate-800">Creator:</span>{" "}
+                  {user?.full_name || "Current user"}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-800">Run:</span>{" "}
-                  {DEFECT_RAISE_CONTEXT.selectedRun}
+                  <span className="font-semibold text-slate-800">Project:</span>{" "}
+                  {selectedProject?.name || "Not selected"}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-800">Case:</span>{" "}
-                  {DEFECT_RAISE_CONTEXT.selectedCase}
+                  <span className="font-semibold text-slate-800">Linked task:</span>{" "}
+                  {selectedTask?.title || "No task linked"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-800">Reproduction steps:</span>{" "}
+                  {parsedSteps.length}
+                </p>
+                <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-blue-700">
+                  Approved defects automatically create a task and keep the defect
+                  linked to that task.
                 </p>
               </div>
             </div>

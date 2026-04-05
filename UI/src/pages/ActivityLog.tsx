@@ -366,7 +366,12 @@ const ActivityLog: React.FC = () => {
 };
 
 function getLogDate(log: AuditActivityLog): Date {
-  return asValidDate(log.created_at) || new Date();
+  return (
+    asValidDate(log.created_at) ||
+    asValidDate(log.changes?.timestamp) ||
+    asValidDate(log.changes?.action_time) ||
+    new Date()
+  );
 }
 
 function isCommentLike(log: AuditActivityLog): boolean {

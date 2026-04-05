@@ -8,6 +8,12 @@ export interface Task {
   dueDate?: string;
   projectId?: string;
   assigneeId?: string;
+  defectId?: string;
+  sprintId?: string;
+  sprint?: {
+    id: string;
+    name: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +26,8 @@ export interface CreateTaskRequest {
   dueDate?: string;
   projectId?: string;
   assigneeId?: string;
+  defectId?: string;
+  sprintId?: string;
 }
 
 export interface TasksResponse {

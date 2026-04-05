@@ -4,13 +4,18 @@ import ProjectMember from '../models/ProjectMember';
 import User from '../models/user';
 import Task from '../models/task';
 import ProjectConfidentialAccessRequest from '../models/projectConfidentialAccessRequest';
+import Config from '../models/config';
 import { Op, fn, col, literal } from 'sequelize';
 import { processInvites } from "../services/invitation";
 import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
 import { parseBoundedInt } from "../helpers/query";
 import { isWorkspaceAdmin } from "../middleware/rbac";
 import { getAuditLogs } from "../services/auditService";
-import { ProjectRole, ConfidentialAccessState } from '../enums';
+import {
+  ProjectRole,
+  ConfidentialAccessScope,
+  ConfidentialAccessState,
+} from '../enums';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -25,6 +30,10 @@ type AccessContext = {
   isOwner: boolean;
   memberRole: string | null;
   latestRequest: ProjectConfidentialAccessRequest | null;
+  config: {
+    access_scope: ConfidentialAccessScope;
+    allowed_user_ids: string[];
+  } | null;
 };
 
 const isMissingTableError = (error: unknown) => {
@@ -59,11 +68,17 @@ export class ProjectController {
     this.updateProjectMemberRole = this.updateProjectMemberRole.bind(this);
     this.removeProjectMember = this.removeProjectMember.bind(this);
     this.getProjectActivity = this.getProjectActivity.bind(this);
+    this.getConfidentialAccessProjects =
+      this.getConfidentialAccessProjects.bind(this);
     this.requestConfidentialAccess = this.requestConfidentialAccess.bind(this);
     this.getConfidentialAccessRequests =
       this.getConfidentialAccessRequests.bind(this);
     this.reviewConfidentialAccessRequest =
-    this.reviewConfidentialAccessRequest.bind(this);
+      this.reviewConfidentialAccessRequest.bind(this);
+    this.getConfidentialAccessConfig =
+      this.getConfidentialAccessConfig.bind(this);
+    this.updateConfidentialAccessConfig =
+      this.updateConfidentialAccessConfig.bind(this);
   }
 
   private async getRequesterOrganizationId(userId: string): Promise<string | null> {
@@ -92,14 +107,22 @@ export class ProjectController {
 
     const memberRole = member?.role || null;
     let latestRequest: ProjectConfidentialAccessRequest | null = null;
+    let accessConfig: Config | null = null;
     try {
-      latestRequest = await ProjectConfidentialAccessRequest.findOne({
-        where: {
-          project_id: project.id,
-          requester_id: userId,
-        },
-        order: [["requested_at", "DESC"]],
-      });
+      [latestRequest, accessConfig] = await Promise.all([
+        ProjectConfidentialAccessRequest.findOne({
+          where: {
+            project_id: project.id,
+            requester_id: userId,
+          },
+          order: [["requested_at", "DESC"]],
+        }),
+        Config.findOne({
+          where: {
+            project_id: project.id,
+          },
+        }),
+      ]);
     } catch (error) {
       if (!isSchemaMismatchError(error)) {
         throw error;
@@ -110,14 +133,22 @@ export class ProjectController {
         (error as any)?.message || error,
       );
       latestRequest = null;
+      accessConfig = null;
     }
 
     const hasApprovedRequest = latestRequest?.status === ConfidentialAccessState.APPROVED;
+    const configAllowedUserIds = Array.isArray(accessConfig?.allowed_user_ids)
+      ? accessConfig!.allowed_user_ids.filter((value) => typeof value === "string")
+      : [];
+    const configAllowsUser =
+      accessConfig?.access_scope === ConfidentialAccessScope.ORGANIZATION ||
+      configAllowedUserIds.includes(userId);
     const canViewConfidential =
       workspaceAdmin ||
       isOwner ||
       memberRole === ProjectRole.OWNER ||
       memberRole === ProjectRole.ADMIN ||
+      configAllowsUser ||
       hasApprovedRequest;
 
     return {
@@ -126,6 +157,61 @@ export class ProjectController {
       isOwner,
       memberRole,
       latestRequest,
+      config: accessConfig
+        ? {
+            access_scope: accessConfig.access_scope,
+            allowed_user_ids: configAllowedUserIds,
+          }
+        : null,
+    };
+  }
+
+  private async getConfidentialAccessConfigRecord(projectId: string) {
+    try {
+      return await Config.findOne({
+        where: {
+          project_id: projectId,
+        },
+      });
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async serializeConfidentialAccessConfig(
+    config: Config | null,
+    organizationId: string,
+  ) {
+    const allowedUserIds = Array.isArray(config?.allowed_user_ids)
+      ? config!.allowed_user_ids.filter((value) => typeof value === "string")
+      : [];
+
+    const allowedUsers =
+      allowedUserIds.length > 0
+        ? await User.findAll({
+            where: {
+              id: { [Op.in]: allowedUserIds },
+              organization_id: organizationId,
+            },
+            attributes: ["id", "full_name", "email", "role"],
+            order: [["full_name", "ASC"]],
+          })
+        : [];
+
+    return {
+      access_scope:
+        config?.access_scope || ConfidentialAccessScope.SPECIFIC_USERS,
+      allowed_user_ids: allowedUserIds,
+      allowed_users: allowedUsers.map((user) => ({
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+      })),
+      updated_at: config?.updated_at || null,
     };
   }
 
@@ -355,6 +441,101 @@ export class ProjectController {
     }
   }
 
+  async getConfidentialAccessProjects(
+    req: AuthenticatedRequest,
+    res: Response,
+  ) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      if (!isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Only workspace admins can manage project access settings",
+        });
+      }
+
+      const requester = await User.findByPk(userId, {
+        attributes: ["id", "organization_id"],
+      });
+
+      if (!requester?.organization_id) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+        });
+      }
+
+      const projects = await Project.findAll({
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "full_name", "email"],
+            where: { organization_id: requester.organization_id },
+          },
+        ],
+        attributes: ["id", "name", "status", "priority", "updated_at"],
+        order: [["name", "ASC"]],
+      });
+
+      const projectIds = projects.map((project) => project.id);
+      const configs =
+        projectIds.length > 0
+          ? await Config.findAll({
+              where: {
+                project_id: { [Op.in]: projectIds },
+              },
+            })
+          : [];
+
+      const configByProjectId = new Map(configs.map((config) => [config.project_id, config]));
+
+      const data = await Promise.all(
+        projects.map(async (project) => {
+          const config = configByProjectId.get(project.id) || null;
+          const serializedConfig = await this.serializeConfidentialAccessConfig(
+            config,
+            requester.organization_id as string,
+          );
+
+          return {
+            id: project.id,
+            name: project.name,
+            status: project.status,
+            priority: project.priority,
+            updated_at: project.updated_at,
+            owner: {
+              id: project.owner.id,
+              full_name: project.owner.full_name,
+              email: project.owner.email,
+            },
+            config: serializedConfig,
+          };
+        }),
+      );
+
+      return res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      console.error("Error fetching confidential access projects:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch confidential access projects",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
   // Get single project by ID
   async getProject(req: AuthenticatedRequest, res: Response) {
     try {
@@ -449,6 +630,7 @@ export class ProjectController {
             request_status: accessContext.latestRequest?.status || ConfidentialAccessState.NONE,
             requested_at: accessContext.latestRequest?.requested_at || null,
             decision_note: accessContext.latestRequest?.decision_note || null,
+            config: accessContext.config,
           },
         }
       });
@@ -1565,6 +1747,205 @@ export class ProjectController {
       return res.status(500).json({
         success: false,
         message: "Failed to fetch project activity",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async getConfidentialAccessConfig(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      if (!isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Only workspace admins can manage confidential access config",
+        });
+      }
+
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const config = await this.getConfidentialAccessConfigRecord(project.id);
+      const data = await this.serializeConfidentialAccessConfig(
+        config,
+        requesterOrgId,
+      );
+
+      return res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      console.error("Error fetching confidential access config:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch confidential access config",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async updateConfidentialAccessConfig(
+    req: AuthenticatedRequest,
+    res: Response,
+  ) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const requestedScope = String(
+        req.body?.access_scope || ConfidentialAccessScope.SPECIFIC_USERS,
+      ).toLowerCase() as ConfidentialAccessScope;
+      const requestedUserIds = Array.isArray(req.body?.allowed_user_ids)
+        ? req.body.allowed_user_ids
+        : [];
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      if (!isWorkspaceAdmin(req.user?.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Only workspace admins can update confidential access config",
+        });
+      }
+
+      if (
+        requestedScope !== ConfidentialAccessScope.ORGANIZATION &&
+        requestedScope !== ConfidentialAccessScope.SPECIFIC_USERS
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "access_scope must be organization or specific_users",
+        });
+      }
+
+      const requesterOrgId = await this.getRequesterOrganizationId(userId);
+      if (!requesterOrgId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this project",
+        });
+      }
+
+      const project = await Project.findByPk(id as string, {
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: requesterOrgId },
+          },
+        ],
+      });
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+
+      const sanitizedUserIds: string[] = Array.from(
+        new Set(
+          requestedUserIds
+            .filter((value: unknown) => typeof value === "string")
+            .map((value: string) => value.trim())
+            .filter((value: string) => value.length > 0),
+        ),
+      );
+
+      if (requestedScope === ConfidentialAccessScope.SPECIFIC_USERS) {
+        const users = await User.findAll({
+          where: {
+            id: { [Op.in]: sanitizedUserIds },
+            organization_id: requesterOrgId,
+          },
+          attributes: ["id"],
+        });
+        const validUserIds = new Set(users.map((user) => user.id));
+        const invalidUserIds = sanitizedUserIds.filter((value) => !validUserIds.has(value));
+
+        if (invalidUserIds.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: "All allowed users must belong to the same organization",
+          });
+        }
+      }
+
+      const [config] = await Config.findOrCreate({
+        where: { project_id: project.id },
+        defaults: {
+          project_id: project.id,
+          organization_id: requesterOrgId,
+          access_scope: requestedScope,
+          allowed_user_ids:
+            requestedScope === ConfidentialAccessScope.ORGANIZATION
+              ? []
+              : sanitizedUserIds,
+          created_by: userId,
+          updated_by: userId,
+        },
+      });
+
+      config.organization_id = requesterOrgId;
+      config.access_scope = requestedScope;
+      config.allowed_user_ids =
+        requestedScope === ConfidentialAccessScope.ORGANIZATION
+          ? []
+          : sanitizedUserIds;
+      config.updated_by = userId;
+      await config.save();
+
+      const data = await this.serializeConfidentialAccessConfig(
+        config,
+        requesterOrgId,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Confidential access config updated",
+        data,
+      });
+    } catch (error) {
+      console.error("Error updating confidential access config:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update confidential access config",
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }

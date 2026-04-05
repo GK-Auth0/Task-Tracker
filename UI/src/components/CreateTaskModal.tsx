@@ -5,6 +5,8 @@ import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
 import { TaskPriority } from "../enums";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
+import { defectsAPI } from "../services/defects";
+import { sprintsAPI } from "../services/sprints";
 
 interface User {
   id: string;
@@ -15,6 +17,20 @@ interface User {
 interface Project {
   id: string;
   name: string;
+}
+
+interface DefectOption {
+  id: string;
+  reference_code: string;
+  title: string;
+  project_id: string;
+  created_task_id?: string | null;
+}
+
+interface SprintOption {
+  id: string;
+  name: string;
+  project_id: string;
 }
 
 interface CreateTaskModalProps {
@@ -46,9 +62,13 @@ export default function CreateTaskModal({
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [projectId, setProjectId] = useState("");
+  const [defectId, setDefectId] = useState("");
+  const [sprintId, setSprintId] = useState("");
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [defects, setDefects] = useState<DefectOption[]>([]);
+  const [sprints, setSprints] = useState<SprintOption[]>([]);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
@@ -70,6 +90,8 @@ export default function CreateTaskModal({
     setDueDate("");
     setPriority(TaskPriority.MEDIUM);
     setProjectId("");
+    setDefectId("");
+    setSprintId("");
     setInvitees([]);
     setDescriptionError("");
     setSubmitError("");
@@ -90,6 +112,21 @@ export default function CreateTaskModal({
       fetchUsersAndProjects();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setDefectId("");
+      setSprintId("");
+      return;
+    }
+
+    if (defectId && !defects.some((defect) => defect.id === defectId && defect.project_id === projectId)) {
+      setDefectId("");
+    }
+    if (sprintId && !sprints.some((sprint) => sprint.id === sprintId && sprint.project_id === projectId)) {
+      setSprintId("");
+    }
+  }, [defectId, defects, projectId, sprintId, sprints]);
 
   useEffect(() => {
     if (!isOpen || !title.trim()) {
@@ -127,9 +164,11 @@ export default function CreateTaskModal({
 
   const fetchUsersAndProjects = async () => {
     try {
-      const [usersResponse, projectsResponse] = await Promise.all([
+      const [usersResponse, projectsResponse, defectsResponse, sprintsResponse] = await Promise.all([
         usersAPI.getUsers(),
         projectsAPI.getProjects(),
+        defectsAPI.getDefects(),
+        sprintsAPI.getSprints(),
       ]);
 
       if (usersResponse.success) {
@@ -139,6 +178,30 @@ export default function CreateTaskModal({
       if (projectsResponse.success && projectsResponse.data.length > 0) {
         setProjects(projectsResponse.data);
         // Don't auto-select first project, let user choose
+      }
+
+      if (defectsResponse.success) {
+        setDefects(
+          defectsResponse.data
+            .filter((defect) => !defect.created_task_id)
+            .map((defect) => ({
+              id: defect.id,
+              reference_code: defect.reference_code,
+              title: defect.title,
+              project_id: defect.project_id,
+              created_task_id: defect.created_task_id,
+            })),
+        );
+      }
+
+      if (sprintsResponse.success) {
+        setSprints(
+          sprintsResponse.data.map((sprint) => ({
+            id: sprint.id,
+            name: sprint.name,
+            project_id: sprint.project_id,
+          })),
+        );
       }
     } catch (error) {
       console.error("Failed to fetch users and projects:", error);
@@ -189,6 +252,8 @@ export default function CreateTaskModal({
         description: description.trim(),
         project_id: projectId,
         assignee_id: assigneeId || undefined,
+        defect_id: defectId || undefined,
+        sprint_id: sprintId || undefined,
         due_date: dueDate || undefined,
         priority: priority,
         invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
@@ -231,6 +296,13 @@ export default function CreateTaskModal({
   const removeInvitee = (email: string) => {
     setInvitees((prev) => prev.filter((item) => item.email !== email));
   };
+
+  const availableDefects = defects.filter(
+    (defect) => !projectId || defect.project_id === projectId,
+  );
+  const availableSprints = sprints.filter(
+    (sprint) => !projectId || sprint.project_id === projectId,
+  );
 
   const formatDescription = (
     mode: "bold" | "italic" | "bullet" | "numbered" | "quote",
@@ -475,6 +547,55 @@ export default function CreateTaskModal({
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-semibold">
+                Sprint
+              </label>
+              <select
+                className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                value={sprintId}
+                onChange={(e) => setSprintId(e.target.value)}
+                disabled={!projectId && projects.length > 0}
+                title="Link this task to a sprint"
+                aria-label="Sprint selection"
+              >
+                <option value="">
+                  {!projectId ? "Select a project first" : "No sprint"}
+                </option>
+                {availableSprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>
+                    {sprint.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-semibold">
+                Link Defect
+              </label>
+              <select
+                className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                value={defectId}
+                onChange={(e) => setDefectId(e.target.value)}
+                disabled={!projectId && projects.length > 0}
+                title="Link this task to an approved or open defect"
+                aria-label="Defect selection"
+              >
+                <option value="">
+                  {!projectId ? "Select a project first" : "No linked defect"}
+                </option>
+                {availableDefects.map((defect) => (
+                  <option key={defect.id} value={defect.id}>
+                    {defect.reference_code} - {defect.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500">
+                Linking keeps the defect and task connected for tracking.
+              </p>
             </div>
 
             <div className="space-y-2">

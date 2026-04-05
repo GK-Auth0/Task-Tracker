@@ -1,36 +1,63 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SprintTabs from "../components/sprint/SprintTabs";
 import TestCaseSummaryStrip from "../components/testcases/TestCaseSummaryStrip";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
 import {
-  TEST_CASES,
-  TEST_FOLDERS,
   automationClasses,
   priorityClasses,
   qaSectionLinks,
   statusClasses,
-  type TestAutomation,
-  type TestCaseStatus,
 } from "../data/testManagement";
+import { testCasesAPI } from "../services/testCases";
+import type { TestAutomation, TestCaseRecord, TestCaseStatus } from "../types/testCase";
 
 type DetailTab = "overview" | "steps" | "links" | "history";
 
+const formatRelativeDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Recently updated";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+};
+
 export default function TestCases() {
   const navigate = useNavigate();
-  const [selectedCaseId, setSelectedCaseId] = useState(TEST_CASES[0].id);
+  const [testCases, setTestCases] = useState<TestCaseRecord[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | TestCaseStatus>("All");
-  const [automationFilter, setAutomationFilter] = useState<
-    "All" | TestAutomation
-  >("All");
+  const [automationFilter, setAutomationFilter] = useState<"All" | TestAutomation>("All");
   const [detailTab, setDetailTab] = useState<DetailTab>("overview");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTestCases = async () => {
+      try {
+        setLoading(true);
+        const response = await testCasesAPI.getTestCases();
+        if (response.success) {
+          setTestCases(response.data);
+          setSelectedCaseId((current) => current || response.data[0]?.id || "");
+        }
+      } catch (error) {
+        console.error("Failed to fetch test cases:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTestCases();
+  }, []);
 
   const filteredCases = useMemo(() => {
-    return TEST_CASES.filter((testCase) => {
+    return testCases.filter((testCase) => {
       const matchesQuery =
         !query.trim() ||
-        `${testCase.id} ${testCase.title} ${testCase.module} ${testCase.suite}`
+        `${testCase.reference_code} ${testCase.title} ${testCase.module} ${testCase.suite}`
           .toLowerCase()
           .includes(query.trim().toLowerCase());
       const matchesStatus =
@@ -39,29 +66,42 @@ export default function TestCases() {
         automationFilter === "All" || testCase.automation === automationFilter;
       return matchesQuery && matchesStatus && matchesAutomation;
     });
-  }, [automationFilter, query, statusFilter]);
+  }, [automationFilter, query, statusFilter, testCases]);
+
+  useEffect(() => {
+    if (!filteredCases.length) {
+      setSelectedCaseId("");
+      return;
+    }
+
+    if (!filteredCases.some((item) => item.id === selectedCaseId)) {
+      setSelectedCaseId(filteredCases[0].id);
+    }
+  }, [filteredCases, selectedCaseId]);
 
   const selectedCase =
     filteredCases.find((testCase) => testCase.id === selectedCaseId) ||
     filteredCases[0] ||
     null;
 
-  const readyCount = TEST_CASES.filter((item) => item.status === "Ready").length;
-  const failedCount = TEST_CASES.filter((item) => item.status === "Failed").length;
-  const automatedCount = TEST_CASES.filter(
+  const readyCount = testCases.filter((item) => item.status === "Ready").length;
+  const failedCount = testCases.filter((item) => item.status === "Failed").length;
+  const automatedCount = testCases.filter(
     (item) => item.automation === "Automated",
   ).length;
+  const latestSprint =
+    testCases.find((item) => item.sprint_name)?.sprint_name || "Workspace QA";
   const summaryItems = [
     {
       label: "Total cases",
-      value: TEST_CASES.length,
-      note: "Across all available suites",
+      value: testCases.length,
+      note: "Across all saved suites",
       icon: "fact_check",
     },
     {
       label: "Ready to run",
       value: readyCount,
-      note: "Prepared for this release cycle",
+      note: "Prepared for the current cycle",
       icon: "verified",
     },
     {
@@ -72,11 +112,41 @@ export default function TestCases() {
     },
     {
       label: "Automated coverage",
-      value: `${Math.round((automatedCount / TEST_CASES.length) * 100)}%`,
+      value: testCases.length ? `${Math.round((automatedCount / testCases.length) * 100)}%` : "0%",
       note: "Cases already covered by automation",
       icon: "smart_toy",
     },
   ];
+
+  const suiteFolders = useMemo(() => {
+    const counts = new Map<string, number>();
+    testCases.forEach((item) => {
+      counts.set(item.suite, (counts.get(item.suite) || 0) + 1);
+    });
+
+    return [
+      { name: "All test cases", count: testCases.length, icon: "library_books" },
+      ...Array.from(counts.entries()).map(([name, count]) => ({
+        name,
+        count,
+        icon: "folder_open",
+      })),
+    ];
+  }, [testCases]);
+
+  const executionStats = useMemo(() => {
+    const allHistory = testCases.flatMap((item) => item.execution_history || []);
+    return {
+      passed: allHistory.filter((item) => item.status === "Passed").length,
+      failed: allHistory.filter((item) => item.status === "Failed").length,
+      blocked: allHistory.filter((item) => item.status === "Blocked").length,
+      pending: Math.max(testCases.length - allHistory.length, 0),
+    };
+  }, [testCases]);
+
+  const completionPercent = testCases.length
+    ? Math.round(((executionStats.passed + executionStats.failed + executionStats.blocked) / testCases.length) * 100)
+    : 0;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
@@ -84,9 +154,10 @@ export default function TestCases() {
         <WorkspacePageHeader
           eyebrow="Quality"
           title="Test Cases"
-          description="Manage reusable cases with smaller, clearer sections and a tabbed detail view that matches the cleaner sprint workspace."
+          description="Manage reusable cases with the live workspace catalog, searchable details, linked work items, and execution history."
           metaLabel="Active cycle"
-          metaValue="Sprint 24 Regression"
+          metaValue={latestSprint}
+          showStaticBanner={false}
           actions={
             <div className="flex flex-wrap gap-3">
               <button
@@ -104,7 +175,7 @@ export default function TestCases() {
           }
         />
 
-        <div className="rounded-xl border border-slate-200 bg-white p-2 mb-6">
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-2">
           <div className="flex flex-wrap gap-2">
             {qaSectionLinks.map((link) => (
               <NavLink
@@ -141,7 +212,7 @@ export default function TestCases() {
                 </span>
               </div>
               <div className="mt-4 space-y-2">
-                {TEST_FOLDERS.map((folder, index) => (
+                {suiteFolders.map((folder, index) => (
                   <button
                     key={folder.name}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition ${
@@ -173,15 +244,18 @@ export default function TestCases() {
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Execution cycle</h2>
               <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                  Sprint 24 Regression
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  {latestSprint}
                 </p>
-                <p className="mt-2 text-lg font-bold text-slate-900">68% complete</p>
+                <p className="mt-2 text-lg font-bold text-slate-900">{completionPercent}% complete</p>
                 <div className="mt-4 h-2 rounded-full bg-slate-200">
-                  <div className="h-2 w-[68%] rounded-full bg-blue-600" />
+                  <div
+                    className="h-2 rounded-full bg-blue-600"
+                    style={{ width: `${completionPercent}%` }}
+                  />
                 </div>
                 <p className="mt-3 text-xs leading-5 text-slate-500">
-                  41 passed, 6 failed, 13 pending, 2 blocked
+                  {executionStats.passed} passed, {executionStats.failed} failed, {executionStats.pending} pending, {executionStats.blocked} blocked
                 </p>
               </div>
             </div>
@@ -210,13 +284,11 @@ export default function TestCases() {
                     }
                     className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
                   >
-                    {["All", "Draft", "Ready", "Blocked", "Passed", "Failed"].map(
-                      (option) => (
-                        <option key={option} value={option}>
-                          Status: {option}
-                        </option>
-                      ),
-                    )}
+                    {["All", "Draft", "Ready", "Blocked", "Passed", "Failed"].map((option) => (
+                      <option key={option} value={option}>
+                        Status: {option}
+                      </option>
+                    ))}
                   </select>
                   <select
                     value={automationFilter}
@@ -246,55 +318,62 @@ export default function TestCases() {
               </div>
 
               <div className="divide-y divide-slate-100">
-                {filteredCases.map((testCase) => (
-                  <button
-                    key={testCase.id}
-                    onClick={() => setSelectedCaseId(testCase.id)}
-                    className={`grid w-full grid-cols-[100px_minmax(220px,1.35fr)_140px_110px_120px_110px] gap-4 px-4 py-4 text-left transition ${
-                      selectedCase?.id === testCase.id
-                        ? "bg-blue-50"
-                        : "hover:bg-slate-50"
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{testCase.id}</p>
-                      <p className="mt-1 text-[11px] text-slate-500">{testCase.module}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {testCase.title}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {testCase.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="text-sm text-slate-600">{testCase.suite}</div>
-                    <div className="text-sm text-slate-600">{testCase.owner}</div>
-                    <div>
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClasses[testCase.status]}`}
-                      >
-                        {testCase.status}
-                      </span>
-                    </div>
-                    <div>
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${automationClasses[testCase.automation]}`}
-                      >
-                        {testCase.automation}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                {loading ? (
+                  <div className="px-6 py-12 text-center text-sm text-slate-500">
+                    Loading test cases...
+                  </div>
+                ) : null}
 
-                {!filteredCases.length && (
+                {!loading &&
+                  filteredCases.map((testCase) => (
+                    <button
+                      key={testCase.id}
+                      onClick={() => setSelectedCaseId(testCase.id)}
+                      className={`grid w-full grid-cols-[100px_minmax(220px,1.35fr)_140px_110px_120px_110px] gap-4 px-4 py-4 text-left transition ${
+                        selectedCase?.id === testCase.id
+                          ? "bg-blue-50"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{testCase.reference_code}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">{testCase.module}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {testCase.title}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {testCase.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-sm text-slate-600">{testCase.suite}</div>
+                      <div className="text-sm text-slate-600">{testCase.owner?.full_name || "Unknown"}</div>
+                      <div>
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClasses[testCase.status]}`}
+                        >
+                          {testCase.status}
+                        </span>
+                      </div>
+                      <div>
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${automationClasses[testCase.automation]}`}
+                        >
+                          {testCase.automation}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+
+                {!loading && !filteredCases.length && (
                   <div className="px-6 py-12 text-center">
                     <p className="text-sm font-semibold text-slate-900">
                       No test cases match the current filters.
@@ -315,7 +394,7 @@ export default function TestCases() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        {selectedCase.id}
+                        {selectedCase.reference_code}
                       </p>
                       <h2 className="mt-2 text-lg font-bold text-slate-900">
                         {selectedCase.title}
@@ -330,10 +409,10 @@ export default function TestCases() {
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {[
-                      { label: "Owner", value: selectedCase.owner },
+                      { label: "Owner", value: selectedCase.owner?.full_name || "Unknown" },
                       { label: "Suite", value: selectedCase.suite },
                       { label: "Status", value: selectedCase.status },
-                      { label: "Updated", value: selectedCase.updatedAt },
+                      { label: "Updated", value: formatRelativeDate(selectedCase.updated_at) },
                     ].map((item) => (
                       <div
                         key={item.label}
@@ -370,14 +449,20 @@ export default function TestCases() {
                       Preconditions
                     </h3>
                     <div className="mt-3 space-y-2">
-                      {selectedCase.preconditions.map((item) => (
-                        <div
-                          key={item}
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600"
-                        >
-                          {item}
+                      {selectedCase.preconditions.length ? (
+                        selectedCase.preconditions.map((item) => (
+                          <div
+                            key={item}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600"
+                          >
+                            {item}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+                          No preconditions added yet.
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 )}
@@ -389,25 +474,31 @@ export default function TestCases() {
                       <p className="text-[11px] text-slate-500">Actions and expected results</p>
                     </div>
                     <div className="mt-4 space-y-3">
-                      {selectedCase.steps.map((step) => (
-                        <div
-                          key={step.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-                              {step.id}
+                      {selectedCase.steps.length ? (
+                        selectedCase.steps.map((step) => (
+                          <div
+                            key={step.id}
+                            className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex size-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+                                {step.id}
+                              </div>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {step.action}
+                              </p>
                             </div>
-                            <p className="text-sm font-semibold text-slate-900">
-                              {step.action}
-                            </p>
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-600">
+                              <span className="font-semibold text-slate-800">Expected:</span>{" "}
+                              {step.expected}
+                            </div>
                           </div>
-                          <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-600">
-                            <span className="font-semibold text-slate-800">Expected:</span>{" "}
-                            {step.expected}
-                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+                          No steps added yet.
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 )}
@@ -416,19 +507,35 @@ export default function TestCases() {
                   <div className="rounded-xl border border-slate-200 bg-white p-5">
                     <h3 className="text-sm font-semibold text-slate-900">Linked work items</h3>
                     <div className="mt-4 space-y-3">
-                      {selectedCase.linkedItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
-                        >
+                      {selectedCase.linked_task ? (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            {item.type} • {item.id}
+                            Task • {selectedCase.linked_task.id}
                           </p>
                           <p className="mt-1 text-sm font-medium text-slate-800">
-                            {item.title}
+                            {selectedCase.linked_task.title}
                           </p>
                         </div>
-                      ))}
+                      ) : null}
+                      {selectedCase.linked_items.length ? (
+                        selectedCase.linked_items.map((item) => (
+                          <div
+                            key={`${item.type}-${item.id}`}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              {item.type} • {item.id}
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-slate-800">
+                              {item.title}
+                            </p>
+                          </div>
+                        ))
+                      ) : !selectedCase.linked_task ? (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+                          No linked work items yet.
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -437,29 +544,35 @@ export default function TestCases() {
                   <div className="rounded-xl border border-slate-200 bg-white p-5">
                     <h3 className="text-sm font-semibold text-slate-900">Recent execution history</h3>
                     <div className="mt-4 space-y-3">
-                      {selectedCase.executionHistory.map((item) => (
-                        <div
-                          key={item.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">
-                                {item.cycle}
-                              </p>
-                              <p className="mt-1 text-[11px] text-slate-500">
-                                {item.tester} • {item.executedAt}
-                              </p>
+                      {selectedCase.execution_history.length ? (
+                        selectedCase.execution_history.map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {item.cycle}
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                  {item.tester} • {item.executedAt}
+                                </p>
+                              </div>
+                              <span
+                                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClasses[item.status]}`}
+                              >
+                                {item.status}
+                              </span>
                             </div>
-                            <span
-                              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClasses[item.status]}`}
-                            >
-                              {item.status}
-                            </span>
+                            <p className="mt-3 text-xs leading-5 text-slate-600">{item.note}</p>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-slate-600">{item.note}</p>
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+                          No execution history yet.
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 )}

@@ -13,6 +13,7 @@ import {
   UpdatedAt,
 } from "sequelize-typescript";
 import { User, Project, Subtask, Comment, Label, TaskLabel } from "./index";
+import Sprint from "./sprint";
 
 @Table({
   tableName: "tasks",
@@ -83,6 +84,19 @@ export default class Task extends Model {
   })
   assignee_id?: string;
 
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  defect_id?: string;
+
+  @ForeignKey(() => Sprint)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  sprint_id?: string;
+
   @CreatedAt
   created_at!: Date;
 
@@ -97,6 +111,9 @@ export default class Task extends Model {
 
   @BelongsTo(() => User, "assignee_id")
   assignee?: User;
+
+  @BelongsTo(() => Sprint, "sprint_id")
+  sprint?: Sprint;
 
   @HasMany(() => Subtask, "task_id")
   subtasks!: Subtask[];

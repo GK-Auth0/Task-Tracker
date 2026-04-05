@@ -15,6 +15,8 @@ export interface CreateTaskDto {
   priority: string;
   project_id: string;
   assignee_id?: string;
+  defect_id?: string;
+  sprint_id?: string;
   creator_id: string;
   due_date?: string;
 }
@@ -25,7 +27,7 @@ export interface UpdateTaskDto {
   status?: string;
   priority?: string;
   assignee_id?: string;
+  defect_id?: string;
+  sprint_id?: string;
   due_date?: string;
 }
-
-

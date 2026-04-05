@@ -1,4 +1,4 @@
-import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit } from "../models";
+import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit, Defect, Sprint } from "../models";
 import { Op } from "sequelize";
 import type { CreateTaskDto, TaskFilters, UpdateTaskDto } from "../types/task";
 
@@ -142,6 +142,11 @@ export async function getAllTasks(
         as: "assignee",
         attributes: ["id", "full_name", "email"],
       },
+      {
+        model: Sprint,
+        as: "sprint",
+        attributes: ["id", "name"],
+      },
     ],
     order: [["created_at", "DESC"]],
     limit,
@@ -179,6 +184,34 @@ export async function createTask(dto: CreateTaskDto) {
     }
   }
 
+  if (dto.defect_id) {
+    const defect = await Defect.findOne({
+      where: {
+        id: dto.defect_id,
+        project_id: dto.project_id,
+      },
+      attributes: ["id", "project_id"],
+    });
+
+    if (!defect) {
+      throw new Error("Defect must belong to the selected project");
+    }
+  }
+
+  if (dto.sprint_id) {
+    const sprint = await Sprint.findOne({
+      where: {
+        id: dto.sprint_id,
+        project_id: dto.project_id,
+      },
+      attributes: ["id"],
+    });
+
+    if (!sprint) {
+      throw new Error("Sprint must belong to the selected project");
+    }
+  }
+
   const task = await Task.create({
     title: dto.title,
     description: dto.description,
@@ -186,6 +219,8 @@ export async function createTask(dto: CreateTaskDto) {
     priority: dto.priority,
     project_id: dto.project_id,
     assignee_id: dto.assignee_id,
+    defect_id: dto.defect_id,
+    sprint_id: dto.sprint_id,
     creator_id: dto.creator_id,
     due_date: dto.due_date ? new Date(dto.due_date) : null,
   });
@@ -207,8 +242,22 @@ export async function createTask(dto: CreateTaskDto) {
         as: "assignee",
         attributes: ["id", "full_name", "email"],
       },
+      {
+        model: Sprint,
+        as: "sprint",
+        attributes: ["id", "name"],
+      },
     ],
   });
+
+  if (dto.defect_id) {
+    await Defect.update(
+      { linked_task_id: task.id, created_task_id: task.id },
+      {
+        where: { id: dto.defect_id },
+      },
+    );
+  }
 
   return taskWithRelations?.get({ plain: true });
 }
@@ -247,6 +296,11 @@ export async function getTaskById(taskId: string, userId: string) {
         model: User,
         as: "assignee",
         attributes: ["id", "full_name", "email"],
+      },
+      {
+        model: Sprint,
+        as: "sprint",
+        attributes: ["id", "name"],
       },
       {
         model: Subtask,
@@ -317,6 +371,8 @@ export async function updateTask(
   if (dto.status !== undefined) updateData.status = dto.status;
   if (dto.priority !== undefined) updateData.priority = dto.priority;
   if (dto.assignee_id !== undefined) updateData.assignee_id = dto.assignee_id;
+  if (dto.defect_id !== undefined) updateData.defect_id = dto.defect_id;
+  if (dto.sprint_id !== undefined) updateData.sprint_id = dto.sprint_id;
   if (dto.due_date !== undefined)
     updateData.due_date = dto.due_date ? new Date(dto.due_date) : null;
 
@@ -334,7 +390,49 @@ export async function updateTask(
     }
   }
 
+  if (dto.defect_id) {
+    const defect = await Defect.findOne({
+      where: {
+        id: dto.defect_id,
+        project_id: task.project.id,
+      },
+      attributes: ["id"],
+    });
+
+    if (!defect) {
+      throw new Error("Defect must belong to the selected project");
+    }
+  }
+
+  if (dto.sprint_id) {
+    const sprint = await Sprint.findOne({
+      where: {
+        id: dto.sprint_id,
+        project_id: task.project.id,
+      },
+      attributes: ["id"],
+    });
+
+    if (!sprint) {
+      throw new Error("Sprint must belong to the selected project");
+    }
+  }
+
   await task.update(updateData);
+
+  if (dto.defect_id !== undefined) {
+    if (dto.defect_id) {
+      await Defect.update(
+        { linked_task_id: taskId, created_task_id: taskId },
+        { where: { id: dto.defect_id } },
+      );
+    } else if (task.defect_id) {
+      await Defect.update(
+        { linked_task_id: null, created_task_id: null },
+        { where: { id: task.defect_id } },
+      );
+    }
+  }
 
   const updatedTask = await Task.findByPk(taskId, {
     include: [
@@ -352,6 +450,11 @@ export async function updateTask(
         model: User,
         as: "assignee",
         attributes: ["id", "full_name", "email"],
+      },
+      {
+        model: Sprint,
+        as: "sprint",
+        attributes: ["id", "name"],
       },
     ],
   });

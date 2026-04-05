@@ -4,6 +4,8 @@ import {
   UpdateProjectRequest,
   ProjectsResponse,
   ProjectResponse,
+  ProjectConfidentialAccessConfig,
+  ProjectConfidentialAccessProjectSummary,
 } from "../types/project";
 
 import { API_BASE_URL } from "../config/api";
@@ -170,6 +172,36 @@ export const projectService = {
         decision_note: decisionNote,
       },
     );
+    return response.data;
+  },
+
+  getConfidentialAccessConfig: async (
+    id: string,
+  ): Promise<{ success: boolean; data: ProjectConfidentialAccessConfig }> => {
+    const response = await api.get(`/projects/${id}/confidential-access/config`);
+    return response.data;
+  },
+
+  updateConfidentialAccessConfig: async (
+    id: string,
+    data: {
+      access_scope: "specific_users" | "organization";
+      allowed_user_ids: string[];
+    },
+  ): Promise<{
+    success: boolean;
+    data: ProjectConfidentialAccessConfig;
+    message?: string;
+  }> => {
+    const response = await api.patch(`/projects/${id}/confidential-access/config`, data);
+    return response.data;
+  },
+
+  getConfidentialAccessProjects: async (): Promise<{
+    success: boolean;
+    data: ProjectConfidentialAccessProjectSummary[];
+  }> => {
+    const response = await api.get("/projects/confidential-access/projects");
     return response.data;
   },
 };
