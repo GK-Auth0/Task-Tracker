@@ -25,17 +25,14 @@ describe("createTaskSchema priority validation", () => {
     expect(errors.find((error) => error.field === "priority")).toBeUndefined();
   });
 
-  it("rejects lowercase priority values", async () => {
+  it("accepts lowercase priority values by normalizing them", async () => {
     const errors = await runCreateTaskValidation({
       title: "Create task priority test",
-      description: "Validate that lowercase priority values fail backend checks.",
+      description: "Validate that lowercase priority values are normalized by backend checks.",
       priority: "medium",
       project_id: "9333bda6-334c-4605-99fe-ee9cf3021684",
     });
 
-    expect(errors).toContainEqual({
-      field: "priority",
-      message: "Priority must be one of: Low, Medium, High",
-    });
+    expect(errors.find((error) => error.field === "priority")).toBeUndefined();
   });
 });

@@ -14,6 +14,20 @@ import { processInvites } from "../services/invitation";
 import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 import { TaskPriority, TaskStatus } from "../enums";
 
+const normalizeTaskPriority = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return String(value);
+
+  const normalized = value.trim().toLowerCase();
+  const priorityMap: Record<string, TaskPriority> = {
+    low: TaskPriority.LOW,
+    medium: TaskPriority.MEDIUM,
+    high: TaskPriority.HIGH,
+  };
+
+  return priorityMap[normalized] ?? value;
+};
+
 export const getTasks = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -80,7 +94,7 @@ export const createNewTask = async (req: Request, res: Response) => {
       title: req.body.title,
       description: String(req.body.description || "").trim(),
       status: req.body.status || TaskStatus.TODO,
-      priority: req.body.priority || TaskPriority.MEDIUM,
+      priority: normalizeTaskPriority(req.body.priority) || TaskPriority.MEDIUM,
       project_id: req.body.project_id,
       assignee_id: req.body.assignee_id,
       creator_id: userId,
@@ -182,7 +196,10 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
           ? undefined
           : String(req.body.description).trim(),
       status: req.body.status,
-      priority: req.body.priority,
+      priority:
+        req.body.priority === undefined
+          ? undefined
+          : normalizeTaskPriority(req.body.priority),
       assignee_id: req.body.assignee_id,
       due_date: req.body.due_date,
     };

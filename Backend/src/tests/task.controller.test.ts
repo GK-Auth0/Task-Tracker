@@ -171,4 +171,46 @@ describe("task controller", () => {
       error: "Access denied to this project",
     });
   });
+
+  it("createNewTask normalizes lowercase priority before saving", async () => {
+    mockedCreateTask.mockResolvedValue({
+      id: "task-123",
+      title: "Normalized task priority",
+      description: "Ensure lowercase task priority is persisted in backend format.",
+      status: "To Do",
+      priority: "Medium",
+      project_id: "project-123",
+      creator_id: "user-123",
+      project: {
+        id: "project-123",
+        name: "Task Tracker",
+      },
+    } as any);
+    mockedProcessInvites.mockResolvedValue({
+      invited: 0,
+      skipped: 0,
+      failed: 0,
+    } as any);
+    mockedCreateAuditLog.mockResolvedValue(undefined as any);
+
+    const req = {
+      user: { id: "user-123" },
+      body: {
+        title: "Normalized task priority",
+        description: "  Ensure lowercase task priority is persisted in backend format.  ",
+        priority: "medium",
+        project_id: "project-123",
+        invitees: [],
+      },
+    } as unknown as Request;
+    const { response } = createResponseMock();
+
+    await createNewTask(req, response);
+
+    expect(mockedCreateTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priority: "Medium",
+      }),
+    );
+  });
 });

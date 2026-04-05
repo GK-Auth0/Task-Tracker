@@ -1,5 +1,18 @@
 import { TaskPriority, TaskStatus } from "../enums";
 
+const normalizeTaskPriority = (value: unknown) => {
+  if (typeof value !== "string") return value;
+
+  const normalized = value.trim().toLowerCase();
+  const priorityMap: Record<string, TaskPriority> = {
+    low: TaskPriority.LOW,
+    medium: TaskPriority.MEDIUM,
+    high: TaskPriority.HIGH,
+  };
+
+  return priorityMap[normalized] ?? value;
+};
+
 export const createTaskSchema = {
   title: {
     notEmpty: {
@@ -28,6 +41,9 @@ export const createTaskSchema = {
     },
   },
   priority: {
+    customSanitizer: {
+      options: normalizeTaskPriority,
+    },
     notEmpty: {
       errorMessage: "Priority is required",
     },
@@ -106,6 +122,9 @@ export const updateTaskSchema = {
   },
   priority: {
     optional: true,
+    customSanitizer: {
+      options: normalizeTaskPriority,
+    },
     isIn: {
       options: [Object.values(TaskPriority)],
       errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
