@@ -6,6 +6,7 @@ import AppBackgroundArt from "./layout/AppBackgroundArt";
 import AiAssistantWidget from "./ai/AiAssistantWidget";
 import NotificationBell from "./layout/NotificationBell";
 import GlobalSearch from "./layout/GlobalSearch";
+import TopAccentLine from "./layout/TopAccentLine";
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -97,7 +98,7 @@ export default function Layout() {
         <main className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
           {/* Top Navigation */}
           <header className="sticky top-0 z-30 flex items-center justify-between bg-white/90 backdrop-blur border-b border-slate-200/70 px-4 sm:px-8 py-3 gap-4 shadow-sm relative">
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
+            <TopAccentLine />
             <div className="flex items-center gap-3 flex-1 max-w-md">
               <button
                 className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg lg:hidden"

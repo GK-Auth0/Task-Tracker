@@ -5,6 +5,7 @@ import {
   isWorkspaceAdmin,
   type WorkspaceRole,
 } from "../types/roles";
+import TopAccentLine from "./layout/TopAccentLine";
 
 interface SidebarProps {
   isDesktopCollapsed: boolean;
@@ -74,7 +75,7 @@ export default function Sidebar({
           isCollapsed ? "w-20 p-3" : "w-72 p-6"
         }`}
       >
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
+        <TopAccentLine />
         <div className="flex flex-col gap-6 min-h-0 h-full">
           {/* Logo/Brand and Toggle */}
           <div
