@@ -18,6 +18,7 @@ const router = express.Router();
 router.use("/api/auth", authRoutes);
 router.use("/api/projects", projectRoutes);
 router.use("/api/tasks", taskRoutes);
+router.use("/api/v1/tasks", taskRoutes);
 router.use("/api/users", userRoutes);
 router.use("/api/dashboard", dashboardRoutes);
 router.use("/api/audit-logs", auditLogRoutes);

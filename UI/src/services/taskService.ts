@@ -5,7 +5,7 @@ import { API_BASE_URL } from "../config/api";
 import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
 
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: `${API_BASE_URL}/api/v1`,
   headers: {
     "Content-Type": "application/json",
   },

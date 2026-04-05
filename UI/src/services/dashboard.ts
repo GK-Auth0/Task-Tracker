@@ -326,7 +326,7 @@ export const tasksAPI = {
     if (filters?.page) params.append("page", filters.page.toString());
     if (filters?.limit) params.append("limit", filters.limit.toString());
 
-    const response = await api.get(`/api/tasks?${params.toString()}`);
+    const response = await api.get(`/api/v1/tasks?${params.toString()}`);
     return response.data;
   },
 
@@ -342,7 +342,7 @@ export const tasksAPI = {
       email: string;
     }>;
   }): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.post("/api/tasks", {
+    const response = await api.post("/api/v1/tasks", {
       ...data,
       priority: normalizeTaskPriority(data.priority) || "Medium",
     });
@@ -350,7 +350,7 @@ export const tasksAPI = {
   },
 
   getTask: async (id: string): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.get(`/api/tasks/${id}`);
+    const response = await api.get(`/api/v1/tasks/${id}`);
     return response.data;
   },
 
@@ -358,7 +358,7 @@ export const tasksAPI = {
     id: string,
     data: Partial<Task>,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.patch(`/api/tasks/${id}`, {
+    const response = await api.patch(`/api/v1/tasks/${id}`, {
       ...data,
       ...(data.priority
         ? { priority: normalizeTaskPriority(data.priority) || data.priority }
@@ -373,7 +373,7 @@ export const tasksAPI = {
     success: boolean;
     data: PullRequest[];
   }> => {
-    const response = await api.get(`/api/tasks/${taskId}/pull-requests`);
+    const response = await api.get(`/api/v1/tasks/${taskId}/pull-requests`);
     return response.data;
   },
 
@@ -383,7 +383,7 @@ export const tasksAPI = {
     success: boolean;
     data: Commit[];
   }> => {
-    const response = await api.get(`/api/tasks/${taskId}/commits`);
+    const response = await api.get(`/api/v1/tasks/${taskId}/commits`);
     return response.data;
   },
 
@@ -393,7 +393,7 @@ export const tasksAPI = {
     success: boolean;
     data: ActivityLog[];
   }> => {
-    const response = await api.get(`/api/tasks/${taskId}/activity`);
+    const response = await api.get(`/api/v1/tasks/${taskId}/activity`);
     return response.data;
   },
 };
