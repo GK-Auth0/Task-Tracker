@@ -11,7 +11,6 @@ import preferencesRoutes from "./routes/preferences";
 import webhookRoutes from "./routes/webhook";
 import inviteRoutes from "./routes/invite";
 import organizationRoutes from "./routes/organization";
-import { buildInfo } from "./config";
 
 const router = express.Router();
 
@@ -32,13 +31,6 @@ router.use("/api/organizations", organizationRoutes);
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {
   res.json({ status: "Task Tracker API is running" });
-});
-
-router.get("/api/version", (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    data: buildInfo,
-  });
 });
 
 export default router;

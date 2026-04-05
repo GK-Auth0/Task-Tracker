@@ -7,7 +7,6 @@ import AiAssistantWidget from "./ai/AiAssistantWidget";
 import NotificationBell from "./layout/NotificationBell";
 import GlobalSearch from "./layout/GlobalSearch";
 import TopAccentLine from "./layout/TopAccentLine";
-import { buildInfo } from "../config/buildInfo";
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -182,14 +181,6 @@ export default function Layout() {
               <footer className="mt-auto border-t border-slate-100 bg-white px-4 sm:px-8 py-4 text-center">
                 <p className="text-slate-400 text-xs">
                   © 2026 Task Tracker Inc. All rights reserved.
-                </p>
-                <p
-                  className="mt-1 text-[11px] text-slate-400"
-                  title={`UI ${buildInfo.service} v${buildInfo.version} • ${buildInfo.mode} • commit ${buildInfo.commit}${
-                    buildInfo.builtAt ? ` • built ${buildInfo.builtAt}` : ""
-                  }`}
-                >
-                  UI v{buildInfo.version} • {buildInfo.commit.slice(0, 7)}
                 </p>
               </footer>
             </div>
