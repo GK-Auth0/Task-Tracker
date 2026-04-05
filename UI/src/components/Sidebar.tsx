@@ -68,12 +68,13 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 border-r border-slate-200 bg-white flex flex-col justify-between transition-all duration-300 lg:relative lg:z-0 ${
+        className={`fixed inset-y-0 left-0 z-50 border-r border-slate-200 bg-white flex flex-col justify-between transition-all duration-300 lg:relative lg:z-0 overflow-hidden ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0 ${
           isCollapsed ? "w-20 p-3" : "w-72 p-6"
         }`}
       >
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
         <div className="flex flex-col gap-6 min-h-0 h-full">
           {/* Logo/Brand and Toggle */}
           <div
