@@ -21,7 +21,7 @@ router.post(
   "/",
   authenticateToken,
   requireWorkspaceRole("Member"),
-  checkSchema(createTaskSchema),
+  checkSchema(createTaskSchema, ["body"]),
   createNewTask,
 );
 router.get("/:id", authenticateToken, getTask);
@@ -32,7 +32,7 @@ router.patch(
   "/:id",
   authenticateToken,
   requireWorkspaceRole("Member"),
-  checkSchema(updateTaskSchema),
+  checkSchema(updateTaskSchema, ["body"]),
   updateTaskDetails,
 );
 router.delete("/:id", authenticateToken, requireWorkspaceRole("Member"), removeTask);
