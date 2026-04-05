@@ -9,7 +9,7 @@ import { responseHandler } from "./middleware/responseHandler";
 import { setupApiDocs } from "./api-docs";
 import { globalRateLimiter } from "./middleware/rateLimit";
 import { requestTimeoutGuard } from "./middleware/requestGuard";
-import { database, appConfig } from "./config";
+import { database, appConfig, buildInfo } from "./config";
 
 const app = express();
 
@@ -49,6 +49,14 @@ app.get("/ready", async (_req: Request, res: Response) => {
   } catch (error) {
     return res.status(503).json({ status: "not_ready" });
   }
+});
+
+app.use("/api", (_req, res, next) => {
+  res.setHeader("X-App-Service", buildInfo.service);
+  res.setHeader("X-App-Version", buildInfo.version);
+  res.setHeader("X-App-Env", buildInfo.env);
+  res.setHeader("X-App-Commit", buildInfo.commit);
+  next();
 });
 
 // Main router
