@@ -107,22 +107,25 @@ const Projects: React.FC = () => {
   };
 
   const handleCreateProject = async (projectData: CreateProjectRequest) => {
-    if (!canCreateProject) return;
+    if (!canCreateProject) return null;
     try {
       const response = await projectService.createProject(projectData);
       if (!response.success) {
         throw new Error("Project creation failed");
       }
       setShowCreateModal(false);
-      fetchProjects();
+      await fetchProjects();
+      return {
+        id: response.data.id,
+        name: response.data.name,
+      };
     } catch (error: any) {
       console.error("Error creating project:", error);
       console.error("Error response:", error.response?.data);
       console.error("Error status:", error.response?.status);
-      // Show error to user
       const errorMessage =
         error.response?.data?.message || error.message || "Unknown error";
-      alert(`Failed to create project: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
   };
 

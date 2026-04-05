@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
@@ -55,6 +56,7 @@ export default function CreateTaskModal({
   onClose,
   onTaskCreated,
 }: CreateTaskModalProps) {
+  const navigate = useNavigate();
   const INVITE_SENDS_IMMEDIATELY = true;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -303,6 +305,15 @@ export default function CreateTaskModal({
   const availableSprints = sprints.filter(
     (sprint) => !projectId || sprint.project_id === projectId,
   );
+  const selectedProjectName =
+    projects.find((project) => project.id === projectId)?.name || "this project";
+
+  const handleRedirectToSprintCreate = () => {
+    if (!projectId) return;
+    resetForm();
+    onClose();
+    navigate(`/sprint-board?tab=create&projectId=${encodeURIComponent(projectId)}`);
+  };
 
   const formatDescription = (
     mode: "bold" | "italic" | "bullet" | "numbered" | "quote",
@@ -570,6 +581,27 @@ export default function CreateTaskModal({
                   </option>
                 ))}
               </select>
+              {projectId && availableSprints.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">
+                        No sprint available for {selectedProjectName}.
+                      </p>
+                      <p className="text-xs text-amber-800">
+                        Create one first, then come back and link this task.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRedirectToSprintCreate}
+                      className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+                    >
+                      Create Sprint
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-2">

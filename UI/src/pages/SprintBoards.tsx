@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   SPRINT_CREATE_CONTEXT,
   SPRINT_PLANNING_BOARD,
@@ -141,6 +142,7 @@ const uniqueSprintNames = (defects: Defect[], testCases: TestCaseRecord[]) => {
 };
 
 export default function SprintBoards() {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<MainTab>("planning");
   const [planningTab, setPlanningTab] = useState<PlanningTab>("goals");
   const [boardTab, setBoardTab] = useState<BoardTab>("dev");
@@ -157,6 +159,14 @@ export default function SprintBoards() {
   const [createError, setCreateError] = useState("");
   const [createMessage, setCreateMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const createTabRequested = searchParams.get("tab") === "create";
+  const requestedProjectId = searchParams.get("projectId") || "";
+
+  useEffect(() => {
+    if (createTabRequested) {
+      setActiveTab("create");
+    }
+  }, [createTabRequested]);
 
   useEffect(() => {
     const loadBoardData = async () => {
@@ -205,6 +215,14 @@ export default function SprintBoards() {
 
     loadBoardData();
   }, []);
+
+  useEffect(() => {
+    if (!requestedProjectId) return;
+    setDraft((current) => ({
+      ...current,
+      projectId: requestedProjectId,
+    }));
+  }, [requestedProjectId]);
 
   const updateDraft = (field: keyof SprintDraft, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));

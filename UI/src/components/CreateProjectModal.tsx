@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { CreateProjectRequest } from "../types/project";
 import axios from "axios";
 import aiChatAPI from "../services/aiChat";
@@ -17,13 +18,14 @@ interface User {
 
 interface CreateProjectModalProps {
   onClose: () => void;
-  onSubmit: (data: CreateProjectRequest) => void;
+  onSubmit: (data: CreateProjectRequest) => Promise<{ id: string; name: string } | null>;
 }
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const navigate = useNavigate();
   const INVITE_SENDS_IMMEDIATELY = true;
   const [formData, setFormData] = useState<CreateProjectRequest>({
     name: "",
@@ -44,6 +46,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [redirectToSprint, setRedirectToSprint] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Fetch users when search term changes
@@ -76,8 +81,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     return () => clearTimeout(debounceTimer);
   }, [searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError("");
 
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) {
@@ -113,7 +119,19 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       projectData.endDate = formData.endDate;
     }
 
-    onSubmit(projectData);
+    try {
+      setSubmitting(true);
+      const createdProject = await onSubmit(projectData);
+      if (redirectToSprint && createdProject?.id) {
+        navigate(
+          `/sprint-board?tab=create&projectId=${encodeURIComponent(createdProject.id)}`,
+        );
+      }
+    } catch (error: any) {
+      setSubmitError(error?.message || "Failed to create project");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -263,7 +281,12 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="create-project-form" onSubmit={handleSubmit} className="space-y-6">
+            {submitError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            ) : null}
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
                 Project Preview
@@ -585,6 +608,26 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 </div>
               )}
             </div>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={redirectToSprint}
+                  onChange={(e) => setRedirectToSprint(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">
+                    Open sprint setup after save
+                  </p>
+                  <p className="text-xs text-blue-800">
+                    If this new project needs a sprint right away, jump to the sprint
+                    create page after the project is saved.
+                  </p>
+                </div>
+              </label>
+            </div>
           </form>
         </div>
 
@@ -593,15 +636,22 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             className="px-6 h-11 rounded-lg text-slate-600 font-semibold hover:bg-slate-100 transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
-            className="px-8 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
+            type="submit"
+            form="create-project-form"
+            disabled={submitting}
+            className="px-8 h-11 bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-semibold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
           >
-            Create Project
+            {submitting
+              ? "Saving..."
+              : redirectToSprint
+                ? "Save and Create Sprint"
+                : "Create Project"}
             <span className="material-symbols-outlined text-lg">
               arrow_forward
             </span>
