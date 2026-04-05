@@ -23,6 +23,17 @@ interface CreateTaskModalProps {
   onTaskCreated: () => void;
 }
 
+const buildLocalAiSuggestion = (title: string, description: string): AiTaskSuggestion => {
+  const local = getTaskAiSuggestion(title, description);
+  return {
+    priority: local.priority,
+    due_date: local.dueDate || "",
+    estimated_hours: 1.5,
+    checklist: local.checklist,
+    reason: local.reason,
+  };
+};
+
 export default function CreateTaskModal({
   isOpen,
   onClose,
@@ -46,18 +57,26 @@ export default function CreateTaskModal({
   const [descriptionError, setDescriptionError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() => {
-    const local = getTaskAiSuggestion("", "");
-    return {
-      priority: local.priority,
-      due_date: local.dueDate || "",
-      estimated_hours: 1.5,
-      checklist: local.checklist,
-      reason: local.reason,
-    };
-  });
+  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() =>
+    buildLocalAiSuggestion("", ""),
+  );
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setAssigneeId("");
+    setDueDate("");
+    setPriority(TaskPriority.MEDIUM);
+    setProjectId("");
+    setInvitees([]);
+    setDescriptionError("");
+    setSubmitError("");
+    setAiError("");
+    setAiLoading(false);
+    setAiSuggestion(buildLocalAiSuggestion("", ""));
+  };
 
   const applyTaskTemplate = () => {
     setDescription(buildTaskTemplate(title).slice(0, 1000));
@@ -66,8 +85,7 @@ export default function CreateTaskModal({
 
   useEffect(() => {
     if (isOpen) {
-      setSubmitError("");
-      setDescriptionError("");
+      resetForm();
       // Fetch users and projects when modal opens
       fetchUsersAndProjects();
     }
@@ -75,14 +93,7 @@ export default function CreateTaskModal({
 
   useEffect(() => {
     if (!isOpen || !title.trim()) {
-      const local = getTaskAiSuggestion(title, description);
-      setAiSuggestion({
-        priority: local.priority,
-        due_date: local.dueDate || "",
-        estimated_hours: 1.5,
-        checklist: local.checklist,
-        reason: local.reason,
-      });
+      setAiSuggestion(buildLocalAiSuggestion(title, description));
       setAiError("");
       return;
     }
@@ -97,15 +108,8 @@ export default function CreateTaskModal({
           setAiSuggestion(remote);
         }
       } catch (error) {
-        const local = getTaskAiSuggestion(title, description);
         if (!cancelled) {
-          setAiSuggestion({
-            priority: local.priority,
-            due_date: local.dueDate || "",
-            estimated_hours: 1.5,
-            checklist: local.checklist,
-            reason: local.reason,
-          });
+          setAiSuggestion(buildLocalAiSuggestion(title, description));
           setAiError("AI service unavailable. Using local smart suggestions.");
         }
       } finally {
@@ -190,15 +194,7 @@ export default function CreateTaskModal({
         invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
       });
 
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setAssigneeId("");
-      setDueDate("");
-      setPriority(TaskPriority.MEDIUM);
-      setProjectId("");
-      setInvitees([]);
-
+      resetForm();
       onTaskCreated();
       onClose();
     } catch (error) {
@@ -280,7 +276,10 @@ export default function CreateTaskModal({
           </div>
           <button
             className="text-slate-400 hover:text-slate-600 transition-colors"
-            onClick={onClose}
+            onClick={() => {
+              resetForm();
+              onClose();
+            }}
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -604,6 +603,10 @@ export default function CreateTaskModal({
                   onClick={() => {
                     const next = appendTaskAiDraft(description, title, aiSuggestion).slice(0, 1000);
                     setDescription(next);
+                    setPriority(aiSuggestion.priority as TaskPriority);
+                    if (aiSuggestion.due_date) {
+                      setDueDate(aiSuggestion.due_date);
+                    }
                   }}
                 >
                   Insert Checklist
