@@ -1,4 +1,5 @@
 import api from "./auth";
+import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
 
 export interface DashboardSummary {
   total_tasks: number;
@@ -341,7 +342,10 @@ export const tasksAPI = {
       email: string;
     }>;
   }): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.post("/api/tasks", data);
+    const response = await api.post("/api/tasks", {
+      ...data,
+      priority: normalizeTaskPriority(data.priority) || "Medium",
+    });
     return response.data;
   },
 
@@ -354,7 +358,12 @@ export const tasksAPI = {
     id: string,
     data: Partial<Task>,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.patch(`/api/tasks/${id}`, data);
+    const response = await api.patch(`/api/tasks/${id}`, {
+      ...data,
+      ...(data.priority
+        ? { priority: normalizeTaskPriority(data.priority) || data.priority }
+        : {}),
+    });
     return response.data;
   },
 

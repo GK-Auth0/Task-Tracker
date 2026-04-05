@@ -2,6 +2,7 @@ import axios from "axios";
 import { Task, CreateTaskRequest, TasksResponse } from "../types/task";
 
 import { API_BASE_URL } from "../config/api";
+import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
@@ -52,7 +53,12 @@ export const taskService = {
   createTask: async (
     data: CreateTaskRequest,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.post("/tasks", data);
+    const response = await api.post("/tasks", {
+      ...data,
+      ...(data.priority
+        ? { priority: normalizeTaskPriority(data.priority) || data.priority }
+        : {}),
+    });
     return response.data;
   },
 
@@ -61,7 +67,12 @@ export const taskService = {
     id: string,
     data: Partial<CreateTaskRequest>,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.put(`/tasks/${id}`, data);
+    const response = await api.put(`/tasks/${id}`, {
+      ...data,
+      ...(data.priority
+        ? { priority: normalizeTaskPriority(data.priority) || data.priority }
+        : {}),
+    });
     return response.data;
   },
 
