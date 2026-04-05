@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { Op } from "sequelize";
-import { Project, ProjectMember, Task, TestCase, User } from "../models";
+import { Project, ProjectMember, Sprint, Task, TestCase, User } from "../models";
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -150,6 +150,136 @@ export const listTestCases = async (req: AuthenticatedRequest, res: Response) =>
     return res.status(500).json({
       success: false,
       message: "Failed to fetch test cases",
+      error: (error as any)?.message,
+    });
+  }
+};
+
+export const getTestCaseFormOptions = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not authenticated" });
+    }
+
+    const organizationId = await getRequesterOrganizationId(userId);
+    if (!organizationId) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          projects: [],
+          tasks: [],
+          sprints: [],
+          suites: [],
+          modules: [],
+        },
+      });
+    }
+
+    const projects = await Project.findAll({
+      attributes: ["id", "name"],
+      include: [
+        {
+          model: User,
+          as: "owner",
+          attributes: ["id"],
+          where: { organization_id: organizationId },
+        },
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    const projectIds = projects.map((project) => project.id);
+    if (!projectIds.length) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          projects: [],
+          tasks: [],
+          sprints: [],
+          suites: [],
+          modules: [],
+        },
+      });
+    }
+
+    const projectFilterId = req.query.project_id ? String(req.query.project_id) : "";
+    const scopedProjectIds =
+      projectFilterId && projectIds.includes(projectFilterId) ? [projectFilterId] : projectIds;
+
+    const [tasks, sprints, existingTestCases] = await Promise.all([
+      Task.findAll({
+        where: { project_id: { [Op.in]: scopedProjectIds } },
+        attributes: ["id", "title", "project_id"],
+        include: [{ model: Project, as: "project", attributes: ["id", "name"] }],
+        order: [["updated_at", "DESC"]],
+        limit: 300,
+      }),
+      Sprint.findAll({
+        where: { project_id: { [Op.in]: scopedProjectIds } },
+        attributes: ["id", "name", "project_id", "status", "start_date", "end_date"],
+        include: [{ model: Project, as: "project", attributes: ["id", "name"] }],
+        order: [["updated_at", "DESC"]],
+        limit: 200,
+      }),
+      TestCase.findAll({
+        where: { project_id: { [Op.in]: scopedProjectIds } },
+        attributes: ["suite", "module", "sprint_name"],
+        order: [["updated_at", "DESC"]],
+      }),
+    ]);
+
+    const uniqueValues = (values: Array<string | null | undefined>) =>
+      Array.from(
+        new Set(
+          values
+            .map((value) => String(value || "").trim())
+            .filter(Boolean),
+        ),
+      ).sort((left, right) => left.localeCompare(right));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        projects: projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+        })),
+        tasks: tasks.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          project: task.project
+            ? {
+                id: task.project.id,
+                name: task.project.name,
+              }
+            : null,
+        })),
+        sprints: sprints.map((sprint: any) => ({
+          id: sprint.id,
+          name: sprint.name,
+          project_id: sprint.project_id,
+          status: sprint.status,
+          start_date: sprint.start_date,
+          end_date: sprint.end_date,
+          project: sprint.project
+            ? {
+                id: sprint.project.id,
+                name: sprint.project.name,
+              }
+            : null,
+        })),
+        suites: uniqueValues(existingTestCases.map((item: any) => item.suite)),
+        modules: uniqueValues(existingTestCases.map((item: any) => item.module)),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch test case form options",
       error: (error as any)?.message,
     });
   }

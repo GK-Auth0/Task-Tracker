@@ -45,6 +45,23 @@ const ensureProjectAccess = async (projectId: string, userId: string, role?: str
   return membership ? project : null;
 };
 
+const SPRINT_NAME_PATTERN = /^Sprint[-\s]?(\d+)$/i;
+
+const getNextGeneratedSprintName = async (projectId: string) => {
+  const existingSprints = await Sprint.findAll({
+    where: { project_id: projectId },
+    attributes: ["name"],
+  });
+
+  const sprintNumbers = existingSprints
+    .map((sprint) => String(sprint.name || "").match(SPRINT_NAME_PATTERN))
+    .map((match) => (match ? Number.parseInt(match[1], 10) : null))
+    .filter((value): value is number => Number.isFinite(value ?? NaN));
+
+  const nextNumber = sprintNumbers.length ? Math.max(...sprintNumbers) + 1 : 1;
+  return `Sprint-${nextNumber}`;
+};
+
 const serializeSprint = (sprint: any) => ({
   id: sprint.id,
   name: sprint.name,
@@ -173,8 +190,14 @@ export const createSprintRecord = async (req: AuthenticatedRequest, res: Respons
       }
     }
 
+    const requestedName = String(req.body.name || "").trim();
+    const sprintName =
+      !requestedName || requestedName === "AUTO_SPRINT_NAME"
+        ? await getNextGeneratedSprintName(projectId)
+        : requestedName;
+
     const sprint = await Sprint.create({
-      name: String(req.body.name || "").trim(),
+      name: sprintName,
       goal: req.body.goal ? String(req.body.goal).trim() : null,
       release: req.body.release ? String(req.body.release).trim() : null,
       squad: req.body.squad ? String(req.body.squad).trim() : null,

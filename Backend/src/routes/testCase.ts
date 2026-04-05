@@ -2,7 +2,11 @@ import express from "express";
 import { body, validationResult } from "express-validator";
 import { authenticateToken } from "../middleware/auth";
 import { requireWorkspaceRole } from "../middleware/rbac";
-import { createTestCaseRecord, listTestCases } from "../controllers/testCase";
+import {
+  createTestCaseRecord,
+  getTestCaseFormOptions,
+  listTestCases,
+} from "../controllers/testCase";
 
 const router = express.Router();
 
@@ -19,6 +23,7 @@ const handleValidationErrors: express.RequestHandler = (req, res, next) => {
 };
 
 router.get("/", authenticateToken, listTestCases);
+router.get("/form-options", authenticateToken, getTestCaseFormOptions);
 
 router.post(
   "/",

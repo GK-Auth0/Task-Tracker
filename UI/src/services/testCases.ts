@@ -1,6 +1,51 @@
 import api from "./auth";
 import type { TestAutomation, TestCasePriority, TestCaseRecord, TestCaseStatus } from "../types/testCase";
 
+export interface TestCaseFormProjectOption {
+  id: string;
+  name: string;
+}
+
+export interface TestCaseFormTaskOption {
+  id: string;
+  title: string;
+  project: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface TestCaseFormSprintOption {
+  id: string;
+  name: string;
+  project_id: string;
+  status: "Planning" | "Active" | "Completed";
+  start_date?: string | null;
+  end_date?: string | null;
+  project: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface TestCaseModuleOption {
+  id: string;
+  name: string;
+  project_id: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  project: {
+    id: string;
+    name: string;
+  } | null;
+  owner: {
+    id: string;
+    full_name: string;
+    email: string;
+  } | null;
+}
+
 export const testCasesAPI = {
   getTestCases: async (params?: {
     project_id?: string;
@@ -8,6 +53,22 @@ export const testCasesAPI = {
     automation?: TestAutomation;
   }): Promise<{ success: boolean; data: TestCaseRecord[] }> => {
     const response = await api.get("/api/test-cases", { params });
+    return response.data;
+  },
+
+  getFormOptions: async (params?: {
+    project_id?: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      projects: TestCaseFormProjectOption[];
+      tasks: TestCaseFormTaskOption[];
+      sprints: TestCaseFormSprintOption[];
+      suites: string[];
+      modules: string[];
+    };
+  }> => {
+    const response = await api.get("/api/test-cases/form-options", { params });
     return response.data;
   },
 
@@ -39,6 +100,23 @@ export const testCasesAPI = {
     }>;
   }): Promise<{ success: boolean; data: TestCaseRecord; message: string }> => {
     const response = await api.post("/api/test-cases", data);
+    return response.data;
+  },
+};
+
+export const testCaseModulesAPI = {
+  getModules: async (params?: {
+    project_id?: string;
+  }): Promise<{ success: boolean; data: TestCaseModuleOption[] }> => {
+    const response = await api.get("/api/test-case-modules", { params });
+    return response.data;
+  },
+
+  createModule: async (data: {
+    name: string;
+    project_id: string;
+  }): Promise<{ success: boolean; data: TestCaseModuleOption; message: string }> => {
+    const response = await api.post("/api/test-case-modules", data);
     return response.data;
   },
 };

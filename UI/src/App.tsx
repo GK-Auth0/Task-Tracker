@@ -14,6 +14,8 @@ import Profile from "./pages/Profile";
 import Calendar from "./pages/Calendar";
 import TestCases from "./pages/TestCases";
 import CreateTestCase from "./pages/CreateTestCase";
+import TestCaseModuleDetail from "./pages/TestCaseModuleDetail";
+import TestCaseDetailPage from "./pages/TestCaseDetailPage";
 import SprintBoards from "./pages/SprintBoards";
 import TestPlans from "./pages/TestPlans";
 import TestRuns from "./pages/TestRuns";
@@ -211,6 +213,8 @@ function AppRoutes() {
         <Route path="sprint-board" element={<SprintBoards />} />
         <Route path="test-cases" element={<TestCases />} />
         <Route path="test-cases/create" element={<CreateTestCase />} />
+        <Route path="test-cases/modules/:moduleSlug" element={<TestCaseModuleDetail />} />
+        <Route path="test-cases/case/:id" element={<TestCaseDetailPage />} />
         <Route path="sprint-dev-board" element={<Navigate to="/sprint-board" replace />} />
         <Route path="sprint-qa-board" element={<Navigate to="/sprint-board" replace />} />
         <Route path="test-plans" element={<TestPlans />} />

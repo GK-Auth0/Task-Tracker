@@ -1,50 +1,48 @@
-import { NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { qaSectionLinks } from "../data/testManagement";
-import { projectsAPI, tasksAPI } from "../services/dashboard";
-import { testCasesAPI } from "../services/testCases";
+import { useNavigate } from "react-router-dom";
+import SprintTabs from "../components/sprint/SprintTabs";
+import TestCaseNav from "../components/testcases/TestCaseNav";
+import CreateTestCaseDetailsTab from "../components/testcases/create/CreateTestCaseDetailsTab";
+import CreateTestCaseHeader from "../components/testcases/create/CreateTestCaseHeader";
+import CreateTestCaseLinksTab from "../components/testcases/create/CreateTestCaseLinksTab";
+import CreateTestCaseReviewPanel from "../components/testcases/create/CreateTestCaseReviewPanel";
+import CreateTestCaseStepsTab from "../components/testcases/create/CreateTestCaseStepsTab";
 import { useAuth } from "../contexts/AuthContext";
-import type { TestAutomation, TestCasePriority, TestCaseStatus } from "../types/testCase";
+import {
+  testCasesAPI,
+  testCaseModulesAPI,
+  type TestCaseFormProjectOption,
+  type TestCaseFormSprintOption,
+  type TestCaseModuleOption,
+  type TestCaseFormTaskOption,
+} from "../services/testCases";
+import { sprintsAPI } from "../services/sprints";
+import type { TestAutomation, TestCasePriority, TestCaseStatus, TestStep } from "../types/testCase";
 
-type ProjectOption = {
-  id: string;
-  name: string;
-};
-
-type TaskOption = {
-  id: string;
-  title: string;
-  project: {
-    id: string;
-    name: string;
-  };
-};
-
-type StepDraft = {
-  id: number;
-  action: string;
-  expected: string;
-};
-
-const priorityOptions: TestCasePriority[] = ["Critical", "High", "Medium", "Low"];
-const automationOptions: TestAutomation[] = ["Manual", "Automated", "Candidate"];
-const statusOptions: TestCaseStatus[] = ["Draft", "Ready", "Blocked", "Passed", "Failed"];
+type CreateTab = "details" | "steps" | "links";
 
 export default function CreateTestCase() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [tasks, setTasks] = useState<TaskOption[]>([]);
+
+  const [projects, setProjects] = useState<TestCaseFormProjectOption[]>([]);
+  const [tasks, setTasks] = useState<TestCaseFormTaskOption[]>([]);
+  const [sprints, setSprints] = useState<TestCaseFormSprintOption[]>([]);
+  const [moduleOptions, setModuleOptions] = useState<TestCaseModuleOption[]>([]);
+
+  const [activeTab, setActiveTab] = useState<CreateTab>("details");
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
   const [sprintName, setSprintName] = useState("");
+  const [isCreatingSprint, setIsCreatingSprint] = useState(false);
   const [suite, setSuite] = useState("");
   const [module, setModule] = useState("");
+  const [isCreatingModule, setIsCreatingModule] = useState(false);
   const [priority, setPriority] = useState<TestCasePriority>("Medium");
   const [automation, setAutomation] = useState<TestAutomation>("Manual");
   const [status, setStatus] = useState<TestCaseStatus>("Draft");
   const [preconditionsInput, setPreconditionsInput] = useState("");
-  const [steps, setSteps] = useState<StepDraft[]>([
+  const [steps, setSteps] = useState<TestStep[]>([
     { id: 1, action: "", expected: "" },
     { id: 2, action: "", expected: "" },
   ]);
@@ -52,54 +50,103 @@ export default function CreateTestCase() {
   const [linkedStoryId, setLinkedStoryId] = useState("");
   const [linkedStoryTitle, setLinkedStoryTitle] = useState("");
   const [tagsInput, setTagsInput] = useState("");
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [projectsResponse, tasksResponse] = await Promise.all([
-          projectsAPI.getProjects(),
-          tasksAPI.getTasks({ limit: 200 }),
-        ]);
+        setLoadingOptions(true);
+        const response = await testCasesAPI.getFormOptions(
+          projectId ? { project_id: projectId } : undefined,
+        );
+        const modulesResponse = await testCaseModulesAPI.getModules(
+          projectId ? { project_id: projectId } : undefined,
+        );
 
-        if (projectsResponse.success) {
-          setProjects(projectsResponse.data);
-          if (projectsResponse.data.length === 1) {
-            setProjectId(projectsResponse.data[0].id);
+        if (response.success) {
+          setProjects(response.data.projects);
+          setTasks(response.data.tasks);
+          setSprints(response.data.sprints);
+
+          if (!projectId && response.data.projects.length === 1) {
+            setProjectId(response.data.projects[0].id);
           }
         }
 
-        if (tasksResponse.success) {
-          setTasks(tasksResponse.data as TaskOption[]);
+        if (modulesResponse.success) {
+          setModuleOptions(modulesResponse.data);
         }
       } catch (error) {
         console.error("Failed to load test case form options:", error);
-        setSubmitError("Failed to load project and task options");
+        setSubmitError("Failed to load project, sprint, task, and module options");
+      } finally {
+        setLoadingOptions(false);
       }
     };
 
     loadOptions();
-  }, []);
+  }, [projectId]);
+
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === projectId) || null,
+    [projectId, projects],
+  );
 
   const filteredTasks = useMemo(
     () => tasks.filter((task) => !projectId || task.project?.id === projectId),
     [projectId, tasks],
   );
 
-  useEffect(() => {
-    if (!projectId) {
-      setLinkedTaskId("");
-      return;
-    }
+  const filteredSprints = useMemo(
+    () => sprints.filter((sprint) => !projectId || sprint.project_id === projectId),
+    [projectId, sprints],
+  );
 
+  const sprintPreviewName = useMemo(() => {
+    const sprintNumbers = filteredSprints
+      .map((sprint) => {
+        const match = sprint.name.match(/^Sprint[-\s]?(\d+)$/i);
+        return match ? Number.parseInt(match[1], 10) : null;
+      })
+      .filter((value): value is number => Number.isFinite(value ?? NaN));
+
+    const nextNumber = sprintNumbers.length ? Math.max(...sprintNumbers) + 1 : 1;
+    return `Sprint-${nextNumber}`;
+  }, [filteredSprints]);
+
+  const selectedTask = useMemo(
+    () => filteredTasks.find((task) => task.id === linkedTaskId) || null,
+    [filteredTasks, linkedTaskId],
+  );
+
+  const validSteps = useMemo(
+    () =>
+      steps
+        .filter((step) => step.action.trim() && step.expected.trim())
+        .map((step, index) => ({
+          id: index + 1,
+          action: step.action.trim(),
+          expected: step.expected.trim(),
+        })),
+    [steps],
+  );
+
+  useEffect(() => {
     if (linkedTaskId && !filteredTasks.some((task) => task.id === linkedTaskId)) {
       setLinkedTaskId("");
     }
-  }, [filteredTasks, linkedTaskId, projectId]);
+  }, [filteredTasks, linkedTaskId]);
 
-  const selectedProject = projects.find((project) => project.id === projectId);
-  const selectedTask = filteredTasks.find((task) => task.id === linkedTaskId);
+  useEffect(() => {
+    if (!isCreatingModule) return;
+
+    const projectModules = moduleOptions.filter((item) => !projectId || item.project_id === projectId);
+    if (module && projectModules.some((item) => item.name === module)) {
+      setIsCreatingModule(false);
+    }
+  }, [isCreatingModule, module, moduleOptions, projectId]);
 
   const handleStepChange = (id: number, field: "action" | "expected", value: string) => {
     setSteps((current) =>
@@ -108,10 +155,7 @@ export default function CreateTestCase() {
   };
 
   const handleAddStep = () => {
-    setSteps((current) => [
-      ...current,
-      { id: current.length + 1, action: "", expected: "" },
-    ]);
+    setSteps((current) => [...current, { id: current.length + 1, action: "", expected: "" }]);
   };
 
   const handleRemoveStep = (id: number) => {
@@ -133,16 +177,10 @@ export default function CreateTestCase() {
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
-    const parsedSteps = steps
-      .filter((step) => step.action.trim() && step.expected.trim())
-      .map((step, index) => ({
-        id: index + 1,
-        action: step.action.trim(),
-        expected: step.expected.trim(),
-      }));
 
-    if (!title.trim() || !projectId || !suite.trim() || !module.trim() || !parsedSteps.length) {
+    if (!title.trim() || !projectId || !suite.trim() || !module.trim() || !validSteps.length) {
       setSubmitError("Title, project, suite, module, and at least one valid step are required");
+      setActiveTab(!title.trim() || !projectId || !suite.trim() || !module.trim() ? "details" : "steps");
       return;
     }
 
@@ -151,29 +189,79 @@ export default function CreateTestCase() {
       type: "Story" | "Bug" | "Requirement";
       title: string;
     }> = [];
+
     if (linkedStoryId.trim() && linkedStoryTitle.trim()) {
       linkedItems.push({
         id: linkedStoryId.trim(),
-        type: "Story" as const,
+        type: "Story",
         title: linkedStoryTitle.trim(),
       });
     }
 
     try {
       setSubmitting(true);
+      let resolvedSprintName = sprintName.trim();
+      const existingSprint = filteredSprints.find(
+        (item) => item.name.trim().toLowerCase() === sprintName.trim().toLowerCase(),
+      );
+
+      if (isCreatingSprint && projectId && !existingSprint) {
+        const createdSprintResponse = await sprintsAPI.createSprint({
+          name: "AUTO_SPRINT_NAME",
+          project_id: projectId,
+          status: "Planning",
+        });
+
+        if (createdSprintResponse.success) {
+          resolvedSprintName = createdSprintResponse.data.name;
+          setSprintName(createdSprintResponse.data.name);
+          setSprints((current) =>
+            [...current, createdSprintResponse.data].sort((left, right) =>
+              left.name.localeCompare(right.name),
+            ),
+          );
+        }
+      } else if (existingSprint) {
+        resolvedSprintName = existingSprint.name;
+      }
+
+      const existingModule = moduleOptions.find(
+        (item) =>
+          item.project_id === projectId &&
+          item.name.trim().toLowerCase() === module.trim().toLowerCase(),
+      );
+
+      if (!existingModule && module.trim()) {
+        const createdModuleResponse = await testCaseModulesAPI.createModule({
+          name: module.trim(),
+          project_id: projectId,
+        });
+
+        if (createdModuleResponse.success) {
+          setModuleOptions((current) => {
+            if (current.some((item) => item.id === createdModuleResponse.data.id)) {
+              return current;
+            }
+            return [...current, createdModuleResponse.data].sort((left, right) =>
+              left.name.localeCompare(right.name),
+            );
+          });
+        }
+      }
+
       await testCasesAPI.createTestCase({
         title: title.trim(),
         project_id: projectId,
         linked_task_id: linkedTaskId || undefined,
         suite: suite.trim(),
         module: module.trim(),
-        sprint_name: sprintName.trim() || undefined,
+        sprint_name: resolvedSprintName || undefined,
         priority,
         status,
         automation,
         tags: parsedTags,
         preconditions: parsedPreconditions,
-        steps: parsedSteps,
+        steps: validSteps,
         linked_items: linkedItems,
         execution_history: [],
       });
@@ -186,322 +274,134 @@ export default function CreateTestCase() {
     }
   };
 
+  const headerScope = selectedProject
+    ? `${selectedProject.name}${sprintName ? ` • ${sprintName}` : ""}`
+    : "Choose project and sprint";
+
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
+    <div className="h-full overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)]">
       <div className="min-h-full p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Quality
-            </p>
-            <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-              Create Test Case
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Create a reusable test case with linked project, task, sprint, and
-              requirement context.
-            </p>
-          </div>
-          <div className="flex flex-col items-start gap-3 sm:items-end">
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="material-symbols-outlined text-lg">save</span>
-              <span>{submitting ? "Saving..." : "Save Test Case"}</span>
-            </button>
-          </div>
-        </div>
+        <CreateTestCaseHeader
+          metaValue={headerScope}
+          submitting={submitting}
+          onSave={handleSubmit}
+        />
 
-        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-2">
-          <div className="flex flex-wrap gap-2">
-            {qaSectionLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`
-                }
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {link.icon}
-                </span>
-                {link.label}
-              </NavLink>
-            ))}
-          </div>
-        </div>
+        <div className="space-y-5">
+          <TestCaseNav />
 
-        {submitError ? (
-          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {submitError}
-          </div>
-        ) : null}
+          {submitError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {submitError}
+            </div>
+          ) : null}
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-          <section className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="text-sm font-semibold text-slate-900">Case details</h2>
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label className="block md:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Title
-                  </span>
-                  <input
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="Describe the reusable test case"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Project
-                  </span>
-                  <select
-                    value={projectId}
-                    onChange={(event) => setProjectId(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
-                  >
-                    <option value="">Select project</option>
-                    {projects.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Sprint
-                  </span>
-                  <input
-                    value={sprintName}
-                    onChange={(event) => setSprintName(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="Sprint 24 Regression"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Suite
-                  </span>
-                  <input
-                    value={suite}
-                    onChange={(event) => setSuite(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="Authentication"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Module
-                  </span>
-                  <input
-                    value={module}
-                    onChange={(event) => setModule(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="Password Reset"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Priority
-                  </span>
-                  <select
-                    value={priority}
-                    onChange={(event) => setPriority(event.target.value as TestCasePriority)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
-                  >
-                    {priorityOptions.map((item) => (
-                      <option key={item}>{item}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Automation
-                  </span>
-                  <select
-                    value={automation}
-                    onChange={(event) => setAutomation(event.target.value as TestAutomation)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
-                  >
-                    {automationOptions.map((item) => (
-                      <option key={item}>{item}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Status
-                  </span>
-                  <select
-                    value={status}
-                    onChange={(event) => setStatus(event.target.value as TestCaseStatus)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
-                  >
-                    {statusOptions.map((item) => (
-                      <option key={item}>{item}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className="mt-4 block">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Preconditions
-                </span>
-                <textarea
-                  rows={4}
-                  value={preconditionsInput}
-                  onChange={(event) => setPreconditionsInput(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                  placeholder={"Add one precondition per line\nA user account exists\nEmail auth is enabled"}
+          {loadingOptions ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-500">
+              Loading test case form options...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.3fr)_360px]">
+              <section className="space-y-5">
+                <SprintTabs
+                  items={[
+                    {
+                      key: "details",
+                      label: "Details",
+                      icon: "checklist",
+                      description: "Project, sprint, suite, and case settings",
+                    },
+                    {
+                      key: "steps",
+                      label: "Steps",
+                      icon: "format_list_numbered",
+                      description: "Actions and expected results",
+                    },
+                    {
+                      key: "links",
+                      label: "Links",
+                      icon: "device_hub",
+                      description: "Attach delivery records and story references",
+                    },
+                  ]}
+                  value={activeTab}
+                  onChange={(value) => setActiveTab(value as CreateTab)}
                 />
-              </label>
 
-              <label className="mt-4 block">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Tags
-                </span>
-                <input
-                  value={tagsInput}
-                  onChange={(event) => setTagsInput(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                  placeholder="regression, security, api"
-                />
-              </label>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-900">Test steps</h2>
-                <button
-                  type="button"
-                  onClick={handleAddStep}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Add Step
-                </button>
-              </div>
-              <div className="mt-4 space-y-3">
-                {steps.map((step) => (
-                  <div
-                    key={step.id}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-900">
-                        Step {step.id}
-                      </p>
-                      {steps.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveStep(step.id)}
-                          className="text-xs font-semibold text-rose-600 hover:text-rose-700"
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-                    <textarea
-                      rows={2}
-                      value={step.action}
-                      onChange={(event) =>
-                        handleStepChange(step.id, "action", event.target.value)
-                      }
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                      placeholder="Action"
-                    />
-                    <textarea
-                      rows={2}
-                      value={step.expected}
-                      onChange={(event) =>
-                        handleStepChange(step.id, "expected", event.target.value)
-                      }
-                      className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                      placeholder="Expected result"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <aside className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="text-sm font-semibold text-slate-900">Linked delivery context</h2>
-              <div className="mt-4 space-y-3">
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Task
-                  </span>
-                  <select
-                    value={linkedTaskId}
-                    onChange={(event) => setLinkedTaskId(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
-                  >
-                    <option value="">No linked task</option>
-                    {filteredTasks.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Story ID
-                  </span>
-                  <input
-                    value={linkedStoryId}
-                    onChange={(event) => setLinkedStoryId(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="AUTH-72"
+                {activeTab === "details" ? (
+                  <CreateTestCaseDetailsTab
+                    title={title}
+                    projectId={projectId}
+                    sprintName={sprintName}
+                    isCreatingSprint={isCreatingSprint}
+                    sprintPreviewName={sprintPreviewName}
+                    suite={suite}
+                    module={module}
+                    priority={priority}
+                    automation={automation}
+                    status={status}
+                    preconditionsInput={preconditionsInput}
+                    tagsInput={tagsInput}
+                    projects={projects}
+                    sprintOptions={filteredSprints}
+                    moduleOptions={moduleOptions.filter(
+                      (item) => !projectId || item.project_id === projectId,
+                    )}
+                    isCreatingModule={isCreatingModule}
+                    validStepCount={validSteps.length}
+                    totalStepCount={steps.length}
+                    onTitleChange={setTitle}
+                    onProjectChange={setProjectId}
+                    onSprintNameChange={setSprintName}
+                    onSprintCreateModeChange={setIsCreatingSprint}
+                    onSuiteChange={setSuite}
+                    onModuleChange={setModule}
+                    onModuleCreateModeChange={setIsCreatingModule}
+                    onPriorityChange={setPriority}
+                    onAutomationChange={setAutomation}
+                    onStatusChange={setStatus}
+                    onPreconditionsChange={setPreconditionsInput}
+                    onTagsChange={setTagsInput}
                   />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Story Title
-                  </span>
-                  <input
-                    value={linkedStoryTitle}
-                    onChange={(event) => setLinkedStoryTitle(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="Secure email authentication"
-                  />
-                </label>
-              </div>
-            </div>
+                ) : null}
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="text-sm font-semibold text-slate-900">Review snapshot</h2>
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <p>
-                  <span className="font-semibold text-slate-800">Owner:</span>{" "}
-                  {user?.full_name || "Current user"}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-800">Project:</span>{" "}
-                  {selectedProject?.name || "Not selected"}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-800">Linked task:</span>{" "}
-                  {selectedTask?.title || "No linked task"}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-800">Valid steps:</span>{" "}
-                  {steps.filter((step) => step.action.trim() && step.expected.trim()).length}
-                </p>
-              </div>
+                {activeTab === "steps" ? (
+                  <CreateTestCaseStepsTab
+                    steps={steps}
+                    onStepChange={handleStepChange}
+                    onAddStep={handleAddStep}
+                    onRemoveStep={handleRemoveStep}
+                  />
+                ) : null}
+
+                {activeTab === "links" ? (
+                  <CreateTestCaseLinksTab
+                    linkedTaskId={linkedTaskId}
+                    linkedStoryId={linkedStoryId}
+                    linkedStoryTitle={linkedStoryTitle}
+                    taskOptions={filteredTasks}
+                    onLinkedTaskChange={setLinkedTaskId}
+                    onLinkedStoryIdChange={setLinkedStoryId}
+                    onLinkedStoryTitleChange={setLinkedStoryTitle}
+                  />
+                ) : null}
+              </section>
+
+              <CreateTestCaseReviewPanel
+                ownerName={user?.full_name || "Current user"}
+                projectName={selectedProject?.name || ""}
+                sprintName={sprintName}
+                linkedTaskTitle={selectedTask?.title || ""}
+                suite={suite}
+                module={module}
+                tagsCount={tagsInput
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean).length}
+                validSteps={validSteps}
+              />
             </div>
-          </aside>
+          )}
         </div>
       </div>
     </div>

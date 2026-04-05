@@ -10,7 +10,7 @@ export const sprintsAPI = {
   },
 
   createSprint: async (data: {
-    name: string;
+    name?: string;
     goal?: string;
     release?: string;
     squad?: string;

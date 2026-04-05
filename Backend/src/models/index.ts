@@ -27,9 +27,10 @@ import Config from "./config";
 import Defect from "./defect";
 import TestCase from "./testCase";
 import Sprint from "./sprint";
+import TestCaseModule from "./testCaseModule";
 
-const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint];
+const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule];
 
 export default models;
 
-export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint };
+export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule };

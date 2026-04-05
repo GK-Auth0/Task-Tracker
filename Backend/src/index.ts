@@ -14,6 +14,7 @@ import organizationRoutes from "./routes/organization";
 import defectRoutes from "./routes/defect";
 import testCaseRoutes from "./routes/testCase";
 import sprintRoutes from "./routes/sprint";
+import testCaseModuleRoutes from "./routes/testCaseModule";
 
 const router = express.Router();
 
@@ -32,6 +33,7 @@ router.use("/api/invites", inviteRoutes);
 router.use("/api/organizations", organizationRoutes);
 router.use("/api/defects", defectRoutes);
 router.use("/api/test-cases", testCaseRoutes);
+router.use("/api/test-case-modules", testCaseModuleRoutes);
 router.use("/api/sprints", sprintRoutes);
 
 // Health check route

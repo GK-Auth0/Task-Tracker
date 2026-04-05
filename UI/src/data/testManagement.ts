@@ -1069,3 +1069,18 @@ export const qaSectionLinks = [
   { to: "/test-defects/raise", label: "Raise Defect", icon: "add_circle" },
   { to: "/test-reports", label: "Reports", icon: "analytics" },
 ];
+
+export const testCaseSectionLinks = [
+  { to: "/test-cases", label: "Test Cases", icon: "fact_check" },
+  { to: "/test-cases/create", label: "Create Test Case", icon: "add_task" },
+  { to: "/test-plans", label: "Test Plans", icon: "assignment" },
+  { to: "/test-runs", label: "Test Runs", icon: "playlist_play" },
+  { to: "/test-traceability", label: "Traceability", icon: "account_tree" },
+  { to: "/test-reports", label: "Reports", icon: "analytics" },
+];
+
+export const defectSectionLinks = [
+  { to: "/test-defects", label: "Defects", icon: "bug_report" },
+  { to: "/test-defects/raise", label: "Raise Defect", icon: "add_circle" },
+  { to: "/test-reports", label: "Reports", icon: "analytics" },
+];
