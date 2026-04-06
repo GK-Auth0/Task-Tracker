@@ -306,6 +306,7 @@ export default function DashboardContent() {
                   className="h-5 w-5 rounded border-slate-300 bg-transparent text-blue-600 focus:ring-blue-600 focus:ring-offset-0 focus:outline-none cursor-pointer"
                   type="checkbox"
                   checked={isCompleted}
+                  aria-label={`${isCompleted ? "Mark task as incomplete" : "Mark task as complete"}: ${task.title}`}
                   onChange={(e) => handleTaskToggle(task.id, e.target.checked)}
                 />
               </div>

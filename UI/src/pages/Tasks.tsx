@@ -443,6 +443,7 @@ export default function Tasks() {
                 <select
                   value={selectedViewId}
                   onChange={(event) => setSelectedViewId(event.target.value)}
+                  aria-label="Select a saved task view"
                   className="h-9 min-w-[180px] rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 >
                   <option value="">Select saved view</option>

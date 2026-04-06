@@ -939,6 +939,7 @@ const ProjectDetail: React.FC = () => {
                       event.target.value as "all" | "To Do" | "In Progress" | "Done",
                     )
                   }
+                  aria-label="Filter roadmap tasks by status"
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
                   <option value="all">All status</option>
@@ -953,6 +954,7 @@ const ProjectDetail: React.FC = () => {
                       event.target.value as "all" | "high" | "medium" | "low",
                     )
                   }
+                  aria-label="Filter roadmap tasks by priority"
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
                   <option value="all">All priority</option>
