@@ -406,10 +406,11 @@ export default function CreateTaskModal({
 
             {/* Task Name */}
             <div className="flex flex-col gap-2">
-              <label className="text-gray-900 text-sm font-semibold">
+              <label htmlFor="create-task-title" className="text-gray-900 text-sm font-semibold">
                 Task Name
               </label>
               <input
+                id="create-task-title"
                 className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4 placeholder:text-slate-400"
                 placeholder="e.g. Design system update"
                 type="text"
@@ -484,8 +485,10 @@ export default function CreateTaskModal({
                       </div>
                       <div className="flex gap-2">
                         <input
+                          id="create-task-project-name"
                           className="flex-1 rounded-lg text-gray-900 border-blue-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-10 px-3 text-sm placeholder:text-slate-400"
                           placeholder="Project name"
+                          aria-label="New project name"
                           value={newProjectName}
                           onChange={(e) => setNewProjectName(e.target.value)}
                           onKeyPress={(e) =>
@@ -541,15 +544,17 @@ export default function CreateTaskModal({
 
               {/* Due Date */}
               <div className="flex flex-col gap-2">
-                <label className="text-gray-900 text-sm font-semibold">
+                <label htmlFor="create-task-due-date" className="text-gray-900 text-sm font-semibold">
                   Due Date
                 </label>
                 <div className="relative">
                   <input
+                    id="create-task-due-date"
                     className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 pl-10 px-4"
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
+                    aria-label="Due date"
                   />
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center pointer-events-none">
                     <span className="material-symbols-outlined text-lg">
