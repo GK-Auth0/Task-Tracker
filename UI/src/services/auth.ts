@@ -1,47 +1,141 @@
-import axios from "axios";
+import axios, {
+  type AxiosError,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from "axios";
 
 import { API_BASE_URL } from "../config/api";
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+const ACCESS_TOKEN_STORAGE_KEY = "token";
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+const buildDefaultHeaders = () => ({
+  "Content-Type": "application/json",
 });
 
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+const createBaseClient = (baseURL: string) =>
+  axios.create({
+    baseURL,
+    timeout: 15000,
+    withCredentials: true,
+    headers: buildDefaultHeaders(),
+  });
+
+export const getStoredAccessToken = () => localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+
+export const setStoredAccessToken = (token: string) => {
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+};
+
+export const clearStoredAccessToken = () => {
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+};
+
+const isBrowserAuthRoute = () => {
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  return (
+    currentPath.startsWith("/login") ||
+    currentPath.startsWith("/register") ||
+    currentPath.startsWith("/forgot-password") ||
+    currentPath.startsWith("/reset-password") ||
+    currentPath.startsWith("/auth/callback")
+  );
+};
+
+const isAuthRefreshExcludedRequest = (requestUrl: string) =>
+  requestUrl.includes("/api/auth/login") ||
+  requestUrl.includes("/api/auth/register") ||
+  requestUrl.includes("/api/auth/verify-otp") ||
+  requestUrl.includes("/api/auth/resend-otp") ||
+  requestUrl.includes("/api/auth/forgot-password") ||
+  requestUrl.includes("/api/auth/reset-password") ||
+  requestUrl.includes("/api/auth/change-password-invited") ||
+  requestUrl.includes("/api/auth/auth0") ||
+  requestUrl.includes("/api/auth/refresh") ||
+  requestUrl.includes("/api/auth/logout");
+
+const redirectToLogin = () => {
+  if (typeof window !== "undefined" && !isBrowserAuthRoute()) {
+    window.location.assign("/login");
   }
-  return config;
-});
+};
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = error?.response?.status;
-    if (status === 401) {
-      const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-      const isAuthRoute =
-        currentPath.startsWith("/login") ||
-        currentPath.startsWith("/register") ||
-        currentPath.startsWith("/forgot-password") ||
-        currentPath.startsWith("/reset-password") ||
-        currentPath.startsWith("/auth/callback");
+const refreshClient = createBaseClient(API_BASE_URL);
+let refreshRequest: Promise<string | null> | null = null;
 
-      if (!isAuthRoute) {
-        localStorage.removeItem("token");
-        if (typeof window !== "undefined") {
-          window.location.assign("/login");
+const refreshAccessToken = async () => {
+  const response = await refreshClient.post("/api/auth/refresh");
+  const nextToken = response.data?.data?.token;
+
+  if (nextToken) {
+    setStoredAccessToken(nextToken);
+    return nextToken as string;
+  }
+
+  clearStoredAccessToken();
+  return null;
+};
+
+export const applyAuthInterceptors = (client: AxiosInstance) => {
+  client.interceptors.request.use((config) => {
+    const token = getStoredAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+
+  client.interceptors.response.use(
+    (response) => response,
+    async (error: AxiosError) => {
+      const status = error.response?.status;
+      const originalRequest = error.config as RetryableRequestConfig | undefined;
+      const requestUrl = String(originalRequest?.url || "");
+
+      const shouldAttemptRefresh =
+        (status === 401 || status === 403) &&
+        originalRequest &&
+        !originalRequest._retry &&
+        !isAuthRefreshExcludedRequest(requestUrl);
+
+      if (shouldAttemptRefresh) {
+        originalRequest._retry = true;
+
+        try {
+          if (!refreshRequest) {
+            refreshRequest = refreshAccessToken().finally(() => {
+              refreshRequest = null;
+            });
+          }
+
+          const nextToken = await refreshRequest;
+          if (nextToken) {
+            originalRequest.headers.Authorization = `Bearer ${nextToken}`;
+            return client(originalRequest);
+          }
+        } catch {
+          clearStoredAccessToken();
+          redirectToLogin();
+          return Promise.reject(error);
         }
       }
-    }
-    return Promise.reject(error);
-  },
-);
+
+      if (status === 401 || status === 403) {
+        clearStoredAccessToken();
+        redirectToLogin();
+      }
+
+      return Promise.reject(error);
+    },
+  );
+
+  return client;
+};
+
+const api = applyAuthInterceptors(createBaseClient(API_BASE_URL));
 
 export interface LoginData {
   email: string;
@@ -155,6 +249,16 @@ export const authAPI = {
       otp,
       newPassword,
     });
+    return response.data;
+  },
+
+  refreshSession: async (): Promise<AuthResponse> => {
+    const response = await api.post("/api/auth/refresh");
+    return response.data;
+  },
+
+  logout: async (): Promise<BasicResponse> => {
+    const response = await api.post("/api/auth/logout");
     return response.data;
   },
 

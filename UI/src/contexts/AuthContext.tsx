@@ -5,7 +5,12 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import { authAPI } from "../services/auth";
+import {
+  authAPI,
+  clearStoredAccessToken,
+  getStoredAccessToken,
+  setStoredAccessToken,
+} from "../services/auth";
 import type {
   AuthenticatedUser,
   OtpChallenge,
@@ -81,26 +86,43 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem("token"),
-  );
+  const [token, setToken] = useState<string | null>(getStoredAccessToken());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
-      if (token) {
-        try {
+      try {
+        let activeToken = token;
+
+        if (!activeToken) {
+          const refreshResponse = await authAPI.refreshSession();
+          const refreshedData = refreshResponse.data as Extract<
+            typeof refreshResponse.data,
+            { user: AuthenticatedUser; token: string }
+          >;
+
+          if (refreshedData?.token) {
+            setStoredAccessToken(refreshedData.token);
+            setToken(refreshedData.token);
+            activeToken = refreshedData.token;
+            setUser(normalizeUser(refreshedData.user));
+          }
+        }
+
+        if (activeToken) {
           const response = await authAPI.getCurrentUser();
           setUser(normalizeUser(response.data));
-        } catch (error) {
-          localStorage.removeItem("token");
-          setToken(null);
         }
+      } catch (error) {
+        clearStoredAccessToken();
+        setToken(null);
+        setUser(null);
       }
+
       setLoading(false);
     };
 
-    initAuth();
+    void initAuth();
   }, [token]);
 
   const login = async (email: string, password: string): Promise<User> => {
@@ -123,7 +145,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       { user: AuthenticatedUser; token: string }
     >;
     const { user, token } = authenticatedData;
-    localStorage.setItem("token", token);
+    setStoredAccessToken(token);
     setToken(token);
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
@@ -137,7 +159,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       { user: AuthenticatedUser; token: string }
     >;
     const { user, token } = authenticatedData;
-    localStorage.setItem("token", token);
+    setStoredAccessToken(token);
     setToken(token);
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
@@ -167,7 +189,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     >;
     const { user, token } = authenticatedData;
 
-    localStorage.setItem("token", token);
+    setStoredAccessToken(token);
     setToken(token);
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
@@ -193,7 +215,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
+    void authAPI.logout().catch(() => undefined);
+    clearStoredAccessToken();
     setToken(null);
     setUser(null);
   };

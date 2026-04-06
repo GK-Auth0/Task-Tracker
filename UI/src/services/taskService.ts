@@ -2,23 +2,18 @@ import axios from "axios";
 import { Task, CreateTaskRequest, TasksResponse } from "../types/task";
 
 import { API_BASE_URL } from "../config/api";
+import { applyAuthInterceptors } from "./auth";
 import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
 
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const api = applyAuthInterceptors(
+  axios.create({
+    baseURL: `${API_BASE_URL}/api/v1`,
+    withCredentials: true,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  }),
+);
 
 export const taskService = {
   // Get all tasks

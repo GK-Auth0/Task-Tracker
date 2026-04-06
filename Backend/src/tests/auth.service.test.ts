@@ -8,7 +8,7 @@ import {
   resetPasswordWithOtp,
 } from "../services/auth";
 import { appConfig } from "../config/app";
-import { AuthOtp, User } from "../models";
+import { AuthOtp, AuthRefreshToken, User } from "../models";
 
 jest.mock("bcrypt", () => ({
   __esModule: true,
@@ -37,6 +37,11 @@ jest.mock("../models", () => ({
   AuthPasswordReset: {
     findOne: jest.fn(),
   },
+  AuthRefreshToken: {
+    update: jest.fn(),
+    create: jest.fn(),
+    findByPk: jest.fn(),
+  },
   User: {
     findOne: jest.fn(),
     findByPk: jest.fn(),
@@ -62,6 +67,7 @@ jest.mock("../services/email", () => ({
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedJwt = jwt as jest.Mocked<typeof jwt>;
 const mockedAuthOtp = AuthOtp as jest.Mocked<typeof AuthOtp>;
+const mockedAuthRefreshToken = AuthRefreshToken as jest.Mocked<typeof AuthRefreshToken>;
 const mockedUser = User as jest.Mocked<typeof User>;
 
 const buildUser = (overrides: Record<string, unknown> = {}) => {
@@ -197,6 +203,7 @@ describe("auth service", () => {
     mockedAuthOtp.findByPk.mockResolvedValue(otpSession as never);
     mockedUser.findByPk.mockResolvedValue(user as never);
     mockedBcrypt.hash.mockResolvedValue("hashed-new-password" as never);
+    mockedAuthRefreshToken.update.mockResolvedValue([0] as never);
 
     await resetPasswordWithOtp("otp-123", otp, "newSecret123");
 

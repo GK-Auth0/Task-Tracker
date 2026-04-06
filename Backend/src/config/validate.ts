@@ -5,10 +5,16 @@ const isWeakSecret = (secret: string) => secret.length < 32;
 export const validateRuntimeConfig = () => {
   const errors: string[] = [];
 
-  if (!appConfig.jwt.secret) {
-    errors.push("JWT_SECRET is required.");
-  } else if (isWeakSecret(appConfig.jwt.secret)) {
-    errors.push("JWT_SECRET must be at least 32 characters.");
+  if (!appConfig.jwt.accessSecret) {
+    errors.push("JWT_ACCESS_SECRET or JWT_SECRET is required.");
+  } else if (isWeakSecret(appConfig.jwt.accessSecret)) {
+    errors.push("JWT access secret must be at least 32 characters.");
+  }
+
+  if (!appConfig.jwt.refreshSecret) {
+    errors.push("JWT_REFRESH_SECRET or JWT_SECRET is required.");
+  } else if (isWeakSecret(appConfig.jwt.refreshSecret)) {
+    errors.push("JWT refresh secret must be at least 32 characters.");
   }
 
   if (!appConfig.database.url) {

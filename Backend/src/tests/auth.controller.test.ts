@@ -14,6 +14,7 @@ import {
   requestPasswordReset,
   resetPasswordWithOtp,
   verifyOtpAndIssueToken,
+  createRefreshSession,
 } from "../services/auth";
 
 jest.mock("../helpers/validation", () => ({
@@ -30,6 +31,9 @@ jest.mock("../services/auth", () => ({
   loginWithAuth0AccessToken: jest.fn(),
   resendOtp: jest.fn(),
   changePasswordForInvitedUser: jest.fn(),
+  createRefreshSession: jest.fn(),
+  refreshAuthSession: jest.fn(),
+  revokeRefreshSession: jest.fn(),
 }));
 
 jest.mock("../config/database", () => ({
@@ -52,21 +56,32 @@ const mockedRequestPasswordReset =
   requestPasswordReset as jest.MockedFunction<typeof requestPasswordReset>;
 const mockedResetPasswordWithOtp =
   resetPasswordWithOtp as jest.MockedFunction<typeof resetPasswordWithOtp>;
+const mockedCreateRefreshSession =
+  createRefreshSession as jest.MockedFunction<typeof createRefreshSession>;
 
 const createResponseMock = () => {
   const json = jest.fn();
   const status = jest.fn(() => ({ json }));
+  const cookie = jest.fn();
+  const clearCookie = jest.fn();
 
   return {
     status,
     json,
-    response: { status, json } as unknown as Response,
+    cookie,
+    clearCookie,
+    response: { status, json, cookie, clearCookie } as unknown as Response,
   };
 };
 
 describe("auth controller", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedCreateRefreshSession.mockResolvedValue({
+      token: "refresh-token",
+      sessionId: "11111111-1111-1111-1111-111111111111",
+      expiresAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
   });
 
   it("register returns 201 and commits the transaction", async () => {
@@ -135,6 +150,7 @@ describe("auth controller", () => {
         email: "john@example.com",
         password: "secret123",
       },
+      headers: {},
     } as unknown as Request;
     const { response, status, json } = createResponseMock();
 
@@ -162,6 +178,7 @@ describe("auth controller", () => {
         otpSessionId: "otp-123",
         otp: "123456",
       },
+      headers: {},
     } as unknown as Request;
     const { response, status } = createResponseMock();
 

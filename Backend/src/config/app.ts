@@ -51,6 +51,11 @@ export const appConfig = {
   jwt: {
     secret: getEnv("JWT_SECRET") || "",
     expiresIn: getEnv("JWT_EXPIRES_IN") || "7d",
+    accessSecret: getEnv("JWT_ACCESS_SECRET", "JWT_SECRET") || "",
+    refreshSecret: getEnv("JWT_REFRESH_SECRET", "JWT_SECRET") || "",
+    accessExpiresIn: getEnv("JWT_ACCESS_EXPIRES_IN", "JWT_EXPIRES_IN") || "15m",
+    refreshExpiresIn: getEnv("JWT_REFRESH_EXPIRES_IN") || "30d",
+    refreshCookieName: getEnv("JWT_REFRESH_COOKIE_NAME") || "task_tracker_refresh_token",
   },
   cors: {
     allowedOrigins:

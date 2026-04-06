@@ -9,22 +9,17 @@ import {
 } from "../types/project";
 
 import { API_BASE_URL } from "../config/api";
+import { applyAuthInterceptors } from "./auth";
 
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const api = applyAuthInterceptors(
+  axios.create({
+    baseURL: `${API_BASE_URL}/api`,
+    withCredentials: true,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  }),
+);
 
 export const projectService = {
   // Get all projects

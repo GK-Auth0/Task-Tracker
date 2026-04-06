@@ -12,6 +12,7 @@ import { Commit } from "./commit";
 import UserMetadata from "./userMetadata";
 import AuthOtp from "./authOtp";
 import AuthPasswordReset from "./authPasswordReset";
+import AuthRefreshToken from "./authRefreshToken";
 import AuditLog from "./auditLog";
 import ChatGroup from "./chatGroup";
 import ChatMessage from "./chatMessage";
@@ -32,8 +33,8 @@ import TestPlan from "./testPlan";
 import TestRun from "./testRun";
 import TestCaseSuite from "./testCaseSuite";
 
-const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule, TestPlan, TestRun, TestCaseSuite];
+const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuthRefreshToken, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule, TestPlan, TestRun, TestCaseSuite];
 
 export default models;
 
-export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule, TestPlan, TestRun, TestCaseSuite };
+export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuthRefreshToken, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule, TestPlan, TestRun, TestCaseSuite };
