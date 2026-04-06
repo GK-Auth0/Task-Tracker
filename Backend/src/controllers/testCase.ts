@@ -1,6 +1,8 @@
+import fs from "fs/promises";
 import { Request, Response } from "express";
 import { Op } from "sequelize";
 import { Project, ProjectMember, Sprint, Task, TestCase, User } from "../models";
+import cloudinary from "../config/cloudinary";
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -354,5 +356,232 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       message: "Failed to create test case",
       error: (error as any)?.message,
     });
+  }
+};
+
+export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not authenticated" });
+    }
+
+    const testCaseId = String(req.params.id || "");
+    const testCase = await TestCase.findByPk(testCaseId);
+    if (!testCase) {
+      return res.status(404).json({ success: false, message: "Test case not found" });
+    }
+
+    const projectId = String(req.body.project_id || "");
+    const linkedTaskId = req.body.linked_task_id ? String(req.body.linked_task_id) : undefined;
+    const project = await ensureProjectAccess(projectId, userId, req.user?.role);
+    if (!project || testCase.project_id !== projectId) {
+      return res.status(403).json({ success: false, message: "Access denied to this project" });
+    }
+
+    if (linkedTaskId) {
+      const linkedTask = await Task.findOne({
+        where: {
+          id: linkedTaskId,
+          project_id: projectId,
+        },
+        attributes: ["id"],
+      });
+      if (!linkedTask) {
+        return res.status(400).json({
+          success: false,
+          message: "Linked task must belong to the selected project",
+        });
+      }
+    }
+
+    testCase.title = String(req.body.title || "").trim();
+    testCase.project_id = projectId;
+    testCase.linked_task_id = linkedTaskId;
+    testCase.suite = String(req.body.suite || "").trim();
+    testCase.module = String(req.body.module || "").trim();
+    testCase.sprint_name = req.body.sprint_name ? String(req.body.sprint_name).trim() : null as any;
+    testCase.priority = req.body.priority;
+    testCase.status = req.body.status || testCase.status;
+    testCase.automation = req.body.automation;
+    testCase.tags = Array.isArray(req.body.tags) ? req.body.tags : [];
+    testCase.preconditions = Array.isArray(req.body.preconditions) ? req.body.preconditions : [];
+    testCase.steps = Array.isArray(req.body.steps) ? req.body.steps : [];
+    testCase.linked_items = Array.isArray(req.body.linked_items) ? req.body.linked_items : [];
+    await testCase.save();
+
+    const updated = await TestCase.findByPk(testCase.id, {
+      include: [
+        { model: Project, as: "project", attributes: ["id", "name"] },
+        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: Task, as: "linked_task", attributes: ["id", "title"] },
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Test case updated successfully",
+      data: serializeTestCase(updated?.get({ plain: true })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update test case",
+      error: (error as any)?.message,
+    });
+  }
+};
+
+export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not authenticated" });
+    }
+
+    const testCaseId = String(req.params.id || "");
+    const testCase = await TestCase.findByPk(testCaseId, {
+      include: [
+        { model: Project, as: "project", attributes: ["id", "name"] },
+        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: Task, as: "linked_task", attributes: ["id", "title"] },
+      ],
+    });
+
+    if (!testCase) {
+      return res.status(404).json({ success: false, message: "Test case not found" });
+    }
+
+    const project = await ensureProjectAccess(testCase.project_id, userId, req.user?.role);
+    if (!project) {
+      return res.status(403).json({ success: false, message: "Access denied to this test case" });
+    }
+
+    const status = String(req.body.status || "") as "Passed" | "Failed" | "Blocked";
+    const cycle = String(req.body.cycle || "").trim() || testCase.sprint_name || "Manual run";
+    const note = String(req.body.note || "").trim();
+    const actualBehavior = String(req.body.actual_behavior || "").trim();
+    const attachments = Array.isArray(req.body.attachments)
+      ? req.body.attachments
+          .map((item: any) => ({
+            url: String(item?.url || "").trim(),
+            name: String(item?.name || "").trim(),
+            type: String(item?.type || "").trim() || "file",
+          }))
+          .filter((item: { url: string; name: string; type: string }) => item.url && item.name)
+      : [];
+
+    if (status === "Failed" && !actualBehavior) {
+      return res.status(400).json({
+        success: false,
+        message: "Actual behavior is required when the execution status is Failed",
+      });
+    }
+
+    const currentHistory = Array.isArray(testCase.execution_history) ? testCase.execution_history : [];
+    const executor = await User.findByPk(userId, {
+      attributes: ["id", "full_name"],
+    });
+
+    const nextEntry = {
+      id: `exec-${Date.now()}`,
+      cycle,
+      status,
+      tester: executor?.full_name || "Current user",
+      executedAt: new Date().toISOString(),
+      note,
+      actual_behavior: actualBehavior || "",
+      attachments,
+    };
+
+    testCase.execution_history = [nextEntry, ...currentHistory];
+    testCase.status = status;
+    await testCase.save();
+
+    const updated = await TestCase.findByPk(testCase.id, {
+      include: [
+        { model: Project, as: "project", attributes: ["id", "name"] },
+        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: Task, as: "linked_task", attributes: ["id", "title"] },
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Execution saved successfully",
+      data: serializeTestCase(updated?.get({ plain: true })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save test execution",
+      error: (error as any)?.message,
+    });
+  }
+};
+
+export const uploadTestCaseExecutionAttachment = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  const file = (req as any).file;
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not authenticated" });
+    }
+
+    const testCaseId = String(req.params.id || "");
+    const testCase = await TestCase.findByPk(testCaseId, {
+      attributes: ["id", "project_id"],
+    });
+
+    if (!testCase) {
+      return res.status(404).json({ success: false, message: "Test case not found" });
+    }
+
+    const project = await ensureProjectAccess(testCase.project_id, userId, req.user?.role);
+    if (!project) {
+      return res.status(403).json({ success: false, message: "Access denied to this test case" });
+    }
+
+    if (!file) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
+      return res.status(503).json({
+        success: false,
+        message: "Attachment service is not configured",
+      });
+    }
+
+    const uploadResult = await cloudinary.uploader.upload(file.path, {
+      folder: `task-tracker/test-cases/${testCaseId}/executions`,
+      resource_type: "auto",
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        url: uploadResult.secure_url,
+        name: file.originalname,
+        type: String(file.mimetype || "").startsWith("image/") ? "image" : "file",
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload execution attachment",
+      error: (error as any)?.message,
+    });
+  } finally {
+    if (file?.path) {
+      await fs.unlink(file.path).catch(() => undefined);
+    }
   }
 };

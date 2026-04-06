@@ -14,7 +14,7 @@ export default function CreateTestCaseStepsTab({
   onRemoveStep,
 }: CreateTestCaseStepsTabProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Test steps</h2>
@@ -25,7 +25,7 @@ export default function CreateTestCaseStepsTab({
         <button
           type="button"
           onClick={onAddStep}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Add step
         </button>
@@ -33,10 +33,10 @@ export default function CreateTestCaseStepsTab({
 
       <div className="mt-5 space-y-4">
         {steps.map((step) => (
-          <div key={step.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div key={step.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex size-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
+                <div className="flex size-8 items-center justify-center rounded-md bg-blue-600 text-sm font-semibold text-white">
                   {step.id}
                 </div>
                 <p className="text-sm font-semibold text-slate-900">Step {step.id}</p>
@@ -61,7 +61,7 @@ export default function CreateTestCaseStepsTab({
                   rows={4}
                   value={step.action}
                   onChange={(event) => onStepChange(step.id, "action", event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-500"
                   placeholder="Open the password reset screen and submit a valid email"
                 />
               </label>
@@ -74,7 +74,7 @@ export default function CreateTestCaseStepsTab({
                   rows={4}
                   value={step.expected}
                   onChange={(event) => onStepChange(step.id, "expected", event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-500"
                   placeholder="A success message appears and the reset email is queued"
                 />
               </label>

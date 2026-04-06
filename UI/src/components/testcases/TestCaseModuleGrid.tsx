@@ -125,16 +125,16 @@ export default function TestCaseModuleGrid({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Modules</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Open a module to see its cases on the next page.
+            <h2 className="text-base font-semibold text-slate-900">Module Directory</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Review module coverage and open a working list for each area.
             </p>
           </div>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+          <span className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
             {rows.length} modules
           </span>
         </div>
@@ -155,25 +155,25 @@ export default function TestCaseModuleGrid({
           border: 0,
           height: 560,
           "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: "rgba(248, 250, 252, 0.8)",
+            backgroundColor: "rgba(248, 250, 252, 0.75)",
             color: "rgb(15, 23, 42)",
             fontSize: 12,
             fontWeight: 700,
             textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            borderBottom: "none",
+            letterSpacing: "0.06em",
+            borderBottom: "1px solid rgb(226 232 240)",
           },
           "& .MuiDataGrid-columnHeaderTitle": {
             fontWeight: 700,
           },
           "& .MuiDataGrid-cell": {
-            borderBottom: "none",
+            borderBottom: "1px solid rgb(241 245 249)",
             display: "flex",
             alignItems: "center",
             padding: "12px 16px",
           },
           "& .MuiDataGrid-row:hover": {
-            backgroundColor: "rgba(226, 232, 240, 0.35)",
+            backgroundColor: "rgba(248, 250, 252, 0.95)",
           },
           "& .MuiDataGrid-columnSeparator": {
             display: "none",

@@ -15,6 +15,12 @@ export interface ExecutionEntry {
   tester: string;
   executedAt: string;
   note: string;
+  actual_behavior?: string;
+  attachments?: Array<{
+    url: string;
+    name: string;
+    type: string;
+  }>;
 }
 
 export interface LinkedItem {

@@ -18,7 +18,7 @@ export default function TestCaseFiltersBar({
   onAutomationChange,
 }: TestCaseFiltersBarProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="relative flex-1">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">
@@ -28,7 +28,7 @@ export default function TestCaseFiltersBar({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search by ID, title, suite, or module"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+            className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white"
           />
         </div>
 
@@ -36,7 +36,7 @@ export default function TestCaseFiltersBar({
           <select
             value={statusFilter}
             onChange={(event) => onStatusChange(event.target.value as "All" | TestCaseStatus)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
             {["All", "Draft", "Ready", "Blocked", "Passed", "Failed"].map((option) => (
               <option key={option} value={option}>
@@ -50,7 +50,7 @@ export default function TestCaseFiltersBar({
             onChange={(event) =>
               onAutomationChange(event.target.value as "All" | TestAutomation)
             }
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
             {["All", "Manual", "Automated", "Candidate"].map((option) => (
               <option key={option} value={option}>

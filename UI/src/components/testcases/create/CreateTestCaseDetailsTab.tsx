@@ -3,12 +3,13 @@ import type {
   TestCaseFormProjectOption,
   TestCaseFormSprintOption,
   TestCaseModuleOption,
+  TestCaseSuiteOption,
 } from "../../../services/testCases";
 
 const fieldLabelClass =
-  "text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400";
+  "text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 const fieldClass =
-  "mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-400";
+  "mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white";
 
 interface CreateTestCaseDetailsTabProps {
   title: string;
@@ -17,6 +18,7 @@ interface CreateTestCaseDetailsTabProps {
   isCreatingSprint: boolean;
   sprintPreviewName: string;
   suite: string;
+  suiteOptions: TestCaseSuiteOption[];
   module: string;
   priority: TestCasePriority;
   automation: TestAutomation;
@@ -55,6 +57,7 @@ export default function CreateTestCaseDetailsTab({
   isCreatingSprint,
   sprintPreviewName,
   suite,
+  suiteOptions,
   module,
   priority,
   automation,
@@ -82,10 +85,12 @@ export default function CreateTestCaseDetailsTab({
 }: CreateTestCaseDetailsTabProps) {
   const moduleSelectValue = isCreatingModule ? CUSTOM_VALUE : module;
   const sprintSelectValue = isCreatingSprint ? CUSTOM_VALUE : sprintName;
+  const suiteSelectValue =
+    !suite || suiteOptions.some((item) => item.name === suite) ? suite : CUSTOM_VALUE;
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Case details</h2>
@@ -93,7 +98,7 @@ export default function CreateTestCaseDetailsTab({
               Pick the project context first, then fill in structured metadata.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
             <div>
               <p className={fieldLabelClass}>Projects</p>
               <p className="mt-1 font-semibold text-slate-900">{projects.length}</p>
@@ -167,14 +172,37 @@ export default function CreateTestCaseDetailsTab({
 
           <label className="block">
             <span className={fieldLabelClass}>Suite</span>
-            <input
-              value={suite}
-              onChange={(event) => onSuiteChange(event.target.value)}
+            <select
+              value={suiteSelectValue}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                if (nextValue === CUSTOM_VALUE) {
+                  onSuiteChange("");
+                  return;
+                }
+
+                onSuiteChange(nextValue);
+              }}
               className={fieldClass}
-              placeholder="Authentication"
-            />
+            >
+              <option value="">Select suite</option>
+              {suiteOptions.map((item) => (
+                <option key={item.id} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+              <option value={CUSTOM_VALUE}>Create new suite</option>
+            </select>
+            {suiteSelectValue === CUSTOM_VALUE ? (
+              <input
+                value={suite}
+                onChange={(event) => onSuiteChange(event.target.value)}
+                className={fieldClass}
+                placeholder="Authentication"
+              />
+            ) : null}
             <p className="mt-2 text-xs text-slate-500">
-              Manual entry because there is no dedicated suite API yet.
+              Suite options are loaded from the suite catalog and existing test cases.
             </p>
           </label>
 
@@ -264,7 +292,7 @@ export default function CreateTestCaseDetailsTab({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-slate-900">Coverage notes</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <label className="block">

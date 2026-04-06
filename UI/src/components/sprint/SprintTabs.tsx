@@ -19,28 +19,28 @@ export default function SprintTabs<T extends string>({
   compact = false,
 }: SprintTabsProps<T>) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-1.5">
-      <div className="flex flex-wrap gap-1.5">
+    <div className={compact ? "border-b border-slate-200" : "rounded-xl border border-slate-200 bg-white p-2"}>
+      <div className={`flex flex-wrap ${compact ? "gap-1" : "gap-2"}`}>
         {items.map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => onChange(item.key)}
-            className={`rounded-lg text-left transition-colors ${
+            className={`text-left transition-colors ${
               compact
-                ? `px-3 py-2 text-xs font-semibold ${
+                ? `inline-flex items-center gap-2 rounded-t-lg border border-b-0 px-3 py-2 text-xs font-semibold ${
                     value === item.key
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-slate-600 hover:bg-slate-50"
+                      ? "border-slate-200 bg-white text-slate-900"
+                      : "border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-700"
                   }`
-                : `flex min-w-[150px] flex-1 items-start gap-2.5 px-3 py-3 ${
+                : `flex min-w-[170px] flex-1 items-start gap-3 rounded-lg border px-3.5 py-3 ${
                     value === item.key
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-slate-600 hover:bg-slate-50"
+                      ? "border-blue-200 bg-blue-50/70 text-slate-900 shadow-sm"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`
             }`}
           >
-            {!compact && item.icon ? (
+            {item.icon ? (
               <span className="material-symbols-outlined mt-0.5 text-[18px]">
                 {item.icon}
               </span>

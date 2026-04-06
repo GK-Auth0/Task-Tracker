@@ -153,6 +153,12 @@ export default class TestCase extends Model {
     tester: string;
     executedAt: string;
     note: string;
+    actual_behavior?: string;
+    attachments?: Array<{
+      url: string;
+      name: string;
+      type: string;
+    }>;
   }>;
 
   @CreatedAt

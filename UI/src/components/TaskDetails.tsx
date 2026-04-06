@@ -485,6 +485,9 @@ export default function TaskDetails() {
             ? "Due Today"
             : `${daysToDue}d Remaining`;
   const activityPulse = activityLogs.length > 0 ? "Active" : "Quiet";
+  const navigateToCreateTestCase = () => {
+    navigate(`/test-cases/create?sourceTaskId=${task.id}`);
+  };
 
   return (
     <>
@@ -792,6 +795,30 @@ export default function TaskDetails() {
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                          Quality Shortcut
+                        </p>
+                        <h3 className="mt-2 text-lg font-bold text-blue-950">
+                          Add a test case from this task
+                        </h3>
+                        <p className="mt-1 text-sm text-blue-900/80">
+                          Open the test case flow with this task already linked, plus project and sprint context prefilled.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={navigateToCreateTestCase}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                      >
+                        <span className="material-symbols-outlined text-lg">add_task</span>
+                        <span>Add Test Case</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
@@ -1433,6 +1460,16 @@ export default function TaskDetails() {
                     Actions
                   </p>
                   <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={navigateToCreateTestCase}
+                      className="w-full text-slate-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        add_task
+                      </span>
+                      Add Test Case
+                    </button>
                     <button
                       type="button"
                       onClick={handleStartEditing}

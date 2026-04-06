@@ -13,24 +13,26 @@ export default function TestCaseSummaryStrip({
   items,
 }: TestCaseSummaryStripProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="flex flex-wrap gap-2 xl:flex-nowrap xl:justify-end">
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+          className="min-w-[150px] rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3"
         >
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                {item.label}
-              </p>
-              <p className="mt-1.5 text-lg font-bold text-slate-900">{item.value}</p>
-            </div>
-            <span className="material-symbols-outlined rounded-lg bg-blue-50 p-1.5 text-[18px] text-blue-600">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined rounded-md bg-white p-1.5 text-[16px] text-slate-600">
               {item.icon}
             </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {item.label}
+              </p>
+              <p className="mt-1 text-lg font-bold leading-none text-slate-900">{item.value}</p>
+            </div>
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-500">{item.note}</p>
+          <p className="mt-2 truncate text-xs text-slate-500">
+            {item.note}
+          </p>
         </div>
       ))}
     </div>

@@ -23,7 +23,7 @@ export default function CreateTestCaseReviewPanel({
 }: CreateTestCaseReviewPanelProps) {
   return (
     <aside className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-slate-900">Review snapshot</h2>
         <div className="mt-4 space-y-3 text-sm text-slate-600">
           {[
@@ -35,8 +35,8 @@ export default function CreateTestCaseReviewPanel({
             ["Module", module || "Not selected"],
             ["Tags", tagsCount ? `${tagsCount} selected` : "No tags added"],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 {label}
               </p>
               <p className="mt-1 font-medium text-slate-900">{value}</p>
@@ -45,18 +45,18 @@ export default function CreateTestCaseReviewPanel({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Valid steps</h2>
-          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+          <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
             {validSteps.length}
           </span>
         </div>
         <div className="mt-4 space-y-3">
           {validSteps.length ? (
             validSteps.map((step) => (
-              <div key={step.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <div key={step.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Step {step.id}
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">{step.action}</p>
@@ -64,7 +64,7 @@ export default function CreateTestCaseReviewPanel({
               </div>
             ))
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
               Add at least one complete step to save this test case.
             </div>
           )}

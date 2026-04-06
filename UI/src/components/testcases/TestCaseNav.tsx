@@ -15,15 +15,17 @@ export default function TestCaseNav({
   links = testCaseSectionLinks,
 }: TestCaseNavProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-2">
-      <div className="flex flex-wrap gap-2">
+    <div className="border-b border-slate-200">
+      <div className="flex flex-wrap gap-1">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              `flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"
+              `inline-flex items-center gap-2 rounded-t-lg border border-b-0 px-4 py-2.5 text-sm font-medium transition-colors ${
+                isActive
+                  ? "border-slate-200 bg-white text-slate-900"
+                  : "border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-700"
               }`
             }
           >

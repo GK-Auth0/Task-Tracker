@@ -70,12 +70,12 @@ export default function TestCaseModuleDetail() {
   const linkedTaskCount = testCases.filter((item) => item.linked_task).length;
 
   return (
-    <div className="h-full overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)]">
-      <div className="min-h-full p-4 sm:p-6 lg:p-8">
+    <div className="h-full overflow-y-auto bg-slate-50">
+      <div className="mx-auto min-h-full max-w-[1440px] p-4 sm:p-6 lg:p-8">
         <WorkspacePageHeader
           eyebrow="Quality"
           title={moduleName || "Module"}
-          description="Review module-level project and task context first, then open any test case on its own page."
+          description="Review module-level scope, filter the working list, and open a full case page only when deeper detail is needed."
           metaLabel="Cases in module"
           metaValue={`${testCases.length}`}
           showStaticBanner={false}
@@ -84,7 +84,7 @@ export default function TestCaseModuleDetail() {
               <button
                 type="button"
                 onClick={() => navigate("/test-cases")}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Back to modules
               </button>
@@ -96,24 +96,24 @@ export default function TestCaseModuleDetail() {
           <TestCaseNav />
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Projects
               </p>
               <p className="mt-2 text-base font-semibold text-slate-900">
                 {projects.length ? projects.join(", ") : "No project linked"}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Sprints
               </p>
               <p className="mt-2 text-base font-semibold text-slate-900">
                 {sprints.length ? sprints.join(", ") : "No sprint linked"}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Linked tasks
               </p>
               <p className="mt-2 text-base font-semibold text-slate-900">{linkedTaskCount}</p>
@@ -121,11 +121,11 @@ export default function TestCaseModuleDetail() {
           </div>
 
           {selectedCase ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Selected case
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Focus item
                   </p>
                   <h2 className="mt-2 text-lg font-semibold text-slate-900">
                     {selectedCase.title}
@@ -138,7 +138,7 @@ export default function TestCaseModuleDetail() {
                 <button
                   type="button"
                   onClick={() => navigate(`/test-cases/case/${selectedCase.id}`)}
-                  className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                 >
                   Open full case page
                 </button>

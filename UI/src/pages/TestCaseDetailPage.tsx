@@ -34,13 +34,17 @@ export default function TestCaseDetailPage() {
     loadTestCase();
   }, [id]);
 
+  const handleTestCaseUpdated = (updatedCase: TestCaseRecord) => {
+    setTestCase(updatedCase);
+  };
+
   return (
-    <div className="h-full overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)]">
-      <div className="min-h-full p-4 sm:p-6 lg:p-8">
+    <div className="h-full overflow-y-auto bg-slate-50">
+      <div className="mx-auto min-h-full max-w-[1440px] p-4 sm:p-6 lg:p-8">
         <WorkspacePageHeader
           eyebrow="Quality"
           title={testCase?.title || "Test Case"}
-          description="Dedicated test case page for deeper review of steps, links, execution history, and delivery context."
+          description="Review the complete case record, including execution steps, linked work, and recent run history."
           metaLabel="Reference"
           metaValue={testCase?.reference_code || "Loading"}
           showStaticBanner={false}
@@ -52,7 +56,7 @@ export default function TestCaseDetailPage() {
                   onClick={() =>
                     navigate(`/test-cases/modules/${encodeModuleSlug(testCase.module)}`)
                   }
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Back to module
                 </button>
@@ -60,7 +64,7 @@ export default function TestCaseDetailPage() {
               <button
                 type="button"
                 onClick={() => navigate("/test-cases")}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Back to modules
               </button>
@@ -80,6 +84,7 @@ export default function TestCaseDetailPage() {
               detailTab={detailTab}
               onDetailTabChange={setDetailTab}
               formatRelativeDate={formatTestCaseDate}
+              onTestCaseUpdated={handleTestCaseUpdated}
             />
           )}
         </div>
