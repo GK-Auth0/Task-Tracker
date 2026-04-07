@@ -1,12 +1,10 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateProjectRequest } from "../types/project";
-import axios from "axios";
 import aiChatAPI from "../services/aiChat";
 import { buildProjectTemplate } from "../utils/descriptionTemplates";
 import { ProjectStatus, ProjectPriority } from "../enums";
-
-import { API_BASE_URL } from "../config/api";
+import { projectService } from "../services/projectService";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
 
 interface User {
@@ -61,14 +59,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
       try {
         setLoadingUsers(true);
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_BASE_URL}/api/projects/users`, {
-          params: { search: searchTerm },
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        setAvailableUsers(response.data.data || []);
+        const response = await projectService.getProjectUsers(searchTerm);
+        setAvailableUsers(response.data || []);
       } catch (error) {
         console.error("Error fetching users:", error);
         setAvailableUsers([]);

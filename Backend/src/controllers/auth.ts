@@ -90,12 +90,33 @@ const getRefreshCookieOptions = (): CookieOptions => ({
   maxAge: parseDurationToMs(appConfig.jwt.refreshExpiresIn, 30 * 24 * 60 * 60 * 1000),
 });
 
+const getAccessCookieOptions = (): CookieOptions => ({
+  httpOnly: true,
+  secure: appConfig.isProduction,
+  sameSite: appConfig.isProduction ? "none" : "lax",
+  path: "/",
+  maxAge: parseDurationToMs(appConfig.jwt.accessExpiresIn, 15 * 60 * 1000),
+});
+
+const setAccessCookie = (res: Response, accessToken: string) => {
+  res.cookie(appConfig.jwt.accessCookieName, accessToken, getAccessCookieOptions());
+};
+
+const clearAccessCookie = (res: Response) => {
+  res.clearCookie(appConfig.jwt.accessCookieName, getAccessCookieOptions());
+};
+
 const setRefreshCookie = (res: Response, refreshToken: string) => {
   res.cookie(appConfig.jwt.refreshCookieName, refreshToken, getRefreshCookieOptions());
 };
 
 const clearRefreshCookie = (res: Response) => {
   res.clearCookie(appConfig.jwt.refreshCookieName, getRefreshCookieOptions());
+};
+
+const clearAuthCookies = (res: Response) => {
+  clearAccessCookie(res);
+  clearRefreshCookie(res);
 };
 
 const readCookie = (req: Request, name: string) => {
@@ -118,6 +139,29 @@ const attachRefreshSession = async (req: Request, res: Response, userId: string)
 
   setRefreshCookie(res, refreshSession.token);
 };
+
+const attachAccessToken = (res: Response, accessToken: string) => {
+  if (accessToken) {
+    setAccessCookie(res, accessToken);
+  }
+};
+
+const buildSessionUserPayload = (result: any) => ({
+  ...(result?.user ? { user: result.user } : {}),
+  ...(result?.requiresPasswordChange
+    ? { requiresPasswordChange: result.requiresPasswordChange, email: result.email }
+    : {}),
+  ...(result?.requiresOtp
+    ? {
+        requiresOtp: result.requiresOtp,
+        otpSessionId: result.otpSessionId,
+        email: result.email,
+        expiresAt: result.expiresAt,
+        ...(result?.otp ? { otp: result.otp } : {}),
+        ...(result?.resent ? { resent: result.resent } : {}),
+      }
+    : {}),
+});
 
 export const register = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
@@ -174,12 +218,13 @@ export const login = async (req: Request, res: Response) => {
 
     if ((result as any)?.user?.id) {
       await attachRefreshSession(req, res, (result as any).user.id);
+      attachAccessToken(res, (result as any).token);
     }
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: result,
+      data: buildSessionUserPayload(result),
     });
   } catch (error) {
     return res.status(401).json({
@@ -223,10 +268,11 @@ export const auth0Login = async (req: Request, res: Response) => {
   try {
     const result = await loginWithAuth0AccessToken(req.body.accessToken);
     await attachRefreshSession(req, res, result.user.id);
+    attachAccessToken(res, result.token);
     return res.status(200).json({
       success: true,
       message: "Auth0 login successful",
-      data: result,
+      data: buildSessionUserPayload(result),
     });
   } catch (error) {
     return res.status(401).json({
@@ -246,11 +292,12 @@ export const verifyOtp = async (req: Request, res: Response) => {
       req.body.otp,
     );
     await attachRefreshSession(req, res, result.user.id);
+    attachAccessToken(res, result.token);
 
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully",
-      data: result,
+      data: buildSessionUserPayload(result),
     });
   } catch (error) {
     return res.status(400).json({
@@ -351,7 +398,7 @@ export const refreshSession = async (req: Request, res: Response) => {
     const refreshToken = readCookie(req, appConfig.jwt.refreshCookieName);
 
     if (!refreshToken) {
-      clearRefreshCookie(res);
+      clearAuthCookies(res);
       return res.status(401).json({
         success: false,
         message: "Refresh token required",
@@ -365,17 +412,17 @@ export const refreshSession = async (req: Request, res: Response) => {
     });
 
     setRefreshCookie(res, result.refreshToken);
+    attachAccessToken(res, result.token);
 
     return res.status(200).json({
       success: true,
       message: "Session refreshed",
       data: {
-        token: result.token,
         user: result.user,
       },
     });
   } catch (error) {
-    clearRefreshCookie(res);
+    clearAuthCookies(res);
     return res.status(401).json({
       success: false,
       message: "Failed to refresh session",
@@ -391,7 +438,7 @@ export const logout = async (req: Request, res: Response) => {
     await revokeRefreshSession(refreshToken);
   }
 
-  clearRefreshCookie(res);
+  clearAuthCookies(res);
 
   return res.status(200).json({
     success: true,

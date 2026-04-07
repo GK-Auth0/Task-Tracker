@@ -4,13 +4,27 @@ import { appConfig } from "../config";
 
 const JWT_SECRET = appConfig.jwt.accessSecret;
 
+const readCookie = (req: Request, name: string) => {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return "";
+
+  const cookieValue = cookieHeader
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+
+  return cookieValue ? decodeURIComponent(cookieValue.slice(name.length + 1)) : "";
+};
+
 export const authenticateToken = (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const cookieToken = readCookie(req, appConfig.jwt.accessCookieName);
+  const token = cookieToken || bearerToken;
 
   if (!token) {
     return res.status(401).json({

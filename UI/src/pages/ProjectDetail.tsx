@@ -442,9 +442,7 @@ const ProjectDetail: React.FC = () => {
 
       const response = await fetch(`${API_BASE_URL}/api/projects/${project.id}/files/upload`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        credentials: "include",
         body: formData,
       });
 

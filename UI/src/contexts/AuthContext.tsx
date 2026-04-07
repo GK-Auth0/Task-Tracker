@@ -7,9 +7,6 @@ import {
 } from "react";
 import {
   authAPI,
-  clearStoredAccessToken,
-  getStoredAccessToken,
-  setStoredAccessToken,
 } from "../services/auth";
 import type {
   AuthenticatedUser,
@@ -86,36 +83,14 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(getStoredAccessToken());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        let activeToken = token;
-
-        if (!activeToken) {
-          const refreshResponse = await authAPI.refreshSession();
-          const refreshedData = refreshResponse.data as Extract<
-            typeof refreshResponse.data,
-            { user: AuthenticatedUser; token: string }
-          >;
-
-          if (refreshedData?.token) {
-            setStoredAccessToken(refreshedData.token);
-            setToken(refreshedData.token);
-            activeToken = refreshedData.token;
-            setUser(normalizeUser(refreshedData.user));
-          }
-        }
-
-        if (activeToken) {
-          const response = await authAPI.getCurrentUser();
-          setUser(normalizeUser(response.data));
-        }
+        const response = await authAPI.getCurrentUser();
+        setUser(normalizeUser(response.data));
       } catch (error) {
-        clearStoredAccessToken();
-        setToken(null);
         setUser(null);
       }
 
@@ -123,7 +98,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     void initAuth();
-  }, [token]);
+  }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
     const response = await authAPI.login({ email, password });
@@ -142,11 +117,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const authenticatedData = data as Extract<
       typeof data,
-      { user: AuthenticatedUser; token: string }
+      { user: AuthenticatedUser }
     >;
-    const { user, token } = authenticatedData;
-    setStoredAccessToken(token);
-    setToken(token);
+    const { user } = authenticatedData;
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
     return normalizedUser;
@@ -156,11 +129,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const response = await authAPI.loginWithAuth0(accessToken);
     const authenticatedData = response.data as Extract<
       typeof response.data,
-      { user: AuthenticatedUser; token: string }
+      { user: AuthenticatedUser }
     >;
-    const { user, token } = authenticatedData;
-    setStoredAccessToken(token);
-    setToken(token);
+    const { user } = authenticatedData;
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
     return normalizedUser;
@@ -185,12 +156,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const response = await authAPI.verifyOtp(otpSessionId, otp);
     const authenticatedData = response.data as Extract<
       typeof response.data,
-      { user: AuthenticatedUser; token: string }
+      { user: AuthenticatedUser }
     >;
-    const { user, token } = authenticatedData;
-
-    setStoredAccessToken(token);
-    setToken(token);
+    const { user } = authenticatedData;
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
     return normalizedUser;
@@ -216,14 +184,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = () => {
     void authAPI.logout().catch(() => undefined);
-    clearStoredAccessToken();
-    setToken(null);
     setUser(null);
   };
 
   const value = {
     user,
-    token,
+    token: null,
     login,
     loginWithAuth0,
     register,

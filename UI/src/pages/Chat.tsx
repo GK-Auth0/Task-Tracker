@@ -174,13 +174,7 @@ const Chat: React.FC = () => {
   }, [showCreateGroup, groupMemberQuery, selectedGroupMembers]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat`, [
-      "chat.v1",
-      `access-token.${token}`,
-    ]);
+    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat`, ["chat.v1"]);
 
     socket.onopen = () => {
       setSocketConnected(true);

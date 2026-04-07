@@ -55,6 +55,7 @@ export const appConfig = {
     refreshSecret: getEnv("JWT_REFRESH_SECRET", "JWT_SECRET") || "",
     accessExpiresIn: getEnv("JWT_ACCESS_EXPIRES_IN", "JWT_EXPIRES_IN") || "15m",
     refreshExpiresIn: getEnv("JWT_REFRESH_EXPIRES_IN") || "30d",
+    accessCookieName: getEnv("JWT_ACCESS_COOKIE_NAME") || "task_tracker_access_token",
     refreshCookieName: getEnv("JWT_REFRESH_COOKIE_NAME") || "task_tracker_refresh_token",
   },
   cors: {

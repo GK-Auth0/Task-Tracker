@@ -3,7 +3,6 @@ import { IncomingMessage } from "http";
 import net from "net";
 import jwt from "jsonwebtoken";
 import { Duplex } from "stream";
-import { URL } from "url";
 import { appConfig } from "../config";
 import { isUserInChatGroup } from "../services/chat";
 
@@ -17,6 +16,18 @@ type WebSocketClient = {
 const clients = new Set<WebSocketClient>();
 const JWT_SECRET = appConfig.jwt.accessSecret;
 const SUPPORTED_WS_PROTOCOL = "chat.v1";
+
+const readCookie = (request: IncomingMessage, name: string) => {
+  const cookieHeader = request.headers.cookie;
+  if (!cookieHeader) return "";
+
+  const cookieValue = cookieHeader
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+
+  return cookieValue ? decodeURIComponent(cookieValue.slice(name.length + 1)) : "";
+};
 
 const parseFrame = (buffer: Buffer): { payload: string; bytesUsed: number } | null => {
   if (buffer.length < 2) return null;
@@ -162,6 +173,7 @@ export const broadcastChatMessage = (
 };
 
 const authenticateRequest = (request: IncomingMessage): string | null => {
+  const cookieToken = readCookie(request, appConfig.jwt.accessCookieName);
   const protocolHeader = request.headers["sec-websocket-protocol"];
   const rawProtocols = Array.isArray(protocolHeader)
     ? protocolHeader.join(",")
@@ -171,7 +183,8 @@ const authenticateRequest = (request: IncomingMessage): string | null => {
     .map((item) => item.trim())
     .filter(Boolean);
   const tokenProtocol = protocols.find((entry) => entry.startsWith("access-token."));
-  const token = tokenProtocol?.slice("access-token.".length);
+  const protocolToken = tokenProtocol?.slice("access-token.".length);
+  const token = cookieToken || protocolToken;
   if (!token) return null;
 
   try {

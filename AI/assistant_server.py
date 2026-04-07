@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import os
 import signal
+import hashlib
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
-from time import perf_counter
+from time import perf_counter, time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -25,12 +26,17 @@ METRICS: dict[str, Any] = {
     "requests_total": 0,
     "errors_total": 0,
     "endpoints": {},
+    "cache_hits": 0,
+    "cache_misses": 0,
 }
+RESPONSE_CACHE: dict[str, dict[str, Any]] = {}
+CACHE_LOCK = Lock()
 
 APP_ENV = str(os.getenv("AI_ENV") or os.getenv("NODE_ENV") or "development").lower()
 IS_PRODUCTION = APP_ENV == "production"
 MAX_BODY_BYTES = max(1024, int(os.getenv("AI_MAX_BODY_BYTES", "1048576")))
 API_KEY = str(os.getenv("AI_API_KEY", "")).strip()
+CACHE_TTL_SEC = max(5, int(os.getenv("AI_CACHE_TTL_SEC", "20")))
 ALLOWED_ORIGINS_RAW = str(
     os.getenv("AI_ALLOWED_ORIGINS", "*" if not IS_PRODUCTION else "")
 ).strip()
@@ -151,7 +157,40 @@ class Handler(BaseHTTPRequestHandler):
                 "uptime_seconds": max(0, uptime),
                 "requests_total": METRICS["requests_total"],
                 "errors_total": METRICS["errors_total"],
+                "cache_hits": METRICS["cache_hits"],
+                "cache_misses": METRICS["cache_misses"],
                 "endpoints": dict(METRICS["endpoints"]),
+            }
+
+    def _record_cache_hit(self) -> None:
+        with METRICS_LOCK:
+            METRICS["cache_hits"] += 1
+
+    def _record_cache_miss(self) -> None:
+        with METRICS_LOCK:
+            METRICS["cache_misses"] += 1
+
+    def _cache_key(self, path: str, payload: dict[str, Any]) -> str:
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(f"{path}:{body}".encode("utf-8")).hexdigest()
+        return f"{path}:{digest}"
+
+    def _cache_get(self, key: str) -> dict[str, Any] | None:
+        now = time()
+        with CACHE_LOCK:
+            record = RESPONSE_CACHE.get(key)
+            if not record:
+                return None
+            if float(record.get("expires_at", 0)) <= now:
+                RESPONSE_CACHE.pop(key, None)
+                return None
+            return dict(record.get("payload", {}))
+
+    def _cache_set(self, key: str, payload: dict[str, Any]) -> None:
+        with CACHE_LOCK:
+            RESPONSE_CACHE[key] = {
+                "expires_at": time() + CACHE_TTL_SEC,
+                "payload": payload,
             }
 
     def do_OPTIONS(self) -> None:  # noqa: N802
@@ -230,6 +269,22 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        cacheable_paths = {
+            "/project-insights",
+            "/auto-insights",
+            "/workload-forecast",
+            "/chat-context",
+            "/plan-day",
+        }
+        cache_key = self._cache_key(path, payload) if path in cacheable_paths else None
+        if cache_key:
+            cached_payload = self._cache_get(cache_key)
+            if cached_payload:
+                self._record_cache_hit()
+                self._send_json_timed(200, cached_payload, path, started)
+                return
+            self._record_cache_miss()
+
         if path == "/suggest-task":
             title = str(payload.get("title", "")).strip()
             description = str(payload.get("description", "")).strip()
@@ -262,12 +317,10 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             result = plan_day(tasks, focus_hours)
-            self._send_json_timed(
-                200,
-                {"success": True, "data": result},
-                path,
-                started,
-            )
+            response_payload = {"success": True, "data": result}
+            if cache_key:
+                self._cache_set(cache_key, response_payload)
+            self._send_json_timed(200, response_payload, path, started)
             return
 
         if path == "/project-insights":
@@ -281,12 +334,10 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             result = project_insights(tasks)
-            self._send_json_timed(
-                200,
-                {"success": True, "data": result},
-                path,
-                started,
-            )
+            response_payload = {"success": True, "data": result}
+            if cache_key:
+                self._cache_set(cache_key, response_payload)
+            self._send_json_timed(200, response_payload, path, started)
             return
 
         if path == "/auto-insights":
@@ -310,12 +361,10 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             result = auto_insights(route_context, tasks, projects)
-            self._send_json_timed(
-                200,
-                {"success": True, "data": result},
-                path,
-                started,
-            )
+            response_payload = {"success": True, "data": result}
+            if cache_key:
+                self._cache_set(cache_key, response_payload)
+            self._send_json_timed(200, response_payload, path, started)
             return
 
         if path == "/workload-forecast":
@@ -330,12 +379,10 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             result = workload_forecast(tasks, days)
-            self._send_json_timed(
-                200,
-                {"success": True, "data": result},
-                path,
-                started,
-            )
+            response_payload = {"success": True, "data": result}
+            if cache_key:
+                self._cache_set(cache_key, response_payload)
+            self._send_json_timed(200, response_payload, path, started)
             return
 
         if path == "/chat-context":
@@ -344,6 +391,7 @@ class Handler(BaseHTTPRequestHandler):
             response_mode = str(payload.get("response_mode", "balanced")).lower()
             tasks = payload.get("tasks", [])
             projects = payload.get("projects", [])
+            history = payload.get("history", [])
             if not message:
                 self._send_json_timed(
                     400,
@@ -368,21 +416,36 @@ class Handler(BaseHTTPRequestHandler):
                     started,
                 )
                 return
+            if not isinstance(history, list):
+                self._send_json_timed(
+                    400,
+                    {"error": "Field 'history' must be an array."},
+                    path,
+                    started,
+                )
+                return
             if response_mode not in {"concise", "balanced", "detailed"}:
                 response_mode = "balanced"
+            normalized_history = [
+                {
+                    "role": "assistant" if str(item.get("role")) == "assistant" else "user",
+                    "text": str(item.get("text", "")).strip(),
+                }
+                for item in history[:8]
+                if isinstance(item, dict) and str(item.get("text", "")).strip()
+            ]
             result = assistant_chat(
                 message=message,
                 route_context=route_context,
                 tasks=tasks,
                 projects=projects,
                 response_mode=response_mode,
+                history=normalized_history,
             )
-            self._send_json_timed(
-                200,
-                {"success": True, "data": result},
-                path,
-                started,
-            )
+            response_payload = {"success": True, "data": result}
+            if cache_key:
+                self._cache_set(cache_key, response_payload)
+            self._send_json_timed(200, response_payload, path, started)
             return
 
         self._send_json_timed(404, {"error": "Not found"}, path, started)
