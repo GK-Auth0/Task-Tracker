@@ -1,4 +1,4 @@
-import { TaskPriority, TaskStatus } from "../enums";
+import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
 
 const normalizeTaskPriority = (value: unknown) => {
   if (typeof value !== "string") return value;
@@ -50,6 +50,13 @@ export const createTaskSchema = {
     isIn: {
       options: [Object.values(TaskPriority)],
       errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
+    },
+  },
+  issue_type: {
+    optional: true,
+    isIn: {
+      options: [Object.values(TaskIssueType)],
+      errorMessage: `Issue type must be one of: ${Object.values(TaskIssueType).join(", ")}`,
     },
   },
   project_id: {
@@ -142,6 +149,13 @@ export const updateTaskSchema = {
       errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
     },
   },
+  issue_type: {
+    optional: true,
+    isIn: {
+      options: [Object.values(TaskIssueType)],
+      errorMessage: `Issue type must be one of: ${Object.values(TaskIssueType).join(", ")}`,
+    },
+  },
   assignee_id: {
     optional: true,
     isUUID: {
@@ -170,6 +184,36 @@ export const updateTaskSchema = {
         return Number.isFinite(time);
       },
       errorMessage: "Due date must be a valid ISO 8601 date",
+    },
+  },
+};
+
+export const createSubtaskSchema = {
+  title: {
+    notEmpty: {
+      errorMessage: "Subtask title is required",
+    },
+    trim: true,
+    isLength: {
+      options: { min: 2, max: 255 },
+      errorMessage: "Subtask title must be between 2 and 255 characters",
+    },
+  },
+};
+
+export const updateSubtaskSchema = {
+  title: {
+    optional: true,
+    trim: true,
+    isLength: {
+      options: { min: 2, max: 255 },
+      errorMessage: "Subtask title must be between 2 and 255 characters",
+    },
+  },
+  is_completed: {
+    optional: true,
+    isBoolean: {
+      errorMessage: "is_completed must be a boolean",
     },
   },
 };

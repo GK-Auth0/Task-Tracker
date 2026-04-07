@@ -15,7 +15,14 @@ interface TaskDetails {
   description?: string;
   status: "To Do" | "In Progress" | "Done";
   priority: "Low" | "Medium" | "High";
+  issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;
+  subtasks?: Array<{
+    id: string;
+    title: string;
+    is_completed: boolean;
+    position?: number;
+  }>;
   project: {
     id: string;
     name: string;
@@ -121,6 +128,9 @@ export default function TaskDetails() {
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [subtaskSaving, setSubtaskSaving] = useState(false);
+  const [subtaskError, setSubtaskError] = useState("");
 
   const [prForm, setPrForm] = useState({
     title: "",
@@ -291,6 +301,88 @@ export default function TaskDetails() {
     }
   };
 
+  const handleCreateSubtask = async () => {
+    if (!task || !newSubtaskTitle.trim()) return;
+
+    try {
+      setSubtaskSaving(true);
+      setSubtaskError("");
+      const response = await tasksAPI.createSubtask(task.id, {
+        title: newSubtaskTitle.trim(),
+      });
+
+      if (response.success) {
+        setTask({
+          ...task,
+          subtasks: [...(task.subtasks || []), response.data],
+        });
+        setNewSubtaskTitle("");
+      }
+    } catch (error: any) {
+      setSubtaskError(
+        error?.response?.data?.error ||
+          error?.response?.data?.message ||
+          "Failed to create subtask.",
+      );
+    } finally {
+      setSubtaskSaving(false);
+    }
+  };
+
+  const handleToggleSubtask = async (subtaskId: string, isCompleted: boolean) => {
+    if (!task) return;
+
+    try {
+      setSubtaskSaving(true);
+      setSubtaskError("");
+      const response = await tasksAPI.updateSubtask(task.id, subtaskId, {
+        is_completed: isCompleted,
+      });
+
+      if (response.success) {
+        setTask({
+          ...task,
+          subtasks: (task.subtasks || []).map((subtask) =>
+            subtask.id === subtaskId ? response.data : subtask,
+          ),
+        });
+      }
+    } catch (error: any) {
+      setSubtaskError(
+        error?.response?.data?.error ||
+          error?.response?.data?.message ||
+          "Failed to update subtask.",
+      );
+    } finally {
+      setSubtaskSaving(false);
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    if (!task) return;
+
+    try {
+      setSubtaskSaving(true);
+      setSubtaskError("");
+      const response = await tasksAPI.deleteSubtask(task.id, subtaskId);
+
+      if (response.success) {
+        setTask({
+          ...task,
+          subtasks: (task.subtasks || []).filter((subtask) => subtask.id !== subtaskId),
+        });
+      }
+    } catch (error: any) {
+      setSubtaskError(
+        error?.response?.data?.error ||
+          error?.response?.data?.message ||
+          "Failed to delete subtask.",
+      );
+    } finally {
+      setSubtaskSaving(false);
+    }
+  };
+
   const handleSaveTaskEdits = async () => {
     if (!task) return;
     const trimmedTitle = editTitle.trim();
@@ -456,6 +548,10 @@ export default function TaskDetails() {
   }
 
   const priorityColors = getPriorityColor(task.priority);
+  const issueTypeLabel = task.issue_type || "Task";
+  const completedSubtasks = (task.subtasks || []).filter(
+    (subtask) => subtask.is_completed,
+  ).length;
   const taskTabs: Array<{ id: TaskTab; label: string; icon: string; count?: number }> = [
     { id: "overview", label: "Overview", icon: "description" },
     { id: "prs", label: "PRs & Code", icon: "code", count: pullRequests.length || undefined },
@@ -594,6 +690,9 @@ export default function TaskDetails() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-violet-700">
+                    {issueTypeLabel}
+                  </span>
                   <span
                     className={`px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider ${getStatusColor(task.status)}`}
                   >
@@ -793,6 +892,88 @@ export default function TaskDetails() {
                           </button>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Subtasks</h3>
+                        <p className="text-sm text-slate-500">
+                          {completedSubtasks}/{task.subtasks?.length || 0} completed
+                        </p>
+                      </div>
+                      <div className="flex w-full gap-2 sm:w-auto">
+                        <input
+                          value={newSubtaskTitle}
+                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCreateSubtask();
+                            }
+                          }}
+                          placeholder="Add a subtask"
+                          className="h-10 flex-1 rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateSubtask}
+                          disabled={subtaskSaving || !newSubtaskTitle.trim()}
+                          className="rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {subtaskError ? (
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        {subtaskError}
+                      </div>
+                    ) : null}
+
+                    {task.subtasks && task.subtasks.length > 0 ? (
+                      <div className="space-y-2">
+                        {task.subtasks.map((subtask) => (
+                          <div
+                            key={subtask.id}
+                            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={subtask.is_completed}
+                              onChange={(e) =>
+                                handleToggleSubtask(subtask.id, e.target.checked)
+                              }
+                              className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <p
+                              className={`flex-1 text-sm ${
+                                subtask.is_completed
+                                  ? "text-slate-400 line-through"
+                                  : "text-slate-800"
+                              }`}
+                            >
+                              {subtask.title}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubtask(subtask.id)}
+                              className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                              aria-label="Delete subtask"
+                            >
+                              <span className="material-symbols-outlined text-base">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                        Break this ticket into smaller Jira-style subtasks here.
                       </div>
                     )}
                   </div>
@@ -1388,6 +1569,20 @@ export default function TaskDetails() {
 
                   <div className="space-y-2">
                     <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                      Issue Type
+                    </label>
+                    <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50">
+                      <span className="material-symbols-outlined text-blue-600">
+                        confirmation_number
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {issueTypeLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
                       Priority
                     </label>
                     <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50">
@@ -1451,6 +1646,12 @@ export default function TaskDetails() {
                     <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                       <span>Activity Entries</span>
                       <span className="font-semibold text-slate-900">{activityLogs.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span>Subtasks</span>
+                      <span className="font-semibold text-slate-900">
+                        {completedSubtasks}/{task.subtasks?.length || 0}
+                      </span>
                     </div>
                   </div>
                 </div>

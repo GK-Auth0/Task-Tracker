@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CreateTaskModal from "./CreateTaskModal";
 import { aiAssistantAPI } from "../services/aiAssistant";
 import { projectsAPI, tasksAPI, usersAPI } from "../services/dashboard";
+import { defectsAPI } from "../services/defects";
+import { sprintsAPI } from "../services/sprints";
 
 vi.mock("../services/dashboard", () => ({
   tasksAPI: {
@@ -13,6 +17,18 @@ vi.mock("../services/dashboard", () => ({
   },
   projectsAPI: {
     getProjects: vi.fn(),
+  },
+}));
+
+vi.mock("../services/defects", () => ({
+  defectsAPI: {
+    getDefects: vi.fn(),
+  },
+}));
+
+vi.mock("../services/sprints", () => ({
+  sprintsAPI: {
+    getSprints: vi.fn(),
   },
 }));
 
@@ -36,6 +52,13 @@ vi.mock("./InviteCollaboratorDialog", () => ({
 }));
 
 describe("CreateTaskModal", () => {
+  const renderModal = (props: ComponentProps<typeof CreateTaskModal>) =>
+    render(
+      <MemoryRouter>
+        <CreateTaskModal {...props} />
+      </MemoryRouter>,
+    );
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
@@ -55,6 +78,14 @@ describe("CreateTaskModal", () => {
       success: true,
       data: [{ id: "project-1", name: "Task Tracker" }],
     } as any);
+    vi.mocked(defectsAPI.getDefects).mockResolvedValue({
+      success: true,
+      data: [],
+    } as any);
+    vi.mocked(sprintsAPI.getSprints).mockResolvedValue({
+      success: true,
+      data: [],
+    } as any);
     vi.mocked(aiAssistantAPI.suggestTask).mockResolvedValue({
       priority: "Medium",
       due_date: "2026-04-08",
@@ -72,13 +103,11 @@ describe("CreateTaskModal", () => {
     const onClose = vi.fn();
     const onTaskCreated = vi.fn();
 
-    render(
-      <CreateTaskModal
-        isOpen={true}
-        onClose={onClose}
-        onTaskCreated={onTaskCreated}
-      />,
-    );
+    renderModal({
+      isOpen: true,
+      onClose,
+      onTaskCreated,
+    });
 
     await waitFor(() => {
       expect(projectsAPI.getProjects).toHaveBeenCalled();
@@ -99,7 +128,7 @@ describe("CreateTaskModal", () => {
         target: { value: "  Add coverage for the create-task flow in UI and API.  " },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: /Create Task/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Raise Ticket/i }));
 
     await waitFor(() => {
       expect(tasksAPI.createTask).toHaveBeenCalledWith({
@@ -109,6 +138,7 @@ describe("CreateTaskModal", () => {
         assignee_id: undefined,
         due_date: undefined,
         priority: "Medium",
+        issue_type: "Task",
         invitees: [],
       });
     });
@@ -122,13 +152,11 @@ describe("CreateTaskModal", () => {
       data: {} as any,
     });
 
-    render(
-      <CreateTaskModal
-        isOpen={true}
-        onClose={vi.fn()}
-        onTaskCreated={vi.fn()}
-      />,
-    );
+    renderModal({
+      isOpen: true,
+      onClose: vi.fn(),
+      onTaskCreated: vi.fn(),
+    });
 
     await waitFor(() => {
       expect(projectsAPI.getProjects).toHaveBeenCalled();
@@ -150,7 +178,7 @@ describe("CreateTaskModal", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "High" }));
-    fireEvent.click(screen.getByRole("button", { name: /Create Task/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Raise Ticket/i }));
 
     await waitFor(() => {
       expect(tasksAPI.createTask).toHaveBeenCalledWith(
@@ -175,13 +203,11 @@ describe("CreateTaskModal", () => {
       },
     });
 
-    render(
-      <CreateTaskModal
-        isOpen={true}
-        onClose={vi.fn()}
-        onTaskCreated={vi.fn()}
-      />,
-    );
+    renderModal({
+      isOpen: true,
+      onClose: vi.fn(),
+      onTaskCreated: vi.fn(),
+    });
 
     await waitFor(() => {
       expect(projectsAPI.getProjects).toHaveBeenCalled();
@@ -201,7 +227,7 @@ describe("CreateTaskModal", () => {
         target: { value: "Surface the backend validation details in the modal." },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: /Create Task/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Raise Ticket/i }));
 
     expect(
       await screen.findByText("project_id: Project ID is required"),

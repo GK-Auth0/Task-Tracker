@@ -51,6 +51,8 @@ const buildLocalAiSuggestion = (title: string, description: string): AiTaskSugge
   };
 };
 
+type IssueType = "Story" | "Task" | "Bug";
+
 export default function CreateTaskModal({
   isOpen,
   onClose,
@@ -63,6 +65,7 @@ export default function CreateTaskModal({
   const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
+  const [issueType, setIssueType] = useState<IssueType>("Task");
   const [projectId, setProjectId] = useState("");
   const [defectId, setDefectId] = useState("");
   const [sprintId, setSprintId] = useState("");
@@ -91,6 +94,7 @@ export default function CreateTaskModal({
     setAssigneeId("");
     setDueDate("");
     setPriority(TaskPriority.MEDIUM);
+    setIssueType("Task");
     setProjectId("");
     setDefectId("");
     setSprintId("");
@@ -258,6 +262,7 @@ export default function CreateTaskModal({
         sprint_id: sprintId || undefined,
         due_date: dueDate || undefined,
         priority: priority,
+        issue_type: issueType,
         invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
       });
 
@@ -351,10 +356,10 @@ export default function CreateTaskModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex flex-col">
             <h2 className="text-gray-900 text-xl font-bold leading-tight">
-              Create New Task
+              Raise Ticket
             </h2>
             <p className="text-gray-600 text-xs font-normal">
-              Add details to organize and assign work to your team.
+              Capture a story, task, or bug and assign it to your team.
             </p>
           </div>
           <button
@@ -373,15 +378,15 @@ export default function CreateTaskModal({
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
-                Task Preview
+                Ticket Preview
               </p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">
-                    {title.trim() || "Untitled Task"}
+                    {title.trim() || "Untitled Ticket"}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {priority} Priority {projectId ? "• Project Selected" : ""}
+                    {issueType} • {priority} Priority {projectId ? "• Project Selected" : ""}
                   </p>
                 </div>
                   <span
@@ -404,10 +409,28 @@ export default function CreateTaskModal({
               </div>
             ) : null}
 
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-gray-900 text-sm font-semibold">
+                  Issue Type
+                </label>
+                <select
+                  className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                  value={issueType}
+                  onChange={(e) => setIssueType(e.target.value as IssueType)}
+                  aria-label="Issue type"
+                >
+                  <option value="Story">Story</option>
+                  <option value="Task">Task</option>
+                  <option value="Bug">Bug</option>
+                </select>
+              </div>
+            </div>
+
             {/* Task Name */}
             <div className="flex flex-col gap-2">
               <label htmlFor="create-task-title" className="text-gray-900 text-sm font-semibold">
-                Task Name
+                Ticket Title
               </label>
               <input
                 id="create-task-title"
@@ -900,7 +923,7 @@ export default function CreateTaskModal({
             }
           >
             <span className="material-symbols-outlined text-lg">add_task</span>
-            {loading ? "Creating..." : "Create Task"}
+            {loading ? "Creating..." : "Raise Ticket"}
           </button>
         </div>
       </div>

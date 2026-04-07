@@ -1,6 +1,12 @@
 import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit, Defect, Sprint } from "../models";
 import { Op } from "sequelize";
-import type { CreateTaskDto, TaskFilters, UpdateTaskDto } from "../types/task";
+import type {
+  CreateSubtaskDto,
+  CreateTaskDto,
+  TaskFilters,
+  UpdateSubtaskDto,
+  UpdateTaskDto,
+} from "../types/task";
 
 const getUserOrganizationId = async (userId: string) => {
   const user = await User.findByPk(userId, {
@@ -26,6 +32,29 @@ const getProjectInOrganization = async (projectId: string, organizationId: strin
       },
     ],
     attributes: ["id", "owner_id"],
+  });
+
+const getAccessibleTask = async (taskId: string, userId: string, organizationId: string) =>
+  Task.findOne({
+    where: {
+      id: taskId,
+      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
+    },
+    include: [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id", "name"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+    ],
   });
 
 export async function getAllTasks(
@@ -217,6 +246,7 @@ export async function createTask(dto: CreateTaskDto) {
     description: dto.description,
     status: dto.status,
     priority: dto.priority,
+    issue_type: dto.issue_type || "Task",
     project_id: dto.project_id,
     assignee_id: dto.assignee_id,
     defect_id: dto.defect_id,
@@ -246,6 +276,11 @@ export async function createTask(dto: CreateTaskDto) {
         model: Sprint,
         as: "sprint",
         attributes: ["id", "name"],
+      },
+      {
+        model: Subtask,
+        as: "subtasks",
+        attributes: ["id", "title", "is_completed", "position"],
       },
     ],
   });
@@ -305,7 +340,7 @@ export async function getTaskById(taskId: string, userId: string) {
       {
         model: Subtask,
         as: "subtasks",
-        attributes: ["id", "title", "is_completed"],
+        attributes: ["id", "title", "is_completed", "position"],
       },
       {
         model: Comment,
@@ -320,6 +355,7 @@ export async function getTaskById(taskId: string, userId: string) {
         order: [["created_at", "ASC"]],
       },
     ],
+    order: [[{ model: Subtask, as: "subtasks" }, "position", "ASC"]],
   });
 
   if (!task) {
@@ -370,6 +406,7 @@ export async function updateTask(
   if (dto.description !== undefined) updateData.description = dto.description;
   if (dto.status !== undefined) updateData.status = dto.status;
   if (dto.priority !== undefined) updateData.priority = dto.priority;
+  if (dto.issue_type !== undefined) updateData.issue_type = dto.issue_type;
   if (dto.assignee_id !== undefined) updateData.assignee_id = dto.assignee_id;
   if (dto.defect_id !== undefined) updateData.defect_id = dto.defect_id;
   if (dto.sprint_id !== undefined) updateData.sprint_id = dto.sprint_id;
@@ -456,10 +493,104 @@ export async function updateTask(
         as: "sprint",
         attributes: ["id", "name"],
       },
+      {
+        model: Subtask,
+        as: "subtasks",
+        attributes: ["id", "title", "is_completed", "position"],
+      },
     ],
   });
 
   return updatedTask?.get({ plain: true });
+}
+
+export async function createSubtask(
+  taskId: string,
+  dto: CreateSubtaskDto,
+  userId: string,
+) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const task = await getAccessibleTask(taskId, userId, organizationId);
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const position = await Subtask.count({ where: { task_id: taskId } });
+  const subtask = await Subtask.create({
+    task_id: taskId,
+    title: dto.title,
+    position,
+  });
+
+  return subtask.get({ plain: true });
+}
+
+export async function updateSubtask(
+  taskId: string,
+  subtaskId: string,
+  dto: UpdateSubtaskDto,
+  userId: string,
+) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const task = await getAccessibleTask(taskId, userId, organizationId);
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const subtask = await Subtask.findOne({
+    where: {
+      id: subtaskId,
+      task_id: taskId,
+    },
+  });
+
+  if (!subtask) {
+    throw new Error("Subtask not found");
+  }
+
+  await subtask.update({
+    ...(dto.title !== undefined ? { title: dto.title } : {}),
+    ...(dto.is_completed !== undefined ? { is_completed: dto.is_completed } : {}),
+  });
+
+  return subtask.get({ plain: true });
+}
+
+export async function deleteSubtask(
+  taskId: string,
+  subtaskId: string,
+  userId: string,
+) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const task = await getAccessibleTask(taskId, userId, organizationId);
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const subtask = await Subtask.findOne({
+    where: {
+      id: subtaskId,
+      task_id: taskId,
+    },
+  });
+
+  if (!subtask) {
+    throw new Error("Subtask not found");
+  }
+
+  await subtask.destroy();
 }
 
 export async function deleteTask(taskId: string, userId: string) {

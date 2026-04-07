@@ -114,7 +114,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-lg">add</span>
-            New Task
+            Raise Ticket
           </button>
         </div>
       </div>

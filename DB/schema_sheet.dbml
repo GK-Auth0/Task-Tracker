@@ -57,6 +57,7 @@ Table tasks {
   description text [not null]
   status varchar(20) [not null, note: 'To Do, In Progress, Done']
   priority varchar(10) [not null, note: 'Low, Medium, High']
+  issue_type varchar(20) [not null, note: 'Story, Task, Bug']
   due_date date
   start_date date
   creator_id uuid [not null]

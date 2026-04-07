@@ -59,6 +59,13 @@ export default class Task extends Model {
   priority!: "Low" | "Medium" | "High";
 
   @Column({
+    type: DataType.ENUM("Story", "Task", "Bug"),
+    allowNull: false,
+    defaultValue: "Task",
+  })
+  issue_type!: "Story" | "Task" | "Bug";
+
+  @Column({
     type: DataType.DATEONLY,
     allowNull: true,
   })

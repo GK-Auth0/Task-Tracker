@@ -8,11 +8,14 @@ import {
   deleteTask,
   getTaskPullRequests,
   getTaskCommits,
+  createSubtask,
+  updateSubtask,
+  deleteSubtask,
 } from "../services/task";
 import { createAuditLog, getAuditLogs } from "../services/auditService";
 import { processInvites } from "../services/invitation";
 import { parseBoundedInt, parseIsoDate } from "../helpers/query";
-import { TaskPriority, TaskStatus } from "../enums";
+import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
 
 const normalizeTaskPriority = (value: unknown): string | undefined => {
   if (value === undefined || value === null) return undefined;
@@ -26,6 +29,20 @@ const normalizeTaskPriority = (value: unknown): string | undefined => {
   };
 
   return priorityMap[normalized] ?? value;
+};
+
+const normalizeTaskIssueType = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return String(value);
+
+  const normalized = value.trim().toLowerCase();
+  const typeMap: Record<string, TaskIssueType> = {
+    story: TaskIssueType.STORY,
+    task: TaskIssueType.TASK,
+    bug: TaskIssueType.BUG,
+  };
+
+  return typeMap[normalized] ?? value;
 };
 
 export const getTasks = async (req: Request, res: Response) => {
@@ -95,6 +112,8 @@ export const createNewTask = async (req: Request, res: Response) => {
       description: String(req.body.description || "").trim(),
       status: req.body.status || TaskStatus.TODO,
       priority: normalizeTaskPriority(req.body.priority) || TaskPriority.MEDIUM,
+      issue_type:
+        normalizeTaskIssueType(req.body.issue_type) || TaskIssueType.TASK,
       project_id: req.body.project_id,
       assignee_id: req.body.assignee_id,
       defect_id: req.body.defect_id,
@@ -202,6 +221,10 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
         req.body.priority === undefined
           ? undefined
           : normalizeTaskPriority(req.body.priority),
+      issue_type:
+        req.body.issue_type === undefined
+          ? undefined
+          : normalizeTaskIssueType(req.body.issue_type),
       assignee_id: req.body.assignee_id,
       defect_id: req.body.defect_id,
       sprint_id: req.body.sprint_id,
@@ -263,6 +286,111 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to update task",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const createTaskSubtask = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const subtask = await createSubtask(
+      taskId,
+      { title: String(req.body.title).trim() },
+      userId,
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Subtask created successfully",
+      data: subtask,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to create subtask",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const updateTaskSubtask = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+    const subtaskId = req.params.subtaskId as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const subtask = await updateSubtask(
+      taskId,
+      subtaskId,
+      {
+        title:
+          req.body.title === undefined ? undefined : String(req.body.title).trim(),
+        is_completed: req.body.is_completed,
+      },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Subtask updated successfully",
+      data: subtask,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to update subtask",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const removeTaskSubtask = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+    const subtaskId = req.params.subtaskId as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    await deleteSubtask(taskId, subtaskId, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Subtask deleted successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to delete subtask",
       error: (error as any).message,
     });
   }

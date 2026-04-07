@@ -103,7 +103,14 @@ export interface Task {
   description?: string;
   status: "To Do" | "In Progress" | "Done";
   priority: "Low" | "Medium" | "High";
+  issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;
+  subtasks?: Array<{
+    id: string;
+    title: string;
+    is_completed: boolean;
+    position?: number;
+  }>;
   project: {
     id: string;
     name: string;
@@ -345,6 +352,7 @@ export const tasksAPI = {
     sprint_id?: string;
     due_date?: string;
     priority: "Low" | "Medium" | "High";
+    issue_type?: "Story" | "Task" | "Bug";
     invitees?: Array<{
       full_name: string;
       email: string;
@@ -412,6 +420,55 @@ export const tasksAPI = {
     data: ActivityLog[];
   }> => {
     const response = await api.get(`/api/v1/tasks/${taskId}/activity`);
+    return response.data;
+  },
+
+  createSubtask: async (
+    taskId: string,
+    data: { title: string },
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      title: string;
+      is_completed: boolean;
+      position?: number;
+    };
+  }> => {
+    const response = await api.post(`/api/v1/tasks/${taskId}/subtasks`, data);
+    return response.data;
+  },
+
+  updateSubtask: async (
+    taskId: string,
+    subtaskId: string,
+    data: { title?: string; is_completed?: boolean },
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      title: string;
+      is_completed: boolean;
+      position?: number;
+    };
+  }> => {
+    const response = await api.patch(
+      `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  deleteSubtask: async (
+    taskId: string,
+    subtaskId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> => {
+    const response = await api.delete(
+      `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
+    );
     return response.data;
   },
 };

@@ -58,6 +58,7 @@ describe("task controller", () => {
       description: "Add create-task coverage for the modal and API.",
       status: "To Do",
       priority: "Medium",
+      issue_type: "Task",
       project_id: "project-123",
       assignee_id: "user-456",
       creator_id: "user-123",
@@ -95,8 +96,11 @@ describe("task controller", () => {
       description: "Add create-task coverage for the modal and API.",
       status: "To Do",
       priority: "Medium",
+      issue_type: "Task",
       project_id: "project-123",
       assignee_id: "user-456",
+      defect_id: undefined,
+      sprint_id: undefined,
       creator_id: "user-123",
       due_date: "2026-04-10",
     });
@@ -116,6 +120,7 @@ describe("task controller", () => {
         new_values: expect.objectContaining({
           title: "Ship create-task flow",
           description: "Add create-task coverage for the modal and API.",
+          issue_type: "Task",
         }),
       }),
     );
@@ -129,6 +134,7 @@ describe("task controller", () => {
         description: "Add create-task coverage for the modal and API.",
         status: "To Do",
         priority: "Medium",
+        issue_type: "Task",
         project_id: "project-123",
         assignee_id: "user-456",
         creator_id: "user-123",

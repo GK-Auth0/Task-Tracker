@@ -9,8 +9,16 @@ import {
   getTaskPRs,
   getTaskCommitHistory,
   getTaskActivityLogs,
+  createTaskSubtask,
+  updateTaskSubtask,
+  removeTaskSubtask,
 } from "../controllers/task";
-import { createTaskSchema, updateTaskSchema } from "../validators/task";
+import {
+  createSubtaskSchema,
+  createTaskSchema,
+  updateSubtaskSchema,
+  updateTaskSchema,
+} from "../validators/task";
 import { authenticateToken } from "../middleware/auth";
 import { requireWorkspaceRole } from "../middleware/rbac";
 
@@ -28,6 +36,26 @@ router.get("/:id", authenticateToken, getTask);
 router.get("/:id/activity", authenticateToken, getTaskActivityLogs);
 router.get("/:id/pull-requests", authenticateToken, getTaskPRs);
 router.get("/:id/commits", authenticateToken, getTaskCommitHistory);
+router.post(
+  "/:id/subtasks",
+  authenticateToken,
+  requireWorkspaceRole("Member"),
+  checkSchema(createSubtaskSchema, ["body"]),
+  createTaskSubtask,
+);
+router.patch(
+  "/:id/subtasks/:subtaskId",
+  authenticateToken,
+  requireWorkspaceRole("Member"),
+  checkSchema(updateSubtaskSchema, ["body"]),
+  updateTaskSubtask,
+);
+router.delete(
+  "/:id/subtasks/:subtaskId",
+  authenticateToken,
+  requireWorkspaceRole("Member"),
+  removeTaskSubtask,
+);
 router.patch(
   "/:id",
   authenticateToken,

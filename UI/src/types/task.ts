@@ -1,15 +1,24 @@
+export interface TaskSubtask {
+  id: string;
+  title: string;
+  is_completed: boolean;
+  position?: number;
+}
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
   status: "To Do" | "In Progress" | "Done";
   priority: "low" | "medium" | "high";
+  issueType?: "Story" | "Task" | "Bug";
   startDate?: string;
   dueDate?: string;
   projectId?: string;
   assigneeId?: string;
   defectId?: string;
   sprintId?: string;
+  subtasks?: TaskSubtask[];
   sprint?: {
     id: string;
     name: string;
@@ -23,6 +32,7 @@ export interface CreateTaskRequest {
   description?: string;
   status?: "To Do" | "In Progress" | "Done";
   priority?: "low" | "medium" | "high";
+  issueType?: "Story" | "Task" | "Bug";
   dueDate?: string;
   projectId?: string;
   assigneeId?: string;

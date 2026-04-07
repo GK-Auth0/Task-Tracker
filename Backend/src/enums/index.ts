@@ -10,6 +10,12 @@ export enum TaskStatus {
   DONE = "Done"
 }
 
+export enum TaskIssueType {
+  STORY = "Story",
+  TASK = "Task",
+  BUG = "Bug"
+}
+
 export enum TaskLabels {
   LOW = "LOW",
   MEDIUM = "MEDIUM",
