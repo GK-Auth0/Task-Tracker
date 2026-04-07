@@ -159,7 +159,10 @@ const Chat: React.FC = () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat?token=${encodeURIComponent(token)}`);
+    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat`, [
+      "chat.v1",
+      `access-token.${token}`,
+    ]);
 
     socket.onopen = () => {
       setSocketConnected(true);

@@ -269,8 +269,14 @@ export const sendMessage = async (req: Request, res: Response) => {
       });
     }
 
-    const safeContent = content?.trim() || attachment_name || "Attachment";
-    
+    const safeContent = String(content || "").trim() || attachment_name || "Attachment";
+    if (safeContent.length > 5000) {
+      return res.status(400).json({
+        success: false,
+        message: "Message content must be 5000 characters or fewer",
+      });
+    }
+
     const message = await createChatMessage({
       group_id: groupId,
       user_id: userId,

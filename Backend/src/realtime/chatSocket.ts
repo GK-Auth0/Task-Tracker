@@ -14,7 +14,8 @@ type WebSocketClient = {
 };
 
 const clients = new Set<WebSocketClient>();
-const JWT_SECRET = appConfig.jwt.secret;
+const JWT_SECRET = appConfig.jwt.accessSecret;
+const SUPPORTED_WS_PROTOCOL = "chat.v1";
 
 const parseFrame = (buffer: Buffer): { payload: string; bytesUsed: number } | null => {
   if (buffer.length < 2) return null;
@@ -154,10 +155,16 @@ export const broadcastChatMessage = (
 };
 
 const authenticateRequest = (request: IncomingMessage): string | null => {
-  if (!request.url) return null;
-  const host = request.headers.host || "localhost";
-  const parsed = new URL(request.url, `http://${host}`);
-  const token = parsed.searchParams.get("token");
+  const protocolHeader = request.headers["sec-websocket-protocol"];
+  const rawProtocols = Array.isArray(protocolHeader)
+    ? protocolHeader.join(",")
+    : String(protocolHeader || "");
+  const protocols = rawProtocols
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const tokenProtocol = protocols.find((entry) => entry.startsWith("access-token."));
+  const token = tokenProtocol?.slice("access-token.".length);
   if (!token) return null;
 
   try {
@@ -170,6 +177,13 @@ const authenticateRequest = (request: IncomingMessage): string | null => {
 
 export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
   if (!request.url?.startsWith("/ws/chat")) {
+    socket.destroy();
+    return;
+  }
+
+  const requestedProtocols = String(request.headers["sec-websocket-protocol"] || "");
+  if (!requestedProtocols.includes(SUPPORTED_WS_PROTOCOL)) {
+    socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
     socket.destroy();
     return;
   }
@@ -193,6 +207,7 @@ export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
       "Upgrade: websocket",
       "Connection: Upgrade",
       `Sec-WebSocket-Accept: ${acceptKey}`,
+      `Sec-WebSocket-Protocol: ${SUPPORTED_WS_PROTOCOL}`,
       "\r\n",
     ].join("\r\n"),
   );
