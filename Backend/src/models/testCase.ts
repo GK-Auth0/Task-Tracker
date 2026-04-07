@@ -14,6 +14,7 @@ import {
 import Project from "./project";
 import User from "./user";
 import Task from "./task";
+import Sprint from "./sprint";
 
 export const generateTestCaseReferenceCode = () => {
   const timePart = Date.now().toString(36).toUpperCase();
@@ -88,6 +89,13 @@ export default class TestCase extends Model {
     allowNull: true,
   })
   sprint_name?: string;
+
+  @ForeignKey(() => Sprint)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  sprint_id?: string;
 
   @Column({
     type: DataType.ENUM("Critical", "High", "Medium", "Low"),
@@ -175,4 +183,7 @@ export default class TestCase extends Model {
 
   @BelongsTo(() => Task, "linked_task_id")
   linked_task?: Task;
+
+  @BelongsTo(() => Sprint, "sprint_id")
+  sprint?: Sprint;
 }

@@ -5,6 +5,7 @@ export interface TestPlanRecord {
   id: string;
   reference_code: string;
   name: string;
+  sprint_id?: string | null;
   sprint_name?: string | null;
   release_name?: string | null;
   status: TestPlanStatus;
@@ -24,6 +25,11 @@ export interface TestPlanRecord {
     full_name: string;
     email: string;
   } | null;
+  sprint: {
+    id: string;
+    name: string;
+    status: "Planning" | "Active" | "Completed";
+  } | null;
 }
 
 export interface TestRunRecord {
@@ -36,6 +42,7 @@ export interface TestRunRecord {
   plan_id: string;
   project_id: string;
   owner_id: string;
+  sprint_id?: string | null;
   created_at: string;
   updated_at: string;
   total_cases: number;
@@ -50,6 +57,11 @@ export interface TestRunRecord {
     name: string;
     status: TestPlanStatus;
     suite_names: string[];
+  } | null;
+  sprint: {
+    id: string;
+    name: string;
+    status: "Planning" | "Active" | "Completed";
   } | null;
   project: {
     id: string;

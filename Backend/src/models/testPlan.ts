@@ -13,6 +13,7 @@ import {
 } from "sequelize-typescript";
 import Project from "./project";
 import User from "./user";
+import Sprint from "./sprint";
 
 export const generateTestPlanReferenceCode = () => {
   const timePart = Date.now().toString(36).toUpperCase();
@@ -69,6 +70,13 @@ export default class TestPlan extends Model {
   })
   sprint_name?: string;
 
+  @ForeignKey(() => Sprint)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  sprint_id?: string;
+
   @Column({
     type: DataType.STRING(120),
     allowNull: true,
@@ -100,4 +108,7 @@ export default class TestPlan extends Model {
 
   @BelongsTo(() => User, "owner_id")
   owner!: User;
+
+  @BelongsTo(() => Sprint, "sprint_id")
+  sprint?: Sprint;
 }

@@ -5,6 +5,7 @@ import TestCaseNav from "../components/testcases/TestCaseNav";
 import { useAuth } from "../contexts/AuthContext";
 import { defectsAPI } from "../services/defects";
 import { projectsAPI, tasksAPI, usersAPI } from "../services/dashboard";
+import { sprintsAPI } from "../services/sprints";
 
 type ProjectOption = {
   id: string;
@@ -26,6 +27,12 @@ type TaskOption = {
   };
 };
 
+type SprintOption = {
+  id: string;
+  name: string;
+  project_id: string;
+};
+
 const severityOptions = ["Critical", "High", "Medium", "Low"] as const;
 const priorityOptions = ["Critical", "High", "Medium", "Low"] as const;
 
@@ -35,6 +42,7 @@ export default function RaiseDefect() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [tasks, setTasks] = useState<TaskOption[]>([]);
+  const [sprints, setSprints] = useState<SprintOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -45,7 +53,7 @@ export default function RaiseDefect() {
   const [priority, setPriority] = useState<(typeof priorityOptions)[number]>("Medium");
   const [description, setDescription] = useState("");
   const [reproductionStepsInput, setReproductionStepsInput] = useState("");
-  const [sprintName, setSprintName] = useState("");
+  const [sprintId, setSprintId] = useState("");
   const [linkedRun, setLinkedRun] = useState("");
   const [linkedCase, setLinkedCase] = useState("");
   const [environment, setEnvironment] = useState("");
@@ -53,10 +61,11 @@ export default function RaiseDefect() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [projectsResponse, usersResponse, tasksResponse] = await Promise.all([
+        const [projectsResponse, usersResponse, tasksResponse, sprintsResponse] = await Promise.all([
           projectsAPI.getProjects(),
           usersAPI.getUsers({ limit: 200 }),
           tasksAPI.getTasks({ limit: 200 }),
+          sprintsAPI.getSprints(),
         ]);
 
         if (projectsResponse.success) {
@@ -73,9 +82,19 @@ export default function RaiseDefect() {
         if (tasksResponse.success) {
           setTasks(tasksResponse.data as TaskOption[]);
         }
+
+        if (sprintsResponse.success) {
+          setSprints(
+            sprintsResponse.data.map((item) => ({
+              id: item.id,
+              name: item.name,
+              project_id: item.project_id,
+            })),
+          );
+        }
       } catch (error) {
         console.error("Failed to load defect form options:", error);
-        setSubmitError("Failed to load project, task, and user options");
+        setSubmitError("Failed to load project, task, sprint, and user options");
       }
     };
 
@@ -85,17 +104,26 @@ export default function RaiseDefect() {
   useEffect(() => {
     if (!projectId) {
       setLinkedTaskId("");
+      setSprintId("");
       return;
     }
 
     if (linkedTaskId && !tasks.some((task) => task.id === linkedTaskId && task.project?.id === projectId)) {
       setLinkedTaskId("");
     }
-  }, [projectId, linkedTaskId, tasks]);
+    if (sprintId && !sprints.some((sprint) => sprint.id === sprintId && sprint.project_id === projectId)) {
+      setSprintId("");
+    }
+  }, [linkedTaskId, projectId, sprintId, sprints, tasks]);
 
   const filteredTasks = useMemo(
     () => tasks.filter((task) => !projectId || task.project?.id === projectId),
     [projectId, tasks],
+  );
+
+  const filteredSprints = useMemo(
+    () => sprints.filter((sprint) => !projectId || sprint.project_id === projectId),
+    [projectId, sprints],
   );
 
   const parsedSteps = reproductionStepsInput
@@ -105,6 +133,7 @@ export default function RaiseDefect() {
 
   const selectedProject = projects.find((project) => project.id === projectId);
   const selectedTask = filteredTasks.find((task) => task.id === linkedTaskId);
+  const selectedSprint = filteredSprints.find((sprint) => sprint.id === sprintId);
 
   const handleSubmit = async () => {
     setSubmitError("");
@@ -125,7 +154,8 @@ export default function RaiseDefect() {
         project_id: projectId,
         assignee_id: assigneeId || undefined,
         linked_task_id: linkedTaskId || undefined,
-        sprint_name: sprintName.trim() || undefined,
+        sprint_id: sprintId || undefined,
+        sprint_name: selectedSprint?.name || undefined,
         linked_run: linkedRun.trim() || undefined,
         linked_case: linkedCase.trim() || undefined,
         environment: environment.trim() || undefined,
@@ -318,12 +348,18 @@ export default function RaiseDefect() {
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Sprint
                   </span>
-                  <input
-                    value={sprintName}
-                    onChange={(event) => setSprintName(event.target.value)}
+                  <select
+                    value={sprintId}
+                    onChange={(event) => setSprintId(event.target.value)}
                     className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
-                    placeholder="Sprint 24"
-                  />
+                  >
+                    <option value="">No sprint</option>
+                    {filteredSprints.map((sprint) => (
+                      <option key={sprint.id} value={sprint.id}>
+                        {sprint.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">

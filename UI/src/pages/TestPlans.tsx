@@ -25,7 +25,7 @@ export default function TestPlans() {
 
   const [name, setName] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [sprintName, setSprintName] = useState("");
+  const [sprintId, setSprintId] = useState("");
   const [releaseName, setReleaseName] = useState("");
   const [status, setStatus] = useState<TestPlanStatus>("Draft");
   const [selectedSuites, setSelectedSuites] = useState<string[]>([]);
@@ -82,7 +82,7 @@ export default function TestPlans() {
   const resetForm = () => {
     setName("");
     setProjectId("");
-    setSprintName("");
+    setSprintId("");
     setReleaseName("");
     setStatus("Draft");
     setSelectedSuites([]);
@@ -94,13 +94,15 @@ export default function TestPlans() {
       return;
     }
 
+    const selectedSprint = filteredSprints.find((item) => item.id === sprintId);
     try {
       setSubmitting(true);
       setError("");
       await testPlansAPI.createPlan({
         name: name.trim(),
         project_id: projectId,
-        sprint_name: sprintName || undefined,
+        sprint_id: sprintId || undefined,
+        sprint_name: selectedSprint?.name || undefined,
         release_name: releaseName.trim() || undefined,
         status,
         suite_names: selectedSuites,
@@ -212,13 +214,13 @@ export default function TestPlans() {
                       Sprint
                     </span>
                     <select
-                      value={sprintName}
-                      onChange={(event) => setSprintName(event.target.value)}
+                      value={sprintId}
+                      onChange={(event) => setSprintId(event.target.value)}
                       className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:bg-white"
                     >
                       <option value="">No sprint</option>
                       {filteredSprints.map((item) => (
-                        <option key={item.id} value={item.name}>
+                        <option key={item.id} value={item.id}>
                           {item.name}
                         </option>
                       ))}

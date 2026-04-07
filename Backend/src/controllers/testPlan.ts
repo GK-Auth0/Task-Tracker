@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { Op } from "sequelize";
-import { Project, TestCase, TestPlan, TestRun, User } from "../models";
+import { Project, Sprint, TestCase, TestPlan, TestRun, User } from "../models";
 import {
   AuthenticatedRequest,
   ensureProjectAccess,
@@ -32,7 +32,8 @@ const serializePlan = (
   id: plan.id,
   reference_code: plan.reference_code,
   name: plan.name,
-  sprint_name: plan.sprint_name,
+  sprint_id: plan.sprint_id || plan.sprint?.id || null,
+  sprint_name: plan.sprint?.name || plan.sprint_name,
   release_name: plan.release_name,
   status: plan.status,
   suite_names: Array.isArray(plan.suite_names) ? plan.suite_names : [],
@@ -55,6 +56,13 @@ const serializePlan = (
         email: plan.owner.email,
       }
     : null,
+  sprint: plan.sprint
+    ? {
+        id: plan.sprint.id,
+        name: plan.sprint.name,
+        status: plan.sprint.status,
+      }
+    : null,
 });
 
 export const listTestPlans = async (req: AuthenticatedRequest, res: Response) => {
@@ -73,13 +81,16 @@ export const listTestPlans = async (req: AuthenticatedRequest, res: Response) =>
     const projectFilterId = req.query.project_id ? String(req.query.project_id) : "";
     const scopedProjectIds =
       projectFilterId && projectIds.includes(projectFilterId) ? [projectFilterId] : projectIds;
+    const where: any = { project_id: { [Op.in]: scopedProjectIds } };
+    if (req.query.sprint_id) where.sprint_id = String(req.query.sprint_id);
 
     const [plans, testCases, runs] = await Promise.all([
       TestPlan.findAll({
-        where: { project_id: { [Op.in]: scopedProjectIds } },
+        where,
         include: [
           { model: Project, as: "project", attributes: ["id", "name"] },
           { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+          { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
         ],
         order: [["updated_at", "DESC"]],
       }),
@@ -125,16 +136,36 @@ export const createTestPlanRecord = async (req: AuthenticatedRequest, res: Respo
     }
 
     const projectId = String(req.body.project_id || "");
+    const sprintId = req.body.sprint_id ? String(req.body.sprint_id) : undefined;
     const project = await ensureProjectAccess(projectId, userId, req.user?.role);
     if (!project) {
       return res.status(403).json({ success: false, message: "Access denied to this project" });
+    }
+
+    let resolvedSprintName: string | null = req.body.sprint_name ? String(req.body.sprint_name).trim() : null;
+    if (sprintId) {
+      const sprint = await Sprint.findOne({
+        where: {
+          id: sprintId,
+          project_id: projectId,
+        },
+        attributes: ["id", "name"],
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          success: false,
+          message: "Sprint must belong to the selected project",
+        });
+      }
+      resolvedSprintName = sprint.name;
     }
 
     const plan = await TestPlan.create({
       name: String(req.body.name || "").trim(),
       project_id: projectId,
       owner_id: userId,
-      sprint_name: req.body.sprint_name ? String(req.body.sprint_name).trim() : null,
+      sprint_id: sprintId,
+      sprint_name: resolvedSprintName,
       release_name: req.body.release_name ? String(req.body.release_name).trim() : null,
       status: req.body.status || "Draft",
       suite_names: normalizeSuiteNames(req.body.suite_names),
@@ -144,6 +175,7 @@ export const createTestPlanRecord = async (req: AuthenticatedRequest, res: Respo
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
       ],
     });
 

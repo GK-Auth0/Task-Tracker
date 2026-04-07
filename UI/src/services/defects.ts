@@ -5,6 +5,7 @@ export const defectsAPI = {
   getDefects: async (params?: {
     project_id?: string;
     status?: string;
+    sprint_id?: string;
   }): Promise<{ success: boolean; data: Defect[] }> => {
     const response = await api.get("/api/defects", { params });
     return response.data;
@@ -19,6 +20,7 @@ export const defectsAPI = {
     project_id: string;
     assignee_id?: string;
     linked_task_id?: string;
+    sprint_id?: string;
     sprint_name?: string;
     linked_run?: string;
     linked_case?: string;
@@ -38,6 +40,7 @@ export const defectsAPI = {
       priority: Defect["priority"];
       assignee_id?: string;
       linked_task_id?: string;
+      sprint_id?: string;
       sprint_name?: string;
       linked_run?: string;
       linked_case?: string;

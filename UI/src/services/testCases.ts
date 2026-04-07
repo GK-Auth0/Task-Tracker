@@ -75,6 +75,8 @@ export const testCasesAPI = {
     project_id?: string;
     status?: TestCaseStatus;
     automation?: TestAutomation;
+    sprint_id?: string;
+    linked_task_id?: string;
   }): Promise<{ success: boolean; data: TestCaseRecord[] }> => {
     const response = await api.get("/api/test-cases", { params });
     return response.data;
@@ -102,6 +104,7 @@ export const testCasesAPI = {
     linked_task_id?: string;
     suite: string;
     module: string;
+    sprint_id?: string;
     sprint_name?: string;
     priority: TestCasePriority;
     status?: TestCaseStatus;
@@ -135,6 +138,7 @@ export const testCasesAPI = {
       linked_task_id?: string;
       suite: string;
       module: string;
+      sprint_id?: string;
       sprint_name?: string;
       priority: TestCasePriority;
       status?: TestCaseStatus;

@@ -64,6 +64,7 @@ export const getTasks = async (req: Request, res: Response) => {
       status: req.query.status as string,
       priority: req.query.priority as string,
       project_id: req.query.project_id as string,
+      sprint_id: req.query.sprint_id as string,
       due_from: parseIsoDate(req.query.due_from),
       due_to: parseIsoDate(req.query.due_to),
       created_from: parseIsoDate(req.query.created_from),

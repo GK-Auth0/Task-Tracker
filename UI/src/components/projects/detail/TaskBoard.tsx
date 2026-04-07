@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from "react";
 import { Task } from "../../../types/task";
+import { TASK_STATUSES, getTaskStatusTone, isDoneTaskStatus } from "../../../utils/taskStatus";
 
 interface TaskBoardProps {
   tasks: Task[];
   onOpenTask: (taskId: string) => void;
 }
 
-const TASK_COLUMNS: Array<{ key: Task["status"]; label: string; icon: string; tone: string }> = [
-  { key: "To Do", label: "To Do", icon: "radio_button_unchecked", tone: "bg-slate-100 text-slate-700" },
-  { key: "In Progress", label: "In Progress", icon: "progress_activity", tone: "bg-blue-100 text-blue-700" },
-  { key: "Done", label: "Done", icon: "check_circle", tone: "bg-emerald-100 text-emerald-700" },
-];
+const TASK_COLUMNS: Array<{ key: Task["status"]; label: string; icon: string; tone: string }> =
+  TASK_STATUSES.map((status) => ({
+    key: status,
+    label: status,
+    icon: getTaskStatusTone(status).icon || "radio_button_unchecked",
+    tone: getTaskStatusTone(status).card,
+  }));
 
 const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onOpenTask }) => {
   const [query, setQuery] = useState("");
@@ -28,17 +31,17 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onOpenTask }) => {
     });
 
     const overdue = filtered.filter((task) => {
-      if (!task.dueDate || task.status === "Done") return false;
+      if (!task.dueDate || isDoneTaskStatus(task.status)) return false;
       return new Date(task.dueDate) < now;
     }).length;
 
     const dueSoon = filtered.filter((task) => {
-      if (!task.dueDate || task.status === "Done") return false;
+      if (!task.dueDate || isDoneTaskStatus(task.status)) return false;
       const due = new Date(task.dueDate);
       return due >= now && due <= inThreeDays;
     }).length;
 
-    const done = filtered.filter((task) => task.status === "Done").length;
+    const done = filtered.filter((task) => isDoneTaskStatus(task.status)).length;
 
     return {
       visibleTasks: filtered,
@@ -49,10 +52,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onOpenTask }) => {
   }, [tasks, query, priority]);
 
   const grouped = useMemo(() => {
+    const initialGroups = TASK_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = [];
+      return acc;
+    }, {} as Record<Task["status"], Task[]>);
+
     return TASK_COLUMNS.reduce<Record<Task["status"], Task[]>>((acc, column) => {
       acc[column.key] = visibleTasks.filter((task) => task.status === column.key);
       return acc;
-    }, { "To Do": [], "In Progress": [], "Done": [] });
+    }, initialGroups);
   }, [visibleTasks]);
 
   return (
@@ -104,7 +112,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onOpenTask }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {TASK_COLUMNS.map((column) => (
           <div key={column.key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="mb-3 flex items-center justify-between">

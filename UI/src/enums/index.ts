@@ -7,6 +7,9 @@ export enum TaskPriority {
 export enum TaskStatus {
   TODO = "To Do",
   IN_PROGRESS = "In Progress",
+  READY_FOR_QA = "Ready for QA",
+  IN_QA = "In QA",
+  BLOCKED = "Blocked",
   DONE = "Done"
 }
 

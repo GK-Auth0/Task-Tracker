@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { Op } from "sequelize";
-import { Defect, Task, TestCase, TestPlan, TestRun } from "../models";
+import { Defect, Sprint, Task, TestCase, TestPlan, TestRun } from "../models";
 import {
   AuthenticatedRequest,
   getAccessibleProjects,
@@ -46,10 +46,14 @@ export const getTraceabilityMatrix = async (
         "linked_task_id",
         "status",
         "sprint_name",
+        "sprint_id",
         "updated_at",
         "execution_history",
       ],
-      include: [{ model: Task, as: "linked_task", attributes: ["id", "title"] }],
+      include: [
+        { model: Task, as: "linked_task", attributes: ["id", "title"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+      ],
       order: [["updated_at", "DESC"]],
     });
 
@@ -159,7 +163,9 @@ export const getTestReportsSummary = async (
           "execution_history",
           "updated_at",
           "sprint_name",
+          "sprint_id",
         ],
+        include: [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }],
       }),
       TestPlan.findAll({
         where: { project_id: { [Op.in]: projectIds } },

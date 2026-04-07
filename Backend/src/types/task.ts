@@ -2,6 +2,7 @@ export interface TaskFilters {
   status?: string;
   priority?: string;
   project_id?: string;
+  sprint_id?: string;
   due_from?: Date;
   due_to?: Date;
   created_from?: Date;

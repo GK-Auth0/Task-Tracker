@@ -29,3 +29,36 @@ export const groupTestCasesByModule = (testCases: TestCaseRecord[]) => {
       items,
     }));
 };
+
+export const groupTestCasesByProject = (testCases: TestCaseRecord[]) => {
+  const grouped = new Map<string, TestCaseRecord[]>();
+
+  testCases.forEach((testCase) => {
+    const key = testCase.project?.name || "Unassigned Project";
+    grouped.set(key, [...(grouped.get(key) || []), testCase]);
+  });
+
+  return Array.from(grouped.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([project, items]) => ({
+      project,
+      items,
+    }));
+};
+
+export const groupTestCasesByTask = (testCases: TestCaseRecord[]) => {
+  const grouped = new Map<string, TestCaseRecord[]>();
+
+  testCases.forEach((testCase) => {
+    const key = testCase.linked_task?.title || "Unlinked Cases";
+    grouped.set(key, [...(grouped.get(key) || []), testCase]);
+  });
+
+  return Array.from(grouped.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([task, items]) => ({
+      task,
+      linkedTaskId: items[0]?.linked_task?.id || null,
+      items,
+    }));
+};

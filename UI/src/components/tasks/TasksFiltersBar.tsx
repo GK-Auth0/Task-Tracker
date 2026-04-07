@@ -1,5 +1,6 @@
 import React, { memo } from "react";
 import { TaskGroupOption, TaskSortOption } from "./types";
+import { TASK_STATUSES } from "../../utils/taskStatus";
 
 type ViewMode = "table" | "grid";
 
@@ -75,6 +76,17 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
 
         {/* Dropdowns */}
         <select
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
+        >
+          <option value="">All Focus</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Due Soon">Due Soon</option>
+          <option value="My Focus">My Focus</option>
+        </select>
+
+        <select
           value={priorityFilter}
           onChange={(e) => onPriorityFilterChange(e.target.value)}
           className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
@@ -91,9 +103,11 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
           className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
         >
           <option value="">All Status</option>
-          <option value="To Do">To Do</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Done">Done</option>
+          {TASK_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
         </select>
 
         <select

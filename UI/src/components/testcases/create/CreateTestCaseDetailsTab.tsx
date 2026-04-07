@@ -28,7 +28,6 @@ interface CreateTestCaseDetailsTabProps {
   projects: TestCaseFormProjectOption[];
   sprintOptions: TestCaseFormSprintOption[];
   moduleOptions: TestCaseModuleOption[];
-  isCreatingModule: boolean;
   validStepCount: number;
   totalStepCount: number;
   onTitleChange: (value: string) => void;
@@ -37,7 +36,6 @@ interface CreateTestCaseDetailsTabProps {
   onSprintCreateModeChange: (value: boolean) => void;
   onSuiteChange: (value: string) => void;
   onModuleChange: (value: string) => void;
-  onModuleCreateModeChange: (value: boolean) => void;
   onPriorityChange: (value: TestCasePriority) => void;
   onAutomationChange: (value: TestAutomation) => void;
   onStatusChange: (value: TestCaseStatus) => void;
@@ -67,7 +65,6 @@ export default function CreateTestCaseDetailsTab({
   projects,
   sprintOptions,
   moduleOptions,
-  isCreatingModule,
   validStepCount,
   totalStepCount,
   onTitleChange,
@@ -76,14 +73,12 @@ export default function CreateTestCaseDetailsTab({
   onSprintCreateModeChange,
   onSuiteChange,
   onModuleChange,
-  onModuleCreateModeChange,
   onPriorityChange,
   onAutomationChange,
   onStatusChange,
   onPreconditionsChange,
   onTagsChange,
 }: CreateTestCaseDetailsTabProps) {
-  const moduleSelectValue = isCreatingModule ? CUSTOM_VALUE : module;
   const sprintSelectValue = isCreatingSprint ? CUSTOM_VALUE : sprintName;
   const suiteSelectValue =
     !suite || suiteOptions.some((item) => item.name === suite) ? suite : CUSTOM_VALUE;
@@ -95,7 +90,7 @@ export default function CreateTestCaseDetailsTab({
           <div>
             <h2 className="text-base font-semibold text-slate-900">Case details</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Pick the project context first, then fill in structured metadata.
+              Pick the project context first, then choose the project module and enter the suite.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -202,24 +197,16 @@ export default function CreateTestCaseDetailsTab({
               />
             ) : null}
             <p className="mt-2 text-xs text-slate-500">
-              Suite options are loaded from the suite catalog and existing test cases.
+              Suite stays mandatory for the test case grouping.
             </p>
           </label>
 
           <label className="block">
             <span className={fieldLabelClass}>Module</span>
             <select
-              value={moduleSelectValue}
+              value={module}
               onChange={(event) => {
-                const nextValue = event.target.value;
-                if (nextValue === CUSTOM_VALUE) {
-                  onModuleCreateModeChange(true);
-                  onModuleChange("");
-                  return;
-                }
-
-                onModuleCreateModeChange(false);
-                onModuleChange(nextValue);
+                onModuleChange(event.target.value);
               }}
               className={fieldClass}
             >
@@ -229,21 +216,11 @@ export default function CreateTestCaseDetailsTab({
                   {item.name}
                 </option>
               ))}
-              <option value={CUSTOM_VALUE}>Create new module</option>
             </select>
+            <p className="mt-2 text-xs text-slate-500">
+              Modules come from the project setup and are mandatory here.
+            </p>
           </label>
-
-          {isCreatingModule ? (
-            <label className="block">
-              <span className={fieldLabelClass}>New module name</span>
-              <input
-                value={module}
-                onChange={(event) => onModuleChange(event.target.value)}
-                className={fieldClass}
-                placeholder="Password Reset"
-              />
-            </label>
-          ) : null}
 
           <label className="block">
             <span className={fieldLabelClass}>Priority</span>

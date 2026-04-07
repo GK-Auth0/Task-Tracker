@@ -10,6 +10,7 @@ import ProjectsHeader from "../components/projects/ProjectsHeader";
 import ProjectsFiltersBar, { ViewMode } from "../components/projects/ProjectsFiltersBar";
 import ProjectsList from "../components/projects/ProjectsList";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
+import { testCaseModulesAPI } from "../services/testCases";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWorkspaceContent } from "../types/roles";
 import { ProjectStatus } from "../enums";
@@ -106,13 +107,29 @@ const Projects: React.FC = () => {
     }
   }, [searchParams]);
 
-  const handleCreateProject = useCallback(async (projectData: CreateProjectRequest) => {
+  const handleCreateProject = useCallback(async (
+    projectData: CreateProjectRequest,
+    options?: { modules: string[] },
+  ) => {
     if (!canCreateProject) return null;
     try {
       const response = await projectService.createProject(projectData);
       if (!response.success) {
         throw new Error("Project creation failed");
       }
+
+      const moduleNames = options?.modules || [];
+      if (moduleNames.length) {
+        await Promise.all(
+          moduleNames.map((name) =>
+            testCaseModulesAPI.createModule({
+              name,
+              project_id: response.data.id,
+            }),
+          ),
+        );
+      }
+
       setShowCreateModal(false);
       await fetchProjects();
       return {

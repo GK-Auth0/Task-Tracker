@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { Op } from "sequelize";
-import { Project, TestCase, TestPlan, TestRun, User } from "../models";
+import { Project, Sprint, TestCase, TestPlan, TestRun, User } from "../models";
 import {
   AuthenticatedRequest,
   getAccessibleProjects,
@@ -42,6 +42,7 @@ const serializeRun = (run: any, plan: any, stats: ReturnType<typeof getRunStats>
   plan_id: run.plan_id,
   project_id: run.project_id,
   owner_id: run.owner_id,
+  sprint_id: run.sprint_id || plan?.sprint_id || plan?.sprint?.id || null,
   created_at: run.created_at,
   updated_at: run.updated_at,
   total_cases: stats.total,
@@ -57,6 +58,13 @@ const serializeRun = (run: any, plan: any, stats: ReturnType<typeof getRunStats>
         name: plan.name,
         status: plan.status,
         suite_names: Array.isArray(plan.suite_names) ? plan.suite_names : [],
+      }
+    : null,
+  sprint: run.sprint || plan?.sprint
+    ? {
+        id: (run.sprint || plan?.sprint).id,
+        name: (run.sprint || plan?.sprint).name,
+        status: (run.sprint || plan?.sprint).status,
       }
     : null,
   project: run.project
@@ -94,13 +102,17 @@ export const listTestRuns = async (req: AuthenticatedRequest, res: Response) => 
     if (req.query.plan_id) {
       where.plan_id = String(req.query.plan_id);
     }
+    if (req.query.sprint_id) {
+      where.sprint_id = String(req.query.sprint_id);
+    }
 
     const runs = await TestRun.findAll({
       where,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
-        { model: TestPlan, as: "plan", attributes: ["id", "reference_code", "name", "status", "suite_names", "project_id"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        { model: TestPlan, as: "plan", attributes: ["id", "reference_code", "name", "status", "suite_names", "project_id", "sprint_id"] },
       ],
       order: [["updated_at", "DESC"]],
     });
@@ -108,7 +120,8 @@ export const listTestRuns = async (req: AuthenticatedRequest, res: Response) => 
     const scopedProjectIds = Array.from(new Set(runs.map((run) => run.project_id)));
     const testCases = await TestCase.findAll({
       where: { project_id: { [Op.in]: scopedProjectIds } },
-      attributes: ["id", "project_id", "suite", "status", "sprint_name", "updated_at", "execution_history"],
+      attributes: ["id", "project_id", "suite", "status", "sprint_name", "sprint_id", "updated_at", "execution_history"],
+      include: [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }],
     });
 
     return res.status(200).json({
@@ -137,7 +150,8 @@ export const createTestRunRecord = async (req: AuthenticatedRequest, res: Respon
 
     const planId = String(req.body.plan_id || "");
     const plan = await TestPlan.findByPk(planId, {
-      attributes: ["id", "project_id", "name", "status", "suite_names", "reference_code"],
+      attributes: ["id", "project_id", "name", "status", "suite_names", "reference_code", "sprint_id"],
+      include: [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }],
     });
 
     if (!plan) {
@@ -155,6 +169,7 @@ export const createTestRunRecord = async (req: AuthenticatedRequest, res: Respon
       plan_id: plan.id,
       project_id: plan.project_id,
       owner_id: userId,
+      sprint_id: (plan as any).sprint_id || null,
       environment: String(req.body.environment || "").trim(),
       status: req.body.status || "Planned",
       notes: req.body.notes ? String(req.body.notes).trim() : null,
@@ -164,7 +179,8 @@ export const createTestRunRecord = async (req: AuthenticatedRequest, res: Respon
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
-        { model: TestPlan, as: "plan", attributes: ["id", "reference_code", "name", "status", "suite_names", "project_id"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        { model: TestPlan, as: "plan", attributes: ["id", "reference_code", "name", "status", "suite_names", "project_id", "sprint_id"] },
       ],
     });
 

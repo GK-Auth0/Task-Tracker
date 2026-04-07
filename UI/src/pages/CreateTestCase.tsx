@@ -49,7 +49,6 @@ export default function CreateTestCase() {
   const [isCreatingSprint, setIsCreatingSprint] = useState(false);
   const [suite, setSuite] = useState("");
   const [module, setModule] = useState("");
-  const [isCreatingModule, setIsCreatingModule] = useState(false);
   const [priority, setPriority] = useState<TestCasePriority>("Medium");
   const [automation, setAutomation] = useState<TestAutomation>("Manual");
   const [status, setStatus] = useState<TestCaseStatus>("Draft");
@@ -192,15 +191,6 @@ export default function CreateTestCase() {
     }
   }, [filteredTasks, linkedTaskId]);
 
-  useEffect(() => {
-    if (!isCreatingModule) return;
-
-    const projectModules = moduleOptions.filter((item) => !projectId || item.project_id === projectId);
-    if (module && projectModules.some((item) => item.name === module)) {
-      setIsCreatingModule(false);
-    }
-  }, [isCreatingModule, module, moduleOptions, projectId]);
-
   const handleStepChange = (id: number, field: "action" | "expected", value: string) => {
     setSteps((current) =>
       current.map((step) => (step.id === id ? { ...step, [field]: value } : step)),
@@ -242,7 +232,6 @@ export default function CreateTestCase() {
       setIsCreatingSprint(false);
       setSuite("");
       setModule("");
-      setIsCreatingModule(false);
       setPriority("Medium");
       setAutomation("Manual");
       setStatus("Draft");
@@ -258,7 +247,6 @@ export default function CreateTestCase() {
     setIsCreatingSprint(false);
     setSuite(testCase.suite);
     setModule(testCase.module);
-    setIsCreatingModule(false);
     setPriority(testCase.priority);
     setAutomation(testCase.automation);
     setStatus(testCase.status);
@@ -320,6 +308,7 @@ export default function CreateTestCase() {
     try {
       setSubmitting(true);
       let resolvedSprintName = sprintName.trim();
+      let resolvedSprintId = "";
       const existingSprint = filteredSprints.find(
         (item) => item.name.trim().toLowerCase() === sprintName.trim().toLowerCase(),
       );
@@ -333,6 +322,7 @@ export default function CreateTestCase() {
 
         if (createdSprintResponse.success) {
           resolvedSprintName = createdSprintResponse.data.name;
+          resolvedSprintId = createdSprintResponse.data.id;
           setSprintName(createdSprintResponse.data.name);
           setSprints((current) =>
             [...current, createdSprintResponse.data].sort((left, right) =>
@@ -342,30 +332,7 @@ export default function CreateTestCase() {
         }
       } else if (existingSprint) {
         resolvedSprintName = existingSprint.name;
-      }
-
-      const existingModule = moduleOptions.find(
-        (item) =>
-          item.project_id === projectId &&
-          item.name.trim().toLowerCase() === module.trim().toLowerCase(),
-      );
-
-      if (!existingModule && module.trim()) {
-        const createdModuleResponse = await testCaseModulesAPI.createModule({
-          name: module.trim(),
-          project_id: projectId,
-        });
-
-        if (createdModuleResponse.success) {
-          setModuleOptions((current) => {
-            if (current.some((item) => item.id === createdModuleResponse.data.id)) {
-              return current;
-            }
-            return [...current, createdModuleResponse.data].sort((left, right) =>
-              left.name.localeCompare(right.name),
-            );
-          });
-        }
+        resolvedSprintId = existingSprint.id;
       }
 
       const existingSuite = suiteOptions.find(
@@ -398,6 +365,7 @@ export default function CreateTestCase() {
         linked_task_id: linkedTaskId || undefined,
         suite: suite.trim(),
         module: module.trim(),
+        sprint_id: resolvedSprintId || undefined,
         sprint_name: resolvedSprintName || undefined,
         priority,
         status,
@@ -608,7 +576,6 @@ export default function CreateTestCase() {
                     moduleOptions={moduleOptions.filter(
                       (item) => !projectId || item.project_id === projectId,
                     )}
-                    isCreatingModule={isCreatingModule}
                     validStepCount={validSteps.length}
                     totalStepCount={steps.length}
                     onTitleChange={setTitle}
@@ -617,7 +584,6 @@ export default function CreateTestCase() {
                     onSprintCreateModeChange={setIsCreatingSprint}
                     onSuiteChange={setSuite}
                     onModuleChange={setModule}
-                    onModuleCreateModeChange={setIsCreatingModule}
                     onPriorityChange={setPriority}
                     onAutomationChange={setAutomation}
                     onStatusChange={setStatus}

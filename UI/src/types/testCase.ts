@@ -35,6 +35,7 @@ export interface TestCaseRecord {
   title: string;
   suite: string;
   module: string;
+  sprint_id?: string | null;
   sprint_name?: string | null;
   priority: TestCasePriority;
   status: TestCaseStatus;
@@ -61,5 +62,10 @@ export interface TestCaseRecord {
   linked_task: {
     id: string;
     title: string;
+  } | null;
+  sprint: {
+    id: string;
+    name: string;
+    status: "Planning" | "Active" | "Completed";
   } | null;
 }

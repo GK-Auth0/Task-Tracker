@@ -16,7 +16,10 @@ interface User {
 
 interface CreateProjectModalProps {
   onClose: () => void;
-  onSubmit: (data: CreateProjectRequest) => Promise<{ id: string; name: string } | null>;
+  onSubmit: (
+    data: CreateProjectRequest,
+    options?: { modules: string[] },
+  ) => Promise<{ id: string; name: string } | null>;
 }
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
@@ -45,6 +48,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [redirectToSprint, setRedirectToSprint] = useState(false);
+  const [moduleNameInput, setModuleNameInput] = useState("");
+  const [moduleNames, setModuleNames] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -86,6 +91,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     } else if (formData.description.trim().length < 10) {
       newErrors.description = "Description should be at least 10 characters";
     }
+    if (!moduleNames.length) {
+      newErrors.modules = "At least one module is required";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -113,7 +121,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
     try {
       setSubmitting(true);
-      const createdProject = await onSubmit(projectData);
+      const createdProject = await onSubmit(projectData, { modules: moduleNames });
       if (redirectToSprint && createdProject?.id) {
         navigate(
           `/sprint-board?tab=create&projectId=${encodeURIComponent(createdProject.id)}`,
@@ -157,6 +165,24 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
   const removeMember = (memberId: string) => {
     setSelectedMembers((prev) => prev.filter((m) => m.id !== memberId));
+  };
+
+  const addModule = () => {
+    const nextModule = moduleNameInput.trim();
+    if (!nextModule) return;
+    if (moduleNames.some((item) => item.toLowerCase() === nextModule.toLowerCase())) {
+      setModuleNameInput("");
+      return;
+    }
+    setModuleNames((prev) => [...prev, nextModule]);
+    setModuleNameInput("");
+    if (errors.modules) {
+      setErrors((prev) => ({ ...prev, modules: "" }));
+    }
+  };
+
+  const removeModule = (name: string) => {
+    setModuleNames((prev) => prev.filter((item) => item !== name));
   };
 
   const filteredMembers = availableUsers.filter(
@@ -438,6 +464,66 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     className="form-input flex w-full rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border border-[#cfdce7] bg-white focus:border-blue-600 h-12 px-4 text-base font-normal"
                   />
                 </label>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-[#0d151b] text-sm font-semibold leading-tight tracking-tight">
+                  Project Modules
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Add the functional areas for this project. Test cases will later be linked to one of these modules.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={moduleNameInput}
+                  onChange={(e) => setModuleNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addModule();
+                    }
+                  }}
+                  className={`form-input flex w-full rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border h-12 placeholder:text-[#4c759a] px-4 text-base font-normal ${
+                    errors.modules
+                      ? "border-red-300 bg-red-50"
+                      : "border-[#cfdce7] bg-white focus:border-blue-600"
+                  }`}
+                  placeholder="Authentication"
+                />
+                <button
+                  type="button"
+                  onClick={addModule}
+                  className="h-12 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Add
+                </button>
+              </div>
+              {errors.modules ? (
+                <p className="text-red-500 text-xs">{errors.modules}</p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {moduleNames.length ? (
+                  moduleNames.map((moduleName) => (
+                    <span
+                      key={moduleName}
+                      className="inline-flex items-center gap-2 rounded-full bg-blue-600/10 px-3 py-1.5 text-xs font-semibold text-blue-600"
+                    >
+                      {moduleName}
+                      <button
+                        type="button"
+                        onClick={() => removeModule(moduleName)}
+                        className="material-symbols-outlined text-[14px] hover:text-blue-800"
+                      >
+                        close
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">No modules added yet.</p>
+                )}
               </div>
             </div>
 

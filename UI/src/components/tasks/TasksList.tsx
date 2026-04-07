@@ -4,6 +4,7 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { Avatar, Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { ViewMode } from "./TasksFiltersBar";
 import TaskTooltip from "../TaskTooltip";
+import { getTaskStatusTone, isDoneTaskStatus } from "../../utils/taskStatus";
 
 interface TasksListProps {
   tasks: TaskItem[];
@@ -347,7 +348,7 @@ const TasksList: React.FC<TasksListProps> = ({
       groups.set(key, existing);
     }
 
-    const statusOrder = ["To Do", "In Progress", "Done"];
+    const statusOrder = ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"];
     const priorityOrder = ["High", "Medium", "Low"];
     const dueOrder = ["Overdue", "Due Today", "Next 3 Days", "Later", "No Due Date"];
 
@@ -376,7 +377,7 @@ const TasksList: React.FC<TasksListProps> = ({
   // Grid layout for desktop, list for mobile
   const renderTaskCard = (task: TaskItem) => {
     const dateInfo = task.due_date ? formatDate(task.due_date) : null;
-    const isCompleted = task.status === "Done";
+    const isCompleted = isDoneTaskStatus(task.status);
     const isPinned = Boolean(pinnedTaskIds?.has(task.id));
 
     return (
@@ -425,11 +426,7 @@ const TasksList: React.FC<TasksListProps> = ({
           <div className="flex flex-col gap-1.5 mb-3">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 w-fit">
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${
-                task.status === "Done"
-                  ? "bg-emerald-500"
-                  : task.status === "In Progress"
-                    ? "bg-blue-500"
-                    : "bg-slate-400"
+                getTaskStatusTone(task.status).dot
               }`} />
               {task.status}
             </span>
@@ -481,7 +478,7 @@ const TasksList: React.FC<TasksListProps> = ({
 
   const renderTaskRow = (task: TaskItem) => {
     const dateInfo = task.due_date ? formatDate(task.due_date) : null;
-    const isCompleted = task.status === "Done";
+    const isCompleted = isDoneTaskStatus(task.status);
     const isPinned = Boolean(pinnedTaskIds?.has(task.id));
 
     return (
@@ -520,11 +517,7 @@ const TasksList: React.FC<TasksListProps> = ({
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                 <span
                   className={`inline-block h-1.5 w-1.5 rounded-full ${
-                    task.status === "Done"
-                      ? "bg-emerald-500"
-                      : task.status === "In Progress"
-                        ? "bg-blue-500"
-                        : "bg-slate-400"
+                    getTaskStatusTone(task.status).dot
                   }`}
                 />
                 {task.status}

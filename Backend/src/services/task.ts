@@ -123,6 +123,10 @@ export async function getAllTasks(
     whereClause.priority = filters.priority;
   }
 
+  if (filters.sprint_id) {
+    whereClause.sprint_id = filters.sprint_id;
+  }
+
   if (filters.project_id) {
     const [ownedProject, membership] = await Promise.all([
       Project.findOne({

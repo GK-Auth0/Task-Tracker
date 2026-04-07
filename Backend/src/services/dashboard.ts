@@ -1,5 +1,10 @@
 import { AuditLog, Project, Task, User } from "../models";
 import { fn, literal, Op } from "sequelize";
+import {
+  ACTIVE_TASK_STATUSES,
+  DONE_TASK_STATUSES,
+  TODO_TASK_STATUSES,
+} from "../utils/taskStatus";
 
 const getUserOrganizationId = async (userId: string) => {
   const user = await User.findByPk(userId, {
@@ -64,19 +69,19 @@ export async function getDashboardSummary(userId: string) {
       col: "id",
     }),
     Task.count({
-      where: { ...taskScope, status: "Done" },
+      where: { ...taskScope, status: { [Op.in]: DONE_TASK_STATUSES } },
       include: scopedProjectInclude as any,
       distinct: true,
       col: "id",
     }),
     Task.count({
-      where: { ...taskScope, status: "In Progress" },
+      where: { ...taskScope, status: { [Op.in]: ACTIVE_TASK_STATUSES } },
       include: scopedProjectInclude as any,
       distinct: true,
       col: "id",
     }),
     Task.count({
-      where: { ...taskScope, status: "To Do" },
+      where: { ...taskScope, status: { [Op.in]: TODO_TASK_STATUSES } },
       include: scopedProjectInclude as any,
       distinct: true,
       col: "id",
@@ -84,7 +89,7 @@ export async function getDashboardSummary(userId: string) {
     Task.count({
       where: {
         ...taskScope,
-        status: { [Op.ne]: "Done" },
+        status: { [Op.notIn]: DONE_TASK_STATUSES },
         due_date: {
           [Op.not]: null,
           [Op.lt]: today,
@@ -162,7 +167,7 @@ export async function getDashboardOverview(
     where: {
       ...taskScope,
       status: {
-        [Op.ne]: "Done",
+        [Op.notIn]: DONE_TASK_STATUSES,
       },
       due_date: {
         [Op.not]: null,
@@ -424,7 +429,7 @@ export async function getDashboardInsights(userId: string) {
         [
           fn(
             "SUM",
-            literal(`CASE WHEN "Task"."status" = 'Done' THEN 1 ELSE 0 END`),
+            literal(`CASE WHEN "Task"."status" IN ('Done') THEN 1 ELSE 0 END`),
           ),
           "completed",
         ],
@@ -456,9 +461,9 @@ export async function getDashboardInsights(userId: string) {
 
   statusRows.forEach((row: any) => {
     const count = Number(row.count || 0);
-    if (row.status === "To Do") statusBreakdown.todo += count;
-    if (row.status === "In Progress") statusBreakdown.in_progress += count;
-    if (row.status === "Done") statusBreakdown.done += count;
+    if (TODO_TASK_STATUSES.includes(row.status)) statusBreakdown.todo += count;
+    if (ACTIVE_TASK_STATUSES.includes(row.status)) statusBreakdown.in_progress += count;
+    if (DONE_TASK_STATUSES.includes(row.status)) statusBreakdown.done += count;
   });
 
   const priorityBreakdown = {

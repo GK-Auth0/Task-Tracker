@@ -19,6 +19,7 @@ import { isWorkspaceAdmin } from "../types/roles";
 import { Task } from "../types/task";
 import { ProjectStatus, ProjectPriority } from "../enums";
 import type { Sprint } from "../types/sprint";
+import { TASK_STATUSES, isDoneTaskStatus } from "../utils/taskStatus";
 
 type ProjectTab = "tasks" | "roadmap" | "files" | "activity";
 
@@ -86,7 +87,7 @@ const ProjectDetail: React.FC = () => {
   const [offset, setOffset] = useState(0);
   const [roadmapQuery, setRoadmapQuery] = useState("");
   const [roadmapStatusFilter, setRoadmapStatusFilter] = useState<
-    "all" | "To Do" | "In Progress" | "Done"
+    "all" | (typeof TASK_STATUSES)[number]
   >("all");
   const [roadmapPriorityFilter, setRoadmapPriorityFilter] = useState<
     "all" | "high" | "medium" | "low"
@@ -216,6 +217,11 @@ const ProjectDetail: React.FC = () => {
       in_progress: "In Progress",
       inprogress: "In Progress",
       progress: "In Progress",
+      ready_for_qa: "Ready for QA",
+      readyforqa: "Ready for QA",
+      in_qa: "In QA",
+      inqa: "In QA",
+      blocked: "Blocked",
       done: "Done",
       completed: "Done",
     };
@@ -672,7 +678,7 @@ const ProjectDetail: React.FC = () => {
         roadmapStatusFilter === "all" || task.status === roadmapStatusFilter;
       const matchesPriority =
         roadmapPriorityFilter === "all" || task.priority === roadmapPriorityFilter;
-      const matchesDone = !roadmapHideCompleted || task.status !== "Done";
+      const matchesDone = !roadmapHideCompleted || !isDoneTaskStatus(task.status);
       return matchesQuery && matchesStatus && matchesPriority && matchesDone;
     });
   }, [
@@ -689,13 +695,13 @@ const ProjectDetail: React.FC = () => {
     thisWeekEnd.setDate(now.getDate() + 7);
     thisWeekEnd.setHours(23, 59, 59, 999);
 
-    const done = filteredRoadmapTasks.filter((task) => task.status === "Done").length;
+    const done = filteredRoadmapTasks.filter((task) => isDoneTaskStatus(task.status)).length;
     const overdue = filteredRoadmapTasks.filter((task) => {
-      if (!task.dueDate || task.status === "Done") return false;
+      if (!task.dueDate || isDoneTaskStatus(task.status)) return false;
       return new Date(task.dueDate) < now;
     }).length;
     const dueThisWeek = filteredRoadmapTasks.filter((task) => {
-      if (!task.dueDate || task.status === "Done") return false;
+      if (!task.dueDate || isDoneTaskStatus(task.status)) return false;
       const due = new Date(task.dueDate);
       return due >= now && due <= thisWeekEnd;
     }).length;
@@ -733,7 +739,7 @@ const ProjectDetail: React.FC = () => {
       }
 
       const date = new Date(task.dueDate || task.startDate || task.createdAt);
-      if (task.status !== "Done" && date < todayStart) {
+      if (!isDoneTaskStatus(task.status) && date < todayStart) {
         groups[0].tasks.push(task);
       } else if (date >= todayStart && date <= todayEnd) {
         groups[1].tasks.push(task);
@@ -995,16 +1001,18 @@ const ProjectDetail: React.FC = () => {
                   value={roadmapStatusFilter}
                   onChange={(event) =>
                     setRoadmapStatusFilter(
-                      event.target.value as "all" | "To Do" | "In Progress" | "Done",
+                      event.target.value as "all" | (typeof TASK_STATUSES)[number],
                     )
                   }
                   aria-label="Filter roadmap tasks by status"
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
                   <option value="all">All status</option>
-                  <option value="To Do">To Do</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Done">Done</option>
+                  {TASK_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={roadmapPriorityFilter}

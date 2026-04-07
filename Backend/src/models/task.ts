@@ -14,6 +14,7 @@ import {
 } from "sequelize-typescript";
 import { User, Project, Subtask, Comment, Label, TaskLabel, TaskFile } from "./index";
 import Sprint from "./sprint";
+import { TASK_STATUSES, type TaskStatusValue } from "../utils/taskStatus";
 
 @Table({
   tableName: "tasks",
@@ -45,11 +46,11 @@ export default class Task extends Model {
   description!: string;
 
   @Column({
-    type: DataType.ENUM("To Do", "In Progress", "Done"),
+    type: DataType.ENUM(...TASK_STATUSES),
     allowNull: false,
     defaultValue: "To Do",
   })
-  status!: "To Do" | "In Progress" | "Done";
+  status!: TaskStatusValue;
 
   @Column({
     type: DataType.ENUM("Low", "Medium", "High"),

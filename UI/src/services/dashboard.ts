@@ -1,5 +1,6 @@
 import api from "./auth";
 import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
+import type { TaskStatusValue } from "../utils/taskStatus";
 
 export interface DashboardSummary {
   total_tasks: number;
@@ -13,7 +14,7 @@ export interface DashboardSummary {
 export interface DashboardOverviewUpcomingTask {
   id: string;
   title: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
   due_date?: string;
   days_to_due: number | null;
@@ -101,7 +102,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
   issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;

@@ -58,7 +58,8 @@ const serializeTestCase = (testCase: any) => ({
   title: testCase.title,
   suite: testCase.suite,
   module: testCase.module,
-  sprint_name: testCase.sprint_name,
+  sprint_id: testCase.sprint_id || testCase.sprint?.id || null,
+  sprint_name: testCase.sprint?.name || testCase.sprint_name,
   priority: testCase.priority,
   status: testCase.status,
   automation: testCase.automation,
@@ -91,6 +92,13 @@ const serializeTestCase = (testCase: any) => ({
     ? {
         id: testCase.linked_task.id,
         title: testCase.linked_task.title,
+      }
+    : null,
+  sprint: testCase.sprint
+    ? {
+        id: testCase.sprint.id,
+        name: testCase.sprint.name,
+        status: testCase.sprint.status,
       }
     : null,
 });
@@ -133,6 +141,8 @@ export const listTestCases = async (req: AuthenticatedRequest, res: Response) =>
     if (req.query.project_id) where.project_id = String(req.query.project_id);
     if (req.query.status) where.status = String(req.query.status);
     if (req.query.automation) where.automation = String(req.query.automation);
+    if (req.query.sprint_id) where.sprint_id = String(req.query.sprint_id);
+    if (req.query.linked_task_id) where.linked_task_id = String(req.query.linked_task_id);
 
     const testCases = await TestCase.findAll({
       where,
@@ -140,6 +150,7 @@ export const listTestCases = async (req: AuthenticatedRequest, res: Response) =>
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
       ],
       order: [["updated_at", "DESC"]],
     });
@@ -229,7 +240,7 @@ export const getTestCaseFormOptions = async (
       }),
       TestCase.findAll({
         where: { project_id: { [Op.in]: scopedProjectIds } },
-        attributes: ["suite", "module", "sprint_name"],
+        attributes: ["suite", "module"],
         order: [["updated_at", "DESC"]],
       }),
     ]);
@@ -296,25 +307,44 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
 
     const projectId = String(req.body.project_id || "");
     const linkedTaskId = req.body.linked_task_id ? String(req.body.linked_task_id) : undefined;
+    const sprintId = req.body.sprint_id ? String(req.body.sprint_id) : undefined;
     const project = await ensureProjectAccess(projectId, userId, req.user?.role);
     if (!project) {
       return res.status(403).json({ success: false, message: "Access denied to this project" });
     }
 
     if (linkedTaskId) {
-      const linkedTask = await Task.findOne({
+      const linkedTaskRecord = await Task.findOne({
         where: {
           id: linkedTaskId,
           project_id: projectId,
         },
         attributes: ["id"],
       });
-      if (!linkedTask) {
+      if (!linkedTaskRecord) {
         return res.status(400).json({
           success: false,
           message: "Linked task must belong to the selected project",
         });
       }
+    }
+
+    let resolvedSprintName: string | null = req.body.sprint_name ? String(req.body.sprint_name).trim() : null;
+    if (sprintId) {
+      const sprint = await Sprint.findOne({
+        where: {
+          id: sprintId,
+          project_id: projectId,
+        },
+        attributes: ["id", "name"],
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          success: false,
+          message: "Sprint must belong to the selected project",
+        });
+      }
+      resolvedSprintName = sprint.name;
     }
 
     const testCase = await TestCase.create({
@@ -324,7 +354,8 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       owner_id: userId,
       suite: String(req.body.suite || "").trim(),
       module: String(req.body.module || "").trim(),
-      sprint_name: req.body.sprint_name ? String(req.body.sprint_name).trim() : null,
+      sprint_id: sprintId,
+      sprint_name: resolvedSprintName,
       priority: req.body.priority,
       status: req.body.status || "Draft",
       automation: req.body.automation,
@@ -342,6 +373,7 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
       ],
     });
 
@@ -374,20 +406,21 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
 
     const projectId = String(req.body.project_id || "");
     const linkedTaskId = req.body.linked_task_id ? String(req.body.linked_task_id) : undefined;
+    const sprintId = req.body.sprint_id ? String(req.body.sprint_id) : undefined;
     const project = await ensureProjectAccess(projectId, userId, req.user?.role);
     if (!project || testCase.project_id !== projectId) {
       return res.status(403).json({ success: false, message: "Access denied to this project" });
     }
 
     if (linkedTaskId) {
-      const linkedTask = await Task.findOne({
+      const linkedTaskRecord = await Task.findOne({
         where: {
           id: linkedTaskId,
           project_id: projectId,
         },
         attributes: ["id"],
       });
-      if (!linkedTask) {
+      if (!linkedTaskRecord) {
         return res.status(400).json({
           success: false,
           message: "Linked task must belong to the selected project",
@@ -395,12 +428,31 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       }
     }
 
+    let resolvedSprintName: string | null = req.body.sprint_name ? String(req.body.sprint_name).trim() : null;
+    if (sprintId) {
+      const sprint = await Sprint.findOne({
+        where: {
+          id: sprintId,
+          project_id: projectId,
+        },
+        attributes: ["id", "name"],
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          success: false,
+          message: "Sprint must belong to the selected project",
+        });
+      }
+      resolvedSprintName = sprint.name;
+    }
+
     testCase.title = String(req.body.title || "").trim();
     testCase.project_id = projectId;
     testCase.linked_task_id = linkedTaskId;
     testCase.suite = String(req.body.suite || "").trim();
     testCase.module = String(req.body.module || "").trim();
-    testCase.sprint_name = req.body.sprint_name ? String(req.body.sprint_name).trim() : null as any;
+    testCase.sprint_id = sprintId as any;
+    testCase.sprint_name = resolvedSprintName as any;
     testCase.priority = req.body.priority;
     testCase.status = req.body.status || testCase.status;
     testCase.automation = req.body.automation;
@@ -415,6 +467,7 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
       ],
     });
 
@@ -458,7 +511,11 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
     }
 
     const status = String(req.body.status || "") as "Passed" | "Failed" | "Blocked";
-    const cycle = String(req.body.cycle || "").trim() || testCase.sprint_name || "Manual run";
+    const cycle =
+      String(req.body.cycle || "").trim() ||
+      (testCase as any).sprint?.name ||
+      testCase.sprint_name ||
+      "Manual run";
     const note = String(req.body.note || "").trim();
     const actualBehavior = String(req.body.actual_behavior || "").trim();
     const attachments = Array.isArray(req.body.attachments)
@@ -503,6 +560,7 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
       ],
     });
 

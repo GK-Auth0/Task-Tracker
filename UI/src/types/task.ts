@@ -1,3 +1,5 @@
+import type { TaskStatusValue } from "../utils/taskStatus";
+
 export interface TaskSubtask {
   id: string;
   title: string;
@@ -16,7 +18,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "low" | "medium" | "high";
   issueType?: "Story" | "Task" | "Bug";
   startDate?: string;
@@ -37,7 +39,7 @@ export interface Task {
 export interface CreateTaskRequest {
   title: string;
   description?: string;
-  status?: "To Do" | "In Progress" | "Done";
+  status?: TaskStatusValue;
   priority?: "low" | "medium" | "high";
   issueType?: "Story" | "Task" | "Bug";
   dueDate?: string;

@@ -11,6 +11,7 @@ import { addUsersToChatGroup, createProjectGroup } from "../services/chat";
 import { parseBoundedInt } from "../helpers/query";
 import { isWorkspaceAdmin } from "../middleware/rbac";
 import { getAuditLogs } from "../services/auditService";
+import { isActiveTaskStatus, isDoneTaskStatus, isTodoTaskStatus } from "../utils/taskStatus";
 import {
   ProjectRole,
   ConfidentialAccessScope,
@@ -976,9 +977,9 @@ export class ProjectController {
       });
 
       const totalTasks = tasks.length;
-      const todoTasks = tasks.filter((task: any) => task.status === 'To Do').length;
-      const inProgressTasks = tasks.filter((task: any) => task.status === 'In Progress').length;
-      const completedTasks = tasks.filter((task: any) => task.status === 'Done').length;
+      const todoTasks = tasks.filter((task: any) => isTodoTaskStatus(task.status)).length;
+      const inProgressTasks = tasks.filter((task: any) => isActiveTaskStatus(task.status)).length;
+      const completedTasks = tasks.filter((task: any) => isDoneTaskStatus(task.status)).length;
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
       res.json({

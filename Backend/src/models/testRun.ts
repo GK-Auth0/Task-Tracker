@@ -14,6 +14,7 @@ import {
 import Project from "./project";
 import User from "./user";
 import TestPlan from "./testPlan";
+import Sprint from "./sprint";
 
 export const generateTestRunReferenceCode = () => {
   const timePart = Date.now().toString(36).toUpperCase();
@@ -71,6 +72,13 @@ export default class TestRun extends Model {
   })
   owner_id!: string;
 
+  @ForeignKey(() => Sprint)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  sprint_id?: string;
+
   @Column({
     type: DataType.STRING(120),
     allowNull: false,
@@ -104,4 +112,7 @@ export default class TestRun extends Model {
 
   @BelongsTo(() => User, "owner_id")
   owner!: User;
+
+  @BelongsTo(() => Sprint, "sprint_id")
+  sprint?: Sprint;
 }

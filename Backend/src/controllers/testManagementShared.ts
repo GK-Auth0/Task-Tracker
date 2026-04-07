@@ -93,7 +93,7 @@ export const getLatestCaseExecution = (testCase: any) => {
   if (["Passed", "Failed", "Blocked"].includes(String(testCase?.status || ""))) {
     return {
       status: testCase.status,
-      cycle: testCase.sprint_name || "Current cycle",
+      cycle: testCase.sprint?.name || testCase.sprint_name || "Current cycle",
       executedAt: testCase.updated_at || null,
       note: "",
     };

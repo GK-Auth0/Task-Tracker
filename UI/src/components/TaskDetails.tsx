@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import TaskDetailHeader from "./task-detail/TaskDetailHeader";
+import TaskDetailSidebar from "./task-detail/TaskDetailSidebar";
 import {
   tasksAPI,
   PullRequest,
@@ -8,13 +10,16 @@ import {
   usersAPI,
 } from "../services/dashboard";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
+import { testCasesAPI, testCaseModulesAPI, type TestCaseModuleOption } from "../services/testCases";
+import type { TestCaseRecord, TestCaseStatus } from "../types/testCase";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
+import { isDoneTaskStatus, type TaskStatusValue } from "../utils/taskStatus";
 
 interface TaskDetails {
   id: string;
   title: string;
   description?: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
   issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;
@@ -158,6 +163,22 @@ export default function TaskDetails() {
   const [workspaceUsers, setWorkspaceUsers] = useState<
     Array<{ id: string; full_name: string; email: string }>
   >([]);
+  const [linkedTestCases, setLinkedTestCases] = useState<TestCaseRecord[]>([]);
+  const [testCasesLoading, setTestCasesLoading] = useState(false);
+  const [testCaseRunLoadingId, setTestCaseRunLoadingId] = useState("");
+  const [showQuickTestCaseForm, setShowQuickTestCaseForm] = useState(false);
+  const [quickTestCaseTitle, setQuickTestCaseTitle] = useState("");
+  const [quickTestCaseSuite, setQuickTestCaseSuite] = useState("");
+  const [quickTestCaseModule, setQuickTestCaseModule] = useState("");
+  const [quickTestCasePriority, setQuickTestCasePriority] =
+    useState<"Critical" | "High" | "Medium" | "Low">("Medium");
+  const [quickTestCaseAutomation, setQuickTestCaseAutomation] =
+    useState<"Manual" | "Automated" | "Candidate">("Manual");
+  const [quickStepAction, setQuickStepAction] = useState("");
+  const [quickStepExpected, setQuickStepExpected] = useState("");
+  const [quickTestCaseSubmitting, setQuickTestCaseSubmitting] = useState(false);
+  const [quickTestCaseError, setQuickTestCaseError] = useState("");
+  const [projectModuleOptions, setProjectModuleOptions] = useState<TestCaseModuleOption[]>([]);
 
   const [prForm, setPrForm] = useState({
     title: "",
@@ -188,6 +209,7 @@ export default function TaskDetails() {
     if (id) {
       fetchTask();
       fetchWorkspaceUsers();
+      fetchLinkedTestCases(id);
     }
   }, [id]);
 
@@ -199,8 +221,30 @@ export default function TaskDetails() {
       setEditError("");
       setEditAiError("");
       setEditMode(false);
+      setQuickTestCaseTitle(`Verify ${task.title}`);
     }
   }, [task?.id]);
+
+  useEffect(() => {
+    if (!task?.project?.id) {
+      setProjectModuleOptions([]);
+      return;
+    }
+
+    const loadProjectModules = async () => {
+      try {
+        const response = await testCaseModulesAPI.getModules({ project_id: task.project.id });
+        if (response.success) {
+          setProjectModuleOptions(response.data);
+          setQuickTestCaseModule((current) => current || response.data[0]?.name || "");
+        }
+      } catch (error) {
+        console.error("Failed to fetch project modules:", error);
+      }
+    };
+
+    loadProjectModules();
+  }, [task?.project?.id]);
 
   useEffect(() => {
     if (id && activeTab === "prs") {
@@ -278,6 +322,43 @@ export default function TaskDetails() {
     }
   };
 
+  const fetchLinkedTestCases = async (taskId: string) => {
+    try {
+      setTestCasesLoading(true);
+      const response = await testCasesAPI.getTestCases({ linked_task_id: taskId });
+      if (response.success) {
+        setLinkedTestCases(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch linked test cases:", error);
+    } finally {
+      setTestCasesLoading(false);
+    }
+  };
+
+  const handleRunTestCase = async (
+    testCaseId: string,
+    status: Extract<TestCaseStatus, "Passed" | "Failed" | "Blocked">,
+  ) => {
+    try {
+      setTestCaseRunLoadingId(`${testCaseId}:${status}`);
+      const response = await testCasesAPI.addExecution(testCaseId, {
+        status,
+        cycle: task?.sprint?.name || "Task Detail Run",
+        note: `Executed from task ${task?.title || ""}`.trim(),
+      });
+      if (response.success) {
+        setLinkedTestCases((current) =>
+          current.map((item) => (item.id === response.data.id ? response.data : item)),
+        );
+      }
+    } catch (error) {
+      console.error("Failed to run test case:", error);
+    } finally {
+      setTestCaseRunLoadingId("");
+    }
+  };
+
   const fetchActivityLogs = async () => {
     if (!id) return;
     try {
@@ -294,7 +375,7 @@ export default function TaskDetails() {
   };
 
   const handleStatusUpdate = async (
-    newStatus: "To Do" | "In Progress" | "Done",
+    newStatus: TaskStatusValue,
   ) => {
     if (!task) return;
     try {
@@ -618,44 +699,36 @@ export default function TaskDetails() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Done":
-        return "bg-green-100 text-green-600";
-      case "In Progress":
-        return "bg-blue-100 text-blue-600";
-      case "To Do":
-        return "bg-slate-100 text-slate-600";
-      default:
-        return "bg-slate-100 text-slate-600";
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading...
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="mx-auto flex min-h-full max-w-[1440px] items-center justify-center p-4 sm:p-6 lg:p-8">
+          Loading...
+        </div>
       </div>
     );
   }
 
   if (!task) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-        <p>{taskError || "Task not found"}</p>
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          Back to Tasks
-        </button>
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="mx-auto flex min-h-full max-w-[1440px] flex-col items-center justify-center gap-3 p-4 text-center sm:p-6 lg:p-8">
+          <p>{taskError || "Task not found"}</p>
+          <button
+            type="button"
+            onClick={() => navigate("/tasks")}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Back to Tasks
+          </button>
+        </div>
       </div>
     );
   }
 
   const priorityColors = getPriorityColor(task.priority);
   const issueTypeLabel = task.issue_type || "Task";
+  const issueKey = `TASK-${task.id.slice(-3)}`;
   const completedSubtasks = (task.subtasks || []).filter(
     (subtask) => subtask.is_completed,
   ).length;
@@ -678,7 +751,7 @@ export default function TaskDetails() {
     ? Math.ceil((dueDateObj!.getTime() - now.getTime()) / dayMs)
     : null;
   const slaLabel =
-    task.status === "Done"
+    isDoneTaskStatus(task.status)
       ? "Delivered"
       : daysToDue === null
         ? "No Deadline"
@@ -688,64 +761,137 @@ export default function TaskDetails() {
             ? "Due Today"
             : `${daysToDue}d Remaining`;
   const activityPulse = activityLogs.length > 0 ? "Active" : "Quiet";
+  const assigneeLabel = task.assignee?.full_name || "Unassigned";
+  const assigneeInitials = task.assignee?.full_name
+    ? task.assignee.full_name
+        .split(" ")
+        .map((name) => name[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "?";
+  const dueDateLabel = task.due_date
+    ? new Date(task.due_date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "No deadline";
+  const createdDateLabel = Number.isNaN(createdAtDate.getTime())
+    ? "Unknown"
+    : createdAtDate.toLocaleDateString();
+  const issueHealthTone =
+    isDoneTaskStatus(task.status)
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : daysToDue !== null && daysToDue < 0
+        ? "border-rose-200 bg-rose-50 text-rose-700"
+        : "border-blue-200 bg-blue-50 text-blue-700";
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/tasks");
+  };
+
   const navigateToCreateTestCase = () => {
     navigate(`/test-cases/create?sourceTaskId=${task.id}`);
   };
 
-  return (
-    <>
-      <div className="min-h-screen bg-slate-50">
-        <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-white via-slate-50 to-blue-50/40">
-            <div className="flex items-center gap-4">
-              <div className="flex flex-wrap gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => navigate("/projects")}
-                  className="text-slate-500 font-medium hover:text-blue-600"
-                >
-                  Projects
-                </button>
-                <span className="text-slate-500 font-medium">/</span>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/projects/${task.project.id}`)}
-                  className="text-slate-500 font-medium hover:text-blue-600"
-                >
-                  {task.project.name}
-                </button>
-                <span className="text-slate-500 font-medium">/</span>
-                <span className="text-slate-900 font-medium">
-                  TASK-{task.id.slice(-3)}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
-                <span className="material-symbols-outlined">share</span>
-              </button>
-              <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
-                <span className="material-symbols-outlined">more_horiz</span>
-              </button>
-              <button
-                type="button"
-                className="p-2 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-500 transition-colors ml-2"
-                onClick={() => {
-                  if (window.history.length > 1) {
-                    navigate(-1);
-                    return;
-                  }
-                  navigate("/dashboard");
-                }}
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-          </div>
+  const handleCreateQuickTestCase = async () => {
+    if (!task) return;
+    if (
+      !quickTestCaseTitle.trim() ||
+      !quickTestCaseSuite.trim() ||
+      !quickTestCaseModule.trim() ||
+      !quickStepAction.trim() ||
+      !quickStepExpected.trim()
+    ) {
+      setQuickTestCaseError("Title, suite, module, step action, and expected result are required.");
+      return;
+    }
 
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="p-5 sm:p-6 space-y-6 lg:border-r lg:border-slate-200">
+    try {
+      setQuickTestCaseSubmitting(true);
+      setQuickTestCaseError("");
+      const response = await testCasesAPI.createTestCase({
+        title: quickTestCaseTitle.trim(),
+        project_id: task.project.id,
+        linked_task_id: task.id,
+        sprint_id: task.sprint?.id,
+        suite: quickTestCaseSuite.trim(),
+        module: quickTestCaseModule.trim(),
+        priority: quickTestCasePriority,
+        status: "Draft",
+        automation: quickTestCaseAutomation,
+        tags: [],
+        preconditions: [],
+        steps: [
+          {
+            id: 1,
+            action: quickStepAction.trim(),
+            expected: quickStepExpected.trim(),
+          },
+        ],
+        linked_items: [],
+        execution_history: [],
+      });
+
+      if (response.success) {
+        setLinkedTestCases((current) => [response.data, ...current]);
+        setShowQuickTestCaseForm(false);
+        setQuickTestCaseTitle("");
+        setQuickTestCaseSuite("");
+        setQuickStepAction("");
+        setQuickStepExpected("");
+        setQuickTestCasePriority("Medium");
+        setQuickTestCaseAutomation("Manual");
+      }
+    } catch (error: any) {
+      setQuickTestCaseError(
+        error?.response?.data?.message || "Failed to create test case from this task.",
+      );
+    } finally {
+      setQuickTestCaseSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="mx-auto min-h-full max-w-[1480px] p-4 sm:p-6 lg:p-8">
+          <TaskDetailHeader
+            issueKey={issueKey}
+            issueTypeLabel={issueTypeLabel}
+            title={task.title}
+            projectName={task.project.name}
+            taskStatus={task.status}
+            taskPriority={task.priority}
+            priorityColors={priorityColors}
+            slaLabel={slaLabel}
+            issueHealthTone={issueHealthTone}
+            createdDateLabel={createdDateLabel}
+            creatorName={task.creator.full_name}
+            daysSinceCreated={daysSinceCreated}
+            pullRequestsCount={pullRequests.length}
+            commitsCount={commits.length}
+            activityPulse={activityPulse}
+            activityLogsCount={activityLogs.length}
+            assigneeLabel={assigneeLabel}
+            sprintName={task.sprint?.name}
+            dueDateLabel={dueDateLabel}
+            statusSaving={statusSaving}
+            onOpenProject={() => navigate(`/projects/${task.project.id}`)}
+            onBack={handleBack}
+            onStatusChange={handleStatusUpdate}
+            onEdit={handleStartEditing}
+            onAddTestCase={navigateToCreateTestCase}
+            onMarkDone={() => handleStatusUpdate("Done")}
+          />
+
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="space-y-5 p-4 sm:p-5 lg:border-r lg:border-slate-200">
               {taskError && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   {taskError}
@@ -757,97 +903,7 @@ export default function TaskDetails() {
                 </div>
               )}
 
-              <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap justify-between items-start gap-4">
-                  <h1 className="text-2xl md:text-3xl font-black leading-tight tracking-tight text-slate-900">
-                    {task.title}
-                  </h1>
-                  <div className="flex items-center gap-3">
-                    <select
-                      value={task.status}
-                      onChange={(e) =>
-                        handleStatusUpdate(
-                          e.target.value as "To Do" | "In Progress" | "Done",
-                        )
-                      }
-                      disabled={statusSaving}
-                      aria-label="Task status"
-                      className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium bg-white hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                    >
-                      <option value="To Do">To Do</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Done">Done</option>
-                    </select>
-                    <button
-                      className="flex min-w-[140px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-11 px-6 bg-blue-600 text-white text-sm font-bold leading-normal tracking-wide hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => handleStatusUpdate("Done")}
-                      disabled={task.status === "Done" || statusSaving}
-                    >
-                      <span className="material-symbols-outlined mr-2 text-lg">
-                        check_circle
-                      </span>
-                      <span className="truncate">
-                        {task.status === "Done"
-                          ? "Completed"
-                          : statusSaving
-                            ? "Updating..."
-                          : "Mark as Complete"}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-violet-700">
-                    {issueTypeLabel}
-                  </span>
-                  <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider ${getStatusColor(task.status)}`}
-                  >
-                    {task.status}
-                  </span>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${priorityColors.text} bg-slate-100`}>
-                    <span className={`h-2 w-2 rounded-full ${priorityColors.bg}`}></span>
-                    {task.priority}
-                  </span>
-                  <p className="text-slate-500 text-sm">
-                    Created by {task.creator.full_name} •{" "}
-                    {new Date(task.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
-                    SLA
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-blue-900">{slaLabel}</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Age
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">{daysSinceCreated}d</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Engineering
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">
-                    {pullRequests.length} PRs • {commits.length} commits
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Activity
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">
-                    {activityPulse} • {activityLogs.length} logs
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white px-4">
+              <div className="rounded-xl border border-slate-200 bg-white px-4">
                 <div className="pb-3 pt-4 sm:hidden">
                   <select
                     aria-label="Task detail tabs"
@@ -867,7 +923,7 @@ export default function TaskDetails() {
                     <button
                       key={tab.id}
                       type="button"
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-bold text-sm whitespace-nowrap ${
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold whitespace-nowrap ${
                         activeTab === tab.id
                           ? "border-blue-200 bg-blue-50 text-blue-700"
                           : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-colors"
@@ -889,9 +945,9 @@ export default function TaskDetails() {
               {/* Tab Content */}
               {activeTab === "overview" && (
                 <>
-                  <div className="space-y-3 group relative rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="group relative space-y-3 rounded-xl border border-slate-200 bg-white p-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-slate-900">
+                      <h3 className="text-base font-semibold text-slate-900">
                         Description
                       </h3>
                       <button
@@ -1003,10 +1059,10 @@ export default function TaskDetails() {
                     )}
                   </div>
 
-                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h3 className="text-lg font-bold text-slate-900">Subtasks</h3>
+                        <h3 className="text-base font-semibold text-slate-900">Subtasks</h3>
                         <p className="text-sm text-slate-500">
                           {completedSubtasks}/{task.subtasks?.length || 0} completed
                         </p>
@@ -1136,13 +1192,13 @@ export default function TaskDetails() {
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5">
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
                           Quality Shortcut
                         </p>
-                        <h3 className="mt-2 text-lg font-bold text-blue-950">
+                        <h3 className="mt-2 text-base font-semibold text-blue-950">
                           Add a test case from this task
                         </h3>
                         <p className="mt-1 text-sm text-blue-900/80">
@@ -1152,7 +1208,7 @@ export default function TaskDetails() {
                       <button
                         type="button"
                         onClick={navigateToCreateTestCase}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                       >
                         <span className="material-symbols-outlined text-lg">add_task</span>
                         <span>Add Test Case</span>
@@ -1160,9 +1216,244 @@ export default function TaskDetails() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900">Linked Test Cases</h3>
+                        <p className="text-sm text-slate-500">
+                          Run and review test coverage for this task directly here.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigate("/test-cases")}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                        >
+                          Open Test Cases
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuickTestCaseForm((current) => !current)}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                        >
+                          {showQuickTestCaseForm ? "Close Quick Create" : "Add Test Case Here"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={navigateToCreateTestCase}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                        >
+                          Full Create Page
+                        </button>
+                      </div>
+                    </div>
+
+                    {showQuickTestCaseForm ? (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <label className="block md:col-span-2">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Test case title
+                            </span>
+                            <input
+                              value={quickTestCaseTitle}
+                              onChange={(event) => setQuickTestCaseTitle(event.target.value)}
+                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                              placeholder={`Verify ${task.title}`}
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Suite
+                            </span>
+                            <input
+                              value={quickTestCaseSuite}
+                              onChange={(event) => setQuickTestCaseSuite(event.target.value)}
+                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                              placeholder="Smoke Regression"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Module
+                            </span>
+                            <select
+                              value={quickTestCaseModule}
+                              onChange={(event) => setQuickTestCaseModule(event.target.value)}
+                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                            >
+                              <option value="">Select module</option>
+                              {projectModuleOptions.map((option) => (
+                                <option key={option.id} value={option.name}>
+                                  {option.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Priority
+                            </span>
+                            <select
+                              value={quickTestCasePriority}
+                              onChange={(event) =>
+                                setQuickTestCasePriority(
+                                  event.target.value as "Critical" | "High" | "Medium" | "Low",
+                                )
+                              }
+                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                            >
+                              {["Critical", "High", "Medium", "Low"].map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Automation
+                            </span>
+                            <select
+                              value={quickTestCaseAutomation}
+                              onChange={(event) =>
+                                setQuickTestCaseAutomation(
+                                  event.target.value as "Manual" | "Automated" | "Candidate",
+                                )
+                              }
+                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                            >
+                              {["Manual", "Automated", "Candidate"].map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Step action
+                            </span>
+                            <textarea
+                              value={quickStepAction}
+                              onChange={(event) => setQuickStepAction(event.target.value)}
+                              className="mt-2 min-h-[96px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                              placeholder="Describe what the tester should do"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Expected result
+                            </span>
+                            <textarea
+                              value={quickStepExpected}
+                              onChange={(event) => setQuickStepExpected(event.target.value)}
+                              className="mt-2 min-h-[96px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                              placeholder="Describe the expected outcome"
+                            />
+                          </label>
+                        </div>
+                        <p className="mt-3 text-xs text-slate-500">
+                          Module comes from the project setup. Suite stays mandatory when creating the test case.
+                        </p>
+                        {quickTestCaseError ? (
+                          <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                            {quickTestCaseError}
+                          </div>
+                        ) : null}
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={handleCreateQuickTestCase}
+                            disabled={quickTestCaseSubmitting}
+                            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {quickTestCaseSubmitting ? "Creating..." : "Create Test Case"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {testCasesLoading ? (
+                      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                        Loading linked test cases...
+                      </div>
+                    ) : linkedTestCases.length ? (
+                      <div className="space-y-3">
+                        {linkedTestCases.map((testCase) => (
+                          <div
+                            key={testCase.id}
+                            className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/test-cases/case/${testCase.id}`)}
+                                  className="text-left"
+                                >
+                                  <p className="text-sm font-semibold text-slate-900 hover:text-blue-700">
+                                    {testCase.reference_code} • {testCase.title}
+                                  </p>
+                                </button>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {testCase.project?.name || "No project"} • {testCase.module} • {testCase.suite}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Status: {testCase.status} • Automation: {testCase.automation} • Last updated{" "}
+                                  {new Date(testCase.updated_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {(["Passed", "Failed", "Blocked"] as const).map((status) => (
+                                  <button
+                                    key={status}
+                                    type="button"
+                                    onClick={() => handleRunTestCase(testCase.id, status)}
+                                    disabled={Boolean(testCaseRunLoadingId)}
+                                    className={`rounded-lg px-3 py-2 text-xs font-semibold text-white ${
+                                      status === "Passed"
+                                        ? "bg-emerald-600 hover:bg-emerald-700"
+                                        : status === "Failed"
+                                          ? "bg-rose-600 hover:bg-rose-700"
+                                          : "bg-amber-600 hover:bg-amber-700"
+                                    } disabled:opacity-50`}
+                                  >
+                                    {testCaseRunLoadingId === `${testCase.id}:${status}`
+                                      ? "Running..."
+                                      : `Run ${status}`}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {testCase.execution_history.length ? (
+                              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                  Latest Execution
+                                </p>
+                                <p className="mt-1 text-sm font-semibold text-slate-900">
+                                  {testCase.execution_history[0].status}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {testCase.execution_history[0].cycle} • {testCase.execution_history[0].tester} •{" "}
+                                  {new Date(testCase.execution_history[0].executedAt).toLocaleString()}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                        No test cases are linked to this task yet. Add one from here and it will show up in this panel.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-blue-900 flex items-center gap-2">
+                      <h3 className="flex items-center gap-2 text-base font-semibold text-blue-900">
                         <span className="material-symbols-outlined text-lg">
                           auto_awesome
                         </span>
@@ -1239,11 +1530,11 @@ export default function TaskDetails() {
                     )}
                   </div>
 
-                  <div className="space-y-6 pt-4 rounded-2xl border border-slate-200 bg-white p-5">
-                    <h3 className="text-lg font-bold text-slate-900">
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <h3 className="text-base font-semibold text-slate-900">
                       Activity
                     </h3>
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {/* Comment Input */}
                       <div className="flex gap-4 pt-4">
                         <div className="bg-blue-600/20 text-blue-600 rounded-full size-10 flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -1287,7 +1578,7 @@ export default function TaskDetails() {
               )}
 
               {activeTab === "prs" && (
-                <div className="space-y-10 rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="space-y-8 rounded-xl border border-slate-200 bg-white p-4">
                   {prLoading ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -1478,8 +1769,8 @@ export default function TaskDetails() {
               )}
 
               {activeTab === "activity" && (
-                <div className="space-y-6 pt-4 rounded-2xl border border-slate-200 bg-white p-5">
-                  <h3 className="text-lg font-bold text-slate-900">
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+                  <h3 className="text-base font-semibold text-slate-900">
                     Activity Log
                   </h3>
                   {activityLoading ? (
@@ -1620,9 +1911,9 @@ export default function TaskDetails() {
               )}
 
               {activeTab === "attachments" && (
-                <div className="space-y-6 pt-4 rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap justify-between items-center gap-4">
-                    <h3 className="text-lg font-bold text-slate-900">
+                    <h3 className="text-base font-semibold text-slate-900">
                       Attachments
                     </h3>
                     <div className="flex items-center gap-3">
@@ -1707,207 +1998,42 @@ export default function TaskDetails() {
               )}
             </div>
 
-            <div className="p-5 sm:p-6 bg-slate-50/60">
-              <div className="space-y-4 lg:sticky lg:top-6">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Task Context
-                  </p>
-                  <div className="space-y-2">
-                    <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-                      Assignee
-                    </label>
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 group">
-                      <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold">
-                        {task.assignee?.full_name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("") || "?"}
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
-                        {task.assignee?.full_name || "Unassigned"}
-                      </span>
-                    </div>
-                  </div>
+            <TaskDetailSidebar
+              assigneeInitials={assigneeInitials}
+              assigneeLabel={assigneeLabel}
+              projectName={task.project.name}
+              sprintName={task.sprint?.name}
+              dueDateLabel={dueDateLabel}
+              issueTypeLabel={issueTypeLabel}
+              taskPriority={task.priority}
+              priorityColors={priorityColors}
+              createdAtLabel={Number.isNaN(createdAtDate.getTime()) ? "Unknown" : createdAtDate.toLocaleString()}
+              updatedAtLabel={Number.isNaN(updatedAtDate.getTime()) ? "Unknown" : updatedAtDate.toLocaleString()}
+              slaLabel={slaLabel}
+              pullRequestsCount={pullRequests.length}
+              commitsCount={commits.length}
+              activityLogsCount={activityLogs.length}
+              completedSubtasks={completedSubtasks}
+              totalSubtasks={task.subtasks?.length || 0}
+              deleteSaving={deleteSaving}
+              onOpenProject={() => navigate(`/projects/${task.project.id}`)}
+              onAddTestCase={navigateToCreateTestCase}
+              onEdit={handleStartEditing}
+              onDelete={handleDeleteTask}
+            />
 
-                  {task.sprint?.name ? (
-                    <div className="space-y-2">
-                      <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-                        Sprint
-                      </label>
-                      <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-2 text-slate-900">
-                        <span className="material-symbols-outlined text-blue-600">
-                          view_kanban
-                        </span>
-                        <span className="text-sm font-semibold">
-                          {task.sprint.name}
-                        </span>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {task.due_date && (
-                    <div className="space-y-2">
-                      <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-                        Due Date
-                      </label>
-                      <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-slate-900">
-                        <span className="material-symbols-outlined text-blue-600">
-                          calendar_today
-                        </span>
-                        <span className="text-sm font-semibold">
-                          {new Date(task.due_date).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-                      Issue Type
-                    </label>
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50">
-                      <span className="material-symbols-outlined text-blue-600">
-                        confirmation_number
-                      </span>
-                      <span className="text-sm font-semibold text-slate-900">
-                        {issueTypeLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-                      Priority
-                    </label>
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50">
-                      <div
-                        className={`w-3 h-3 rounded-full ${priorityColors.bg}`}
-                      ></div>
-                      <span
-                        className={`text-sm font-semibold ${priorityColors.text}`}
-                      >
-                        {task.priority}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Lifecycle
-                  </p>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Created
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
-                      {Number.isNaN(createdAtDate.getTime())
-                        ? "Unknown"
-                        : createdAtDate.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Last Updated
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
-                      {Number.isNaN(updatedAtDate.getTime())
-                        ? "Unknown"
-                        : updatedAtDate.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Delivery Signal
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{slaLabel}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-                    Integration Snapshot
-                  </p>
-                  <div className="space-y-2 text-sm text-slate-700">
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <span>Linked PRs</span>
-                      <span className="font-semibold text-slate-900">{pullRequests.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <span>Related Commits</span>
-                      <span className="font-semibold text-slate-900">{commits.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <span>Activity Entries</span>
-                      <span className="font-semibold text-slate-900">{activityLogs.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <span>Subtasks</span>
-                      <span className="font-semibold text-slate-900">
-                        {completedSubtasks}/{task.subtasks?.length || 0}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-                    Actions
-                  </p>
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={navigateToCreateTestCase}
-                      className="w-full text-slate-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        add_task
-                      </span>
-                      Add Test Case
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleStartEditing}
-                      className="w-full text-slate-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        edit_square
-                      </span>
-                      Update Task
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeleteTask}
-                      disabled={deleteSaving}
-                      className="w-full text-slate-500 hover:text-red-500 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        delete
-                      </span>
-                      {deleteSaving ? "Deleting..." : "Delete Task"}
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div className="border-t border-slate-200 bg-white p-4 md:hidden">
+              <button
+                className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => handleStatusUpdate("Done")}
+                disabled={task.status === "Done"}
+              >
+                {task.status === "Done" ? "Completed" : "Mark as Complete"}
+              </button>
             </div>
           </div>
-
-          <div className="md:hidden p-4 border-t border-slate-200 bg-white">
-            <button
-              className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => handleStatusUpdate("Done")}
-              disabled={task.status === "Done"}
-            >
-              {task.status === "Done" ? "Completed" : "Mark as Complete"}
-            </button>
           </div>
         </div>
-      </div>
       </div>
 
       {/* Link PR Modal */}
@@ -2053,6 +2179,6 @@ export default function TaskDetails() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

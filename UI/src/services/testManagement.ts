@@ -7,7 +7,7 @@ import type {
 } from "../types/testManagement";
 
 export const testPlansAPI = {
-  getPlans: async (params?: { project_id?: string }) => {
+  getPlans: async (params?: { project_id?: string; sprint_id?: string }) => {
     const response = await api.get<{ success: boolean; data: TestPlanRecord[] }>(
       "/api/test-plans",
       { params },
@@ -18,6 +18,7 @@ export const testPlansAPI = {
   createPlan: async (data: {
     name: string;
     project_id: string;
+    sprint_id?: string;
     sprint_name?: string;
     release_name?: string;
     status?: "Draft" | "Active" | "Completed";
@@ -33,7 +34,7 @@ export const testPlansAPI = {
 };
 
 export const testRunsAPI = {
-  getRuns: async (params?: { project_id?: string; plan_id?: string }) => {
+  getRuns: async (params?: { project_id?: string; plan_id?: string; sprint_id?: string }) => {
     const response = await api.get<{ success: boolean; data: TestRunRecord[] }>(
       "/api/test-runs",
       { params },

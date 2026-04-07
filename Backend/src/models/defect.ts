@@ -14,6 +14,7 @@ import {
 import Project from "./project";
 import User from "./user";
 import Task from "./task";
+import Sprint from "./sprint";
 
 export const generateDefectReferenceCode = () => {
   const timePart = Date.now().toString(36).toUpperCase();
@@ -117,6 +118,13 @@ export default class Defect extends Model {
   })
   assignee_id?: string;
 
+  @ForeignKey(() => Sprint)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  sprint_id?: string;
+
   @Column({
     type: DataType.STRING(120),
     allowNull: true,
@@ -187,6 +195,9 @@ export default class Defect extends Model {
 
   @BelongsTo(() => User, "assignee_id")
   assignee?: User;
+
+  @BelongsTo(() => Sprint, "sprint_id")
+  sprint?: Sprint;
 
   @BelongsTo(() => Task, "linked_task_id")
   linked_task?: Task;

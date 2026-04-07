@@ -8,6 +8,7 @@ export interface Defect {
   priority: "Critical" | "High" | "Medium" | "Low";
   status: "Open" | "Approved" | "Rejected" | "In Progress" | "Resolved";
   project_id: string;
+  sprint_id?: string | null;
   sprint_name?: string | null;
   linked_run?: string | null;
   linked_case?: string | null;
@@ -32,6 +33,11 @@ export interface Defect {
     id: string;
     full_name: string;
     email: string;
+  } | null;
+  sprint: {
+    id: string;
+    name: string;
+    status: "Planning" | "Active" | "Completed";
   } | null;
   linked_task: {
     id: string;

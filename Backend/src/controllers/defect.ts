@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { Op } from "sequelize";
-import { Defect, Project, ProjectMember, Task, User } from "../models";
+import { Defect, Project, ProjectMember, Sprint, Task, User } from "../models";
 import { createTask } from "../services/task";
 
 const DEFECT_STATUSES = ["Open", "Approved", "Rejected", "In Progress", "Resolved"] as const;
@@ -35,7 +35,8 @@ const serializeDefect = (defect: any) => ({
   priority: defect.priority,
   status: defect.status,
   project_id: defect.project_id,
-  sprint_name: defect.sprint_name,
+  sprint_id: defect.sprint_id || defect.sprint?.id || null,
+  sprint_name: defect.sprint?.name || defect.sprint_name,
   linked_run: defect.linked_run,
   linked_case: defect.linked_case,
   environment: defect.environment,
@@ -66,6 +67,13 @@ const serializeDefect = (defect: any) => ({
         id: defect.assignee.id,
         full_name: defect.assignee.full_name,
         email: defect.assignee.email,
+      }
+    : null,
+  sprint: defect.sprint
+    ? {
+        id: defect.sprint.id,
+        name: defect.sprint.name,
+        status: defect.sprint.status,
       }
     : null,
   linked_task: defect.linked_task
@@ -137,6 +145,7 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
     const where: any = {};
     if (req.query.project_id) where.project_id = String(req.query.project_id);
     if (req.query.status) where.status = String(req.query.status);
+    if (req.query.sprint_id) where.sprint_id = String(req.query.sprint_id);
 
     const defects = await Defect.findAll({
       where,
@@ -163,6 +172,11 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
           model: User,
           as: "assignee",
           attributes: ["id", "full_name", "email"],
+        },
+        {
+          model: Sprint,
+          as: "sprint",
+          attributes: ["id", "name", "status"],
         },
         {
           model: Task,
@@ -206,6 +220,7 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
 
     const assigneeId = req.body.assignee_id ? String(req.body.assignee_id) : undefined;
     const linkedTaskId = req.body.linked_task_id ? String(req.body.linked_task_id) : undefined;
+    const sprintId = req.body.sprint_id ? String(req.body.sprint_id) : undefined;
 
     if (assigneeId) {
       const assignee = await User.findOne({
@@ -239,6 +254,24 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
       }
     }
 
+    let resolvedSprintName: string | null = req.body.sprint_name ? String(req.body.sprint_name).trim() : null;
+    if (sprintId) {
+      const sprint = await Sprint.findOne({
+        where: {
+          id: sprintId,
+          project_id: projectId,
+        },
+        attributes: ["id", "name"],
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          success: false,
+          message: "Sprint must belong to the selected project",
+        });
+      }
+      resolvedSprintName = sprint.name;
+    }
+
     const defect = await Defect.create({
       title: String(req.body.title || "").trim(),
       description: String(req.body.description || "").trim(),
@@ -252,7 +285,8 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
       linked_task_id: linkedTaskId,
       creator_id: userId,
       assignee_id: assigneeId,
-      sprint_name: req.body.sprint_name ? String(req.body.sprint_name) : null,
+      sprint_id: sprintId,
+      sprint_name: resolvedSprintName,
       linked_run: req.body.linked_run ? String(req.body.linked_run) : null,
       linked_case: req.body.linked_case ? String(req.body.linked_case) : null,
       environment: req.body.environment ? String(req.body.environment) : null,
@@ -272,6 +306,7 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
         { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         { model: Task, as: "created_task", attributes: ["id", "title"] },
       ],
@@ -326,6 +361,7 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
       "description",
       "severity",
       "priority",
+      "sprint_id",
       "sprint_name",
       "linked_run",
       "linked_case",
@@ -376,6 +412,25 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
           message: "Linked task must belong to the selected project",
         });
       }
+    }
+
+    if (updates.sprint_id) {
+      const sprint = await Sprint.findOne({
+        where: {
+          id: updates.sprint_id,
+          project_id: defect.project_id,
+        },
+        attributes: ["id", "name"],
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          success: false,
+          message: "Sprint must belong to the selected project",
+        });
+      }
+      updates.sprint_name = sprint.name;
+    } else if (req.body.sprint_id !== undefined) {
+      updates.sprint_name = req.body.sprint_name ? String(req.body.sprint_name).trim() : null;
     }
 
     await defect.update(updates);

@@ -136,6 +136,7 @@ function AppRoutes() {
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="dashboard"                   element={<Dashboard />} />
           <Route path="tasks"                        element={<Tasks />} />
+          <Route path="task/:id"                     element={<TaskDetails />} />
           <Route path="projects"                     element={<Projects />} />
           <Route path="projects/:id"                 element={<ProjectDetail />} />
           <Route path="calendar"                     element={<Calendar />} />
@@ -169,12 +170,6 @@ function AppRoutes() {
             }
           />
         </Route>
-
-        {/* Task Detail */}
-        <Route
-          path="/task/:id"
-          element={<ProtectedRoute><TaskDetails /></ProtectedRoute>}
-        />
 
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
