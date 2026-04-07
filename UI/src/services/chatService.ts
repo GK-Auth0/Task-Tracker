@@ -90,6 +90,7 @@ export const chatAPI = {
   searchUsers: async (
     q: string,
     limit: number = 20,
+    signal?: AbortSignal,
   ): Promise<{
     success: boolean;
     data: Array<{
@@ -101,6 +102,7 @@ export const chatAPI = {
   }> => {
     const response = await api.get(
       `/api/chat/users/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+      { signal },
     );
     return response.data;
   },

@@ -282,7 +282,6 @@ export class ProjectController {
       const safePage = parseBoundedInt(page, 1, 1, 100000);
       const safeLimit = parseBoundedInt(limit, 10, 1, 100);
       const offset = (safePage - 1) * safeLimit;
-      const whereClause: any = {};
       const userId = req.user?.id;
 
       if (!userId) {
@@ -309,63 +308,34 @@ export class ProjectController {
         });
       }
 
-      // Get projects where user is owner or member
-      const userProjectIds = await ProjectMember.findAll({
-        where: { user_id: userId },
-        attributes: ['project_id']
-      });
-      
-      const memberProjectIds = userProjectIds.map(pm => pm.project_id);
-      
-      // Also include projects owned by the user
-      const ownedProjects = await Project.findAll({
-        where: { owner_id: userId },
-        include: [
-          {
-            model: User,
-            as: "owner",
-            attributes: ["id", "organization_id"],
-            where: { organization_id: requester.organization_id },
-          },
-        ],
-        attributes: ['id']
-      });
-      
-      const ownedProjectIds = ownedProjects.map(p => p.id);
-      const allProjectIds = [...new Set([...memberProjectIds, ...ownedProjectIds])];
-      
-      if (allProjectIds.length > 0) {
-        whereClause.id = { [Op.in]: allProjectIds };
-      } else {
-        // User has no projects, return empty result
-        return res.json({
-          success: true,
-          data: [],
-          pagination: {
-            page: safePage,
-            limit: safeLimit,
-            total: 0,
-            totalPages: 0
-          }
+      const filters: any[] = [
+        {
+          [Op.or]: [
+            { owner_id: userId },
+            { "$members.user_id$": userId },
+          ],
+        },
+      ];
+
+      if (status) {
+        filters.push({ status });
+      }
+      if (priority) {
+        filters.push({ priority });
+      }
+      if (ownerId) {
+        filters.push({ owner_id: ownerId });
+      }
+      if (search) {
+        filters.push({
+          [Op.or]: [
+            { name: { [Op.iLike]: `%${search}%` } },
+            { description: { [Op.iLike]: `%${search}%` } },
+          ],
         });
       }
 
-      // Add filters
-      if (status) {
-        whereClause.status = status;
-      }
-      if (priority) {
-        whereClause.priority = priority;
-      }
-      if (ownerId) {
-        whereClause.ownerId = ownerId;
-      }
-      if (search) {
-        whereClause[Op.or] = [
-          { name: { [Op.iLike]: `%${search}%` } },
-          { description: { [Op.iLike]: `%${search}%` } }
-        ];
-      }
+      const whereClause = { [Op.and]: filters };
 
       const { count, rows: projects } = await Project.findAndCountAll({
         where: whereClause,
@@ -375,10 +345,19 @@ export class ProjectController {
             as: 'owner',
             attributes: ['id', 'full_name', 'email', 'avatar_url'],
             where: { organization_id: requester.organization_id },
-          }
+          },
+          {
+            model: ProjectMember,
+            as: "members",
+            attributes: [],
+            where: { user_id: userId },
+            required: false,
+          },
         ],
         limit: safeLimit,
         offset,
+        distinct: true,
+        subQuery: false,
         order: [['updated_at', 'DESC']]
       });
 

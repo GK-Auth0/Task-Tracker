@@ -141,21 +141,24 @@ export default function Settings() {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const loadUserOptions = async () => {
       try {
         setUserSearchLoading(true);
-        const response = await projectService.getProjectUsers(query);
-        if (!cancelled) {
+        const response = await projectService.getProjectUsers(
+          query,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
           setUserOptions(response.success ? response.data || [] : []);
         }
       } catch {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setUserOptions([]);
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setUserSearchLoading(false);
         }
       }
@@ -164,7 +167,7 @@ export default function Settings() {
     loadUserOptions();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [canManageProjectAccess, debouncedUserSearch]);
 

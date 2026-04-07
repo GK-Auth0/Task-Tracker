@@ -59,6 +59,15 @@ export const addUsersToChatGroup = async (groupId: string, userIds: string[]) =>
   );
 };
 
+export const isUserInChatGroup = async (groupId: string, userId: string) => {
+  const member = await ChatGroupMember.findOne({
+    where: { group_id: groupId, user_id: userId },
+    attributes: ["group_id"],
+  });
+
+  return Boolean(member);
+};
+
 export const getChatGroups = async (userId: string) => {
   const memberGroups = await ChatGroupMember.findAll({
     where: { user_id: userId },
@@ -89,41 +98,35 @@ export const getChatGroups = async (userId: string) => {
     ],
   });
   
-  // Get member counts and format response
-  const groupsWithCounts = await Promise.all(
-    memberGroups.map(async (memberGroup) => {
-      const group = memberGroup.group;
-      if (!group) return null;
-      const memberCount = await ChatGroupMember.count({
-        where: { group_id: group.id },
-      });
+  const groupsWithCounts = memberGroups.map((memberGroup) => {
+    const group = memberGroup.group;
+    if (!group) return null;
 
-      const groupJson: any = group.toJSON();
-      const members = Array.isArray(groupJson.members) ? groupJson.members : [];
-      let displayName = groupJson.name;
-      const directKey = String(groupJson.description || "");
-      const isDirect = directKey.startsWith("direct:");
+    const groupJson: any = group.toJSON();
+    const members = Array.isArray(groupJson.members) ? groupJson.members : [];
+    let displayName = groupJson.name;
+    const directKey = String(groupJson.description || "");
+    const isDirect = directKey.startsWith("direct:");
 
-      if (isDirect) {
-        const otherMember = members.find((m: any) => m?.user?.id !== userId);
-        if (otherMember?.user?.full_name) {
-          displayName = otherMember.user.full_name;
-        }
+    if (isDirect) {
+      const otherMember = members.find((m: any) => m?.user?.id !== userId);
+      if (otherMember?.user?.full_name) {
+        displayName = otherMember.user.full_name;
       }
-      
-      return {
-        ...groupJson,
-        name: displayName,
-        is_direct: isDirect,
-        members: members.map((m: any) => ({
-          id: m?.user?.id,
-          full_name: m?.user?.full_name,
-          email: m?.user?.email,
-        })),
-        memberCount,
-      };
-    }),
-  );
+    }
+    
+    return {
+      ...groupJson,
+      name: displayName,
+      is_direct: isDirect,
+      members: members.map((m: any) => ({
+        id: m?.user?.id,
+        full_name: m?.user?.full_name,
+        email: m?.user?.email,
+      })),
+      memberCount: members.length,
+    };
+  });
   
   return (groupsWithCounts.filter(Boolean) as NonNullable<typeof groupsWithCounts[number]>[])
     .sort(

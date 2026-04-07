@@ -92,6 +92,7 @@ export const projectService = {
 
   getProjectUsers: async (
     search?: string,
+    signal?: AbortSignal,
   ): Promise<{
     success: boolean;
     data: Array<{
@@ -104,6 +105,7 @@ export const projectService = {
   }> => {
     const response = await api.get("/projects/users", {
       params: { search },
+      signal,
     });
     return response.data;
   },

@@ -4,13 +4,14 @@ import net from "net";
 import jwt from "jsonwebtoken";
 import { Duplex } from "stream";
 import { URL } from "url";
-import ChatGroupMember from "../models/chatGroupMember";
 import { appConfig } from "../config";
+import { isUserInChatGroup } from "../services/chat";
 
 type WebSocketClient = {
   socket: net.Socket;
   userId: string;
   subscribedGroups: Set<string>;
+  authorizedGroups: Set<string>;
 };
 
 const clients = new Set<WebSocketClient>();
@@ -110,10 +111,16 @@ const handleMessage = async (client: WebSocketClient, rawMessage: string) => {
   try {
     const parsed = JSON.parse(rawMessage) as { type?: string; groupId?: string };
     if (parsed.type === "subscribe" && parsed.groupId) {
-      const membershipCount = await ChatGroupMember.count({
-        where: { group_id: parsed.groupId, user_id: client.userId },
-      });
-      if (membershipCount === 0) {
+      if (!client.authorizedGroups.has(parsed.groupId)) {
+        const isMember = await isUserInChatGroup(parsed.groupId, client.userId);
+        if (!isMember) {
+          sendSystem(client, "Access denied for this chat group");
+          return;
+        }
+        client.authorizedGroups.add(parsed.groupId);
+      }
+
+      if (!client.authorizedGroups.has(parsed.groupId)) {
         sendSystem(client, "Access denied for this chat group");
         return;
       }
@@ -216,6 +223,7 @@ export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
     socket: socket as net.Socket,
     userId,
     subscribedGroups: new Set<string>(),
+    authorizedGroups: new Set<string>(),
   };
 
   clients.add(client);

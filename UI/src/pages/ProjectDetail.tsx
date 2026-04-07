@@ -116,21 +116,24 @@ const ProjectDetail: React.FC = () => {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const searchUsers = async () => {
       try {
         setSearchingUsers(true);
-        const response = await projectService.getProjectUsers(keyword);
-        if (!cancelled) {
+        const response = await projectService.getProjectUsers(
+          keyword,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
           setSearchedUsers(response.success ? response.data || [] : []);
         }
       } catch {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setSearchedUsers([]);
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setSearchingUsers(false);
         }
       }
@@ -139,7 +142,7 @@ const ProjectDetail: React.FC = () => {
     searchUsers();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [debouncedManagementSearch]);
 
@@ -151,21 +154,24 @@ const ProjectDetail: React.FC = () => {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const searchConfigUsers = async () => {
       try {
         setConfigSearchLoading(true);
-        const response = await projectService.getProjectUsers(keyword);
-        if (!cancelled) {
+        const response = await projectService.getProjectUsers(
+          keyword,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
           setConfigUserOptions(response.success ? response.data || [] : []);
         }
       } catch {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setConfigUserOptions([]);
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setConfigSearchLoading(false);
         }
       }
@@ -174,7 +180,7 @@ const ProjectDetail: React.FC = () => {
     searchConfigUsers();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [debouncedConfigSearch]);
 

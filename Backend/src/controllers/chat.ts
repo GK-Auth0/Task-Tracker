@@ -8,8 +8,8 @@ import {
   searchChatUsers,
   getOrCreateDirectGroup,
   addUsersToChatGroup,
+  isUserInChatGroup,
 } from "../services/chat";
-import ChatGroupMember from "../models/chatGroupMember";
 import { broadcastChatMessage } from "../realtime/chatSocket";
 import cloudinary from "../config/cloudinary";
 import { parseBoundedInt } from "../helpers/query";
@@ -145,10 +145,8 @@ export const getMessages = async (req: Request, res: Response) => {
       });
     }
 
-    const membershipCount = await ChatGroupMember.count({
-      where: { group_id: groupId, user_id: userId },
-    });
-    if (membershipCount === 0) {
+    const isMember = await isUserInChatGroup(groupId, userId);
+    if (!isMember) {
       return res.status(403).json({
         success: false,
         message: "Access denied to this chat group",
@@ -252,10 +250,8 @@ export const sendMessage = async (req: Request, res: Response) => {
       });
     }
 
-    const membershipCount = await ChatGroupMember.count({
-      where: { group_id: groupId, user_id: userId },
-    });
-    if (membershipCount === 0) {
+    const isMember = await isUserInChatGroup(groupId, userId);
+    if (!isMember) {
       return res.status(403).json({
         success: false,
         message: "Access denied to this chat group",
@@ -329,10 +325,8 @@ export const uploadAttachment = async (req: Request, res: Response) => {
       });
     }
 
-    const membershipCount = await ChatGroupMember.count({
-      where: { group_id: groupId, user_id: userId },
-    });
-    if (membershipCount === 0) {
+    const isMember = await isUserInChatGroup(groupId, userId);
+    if (!isMember) {
       return res.status(403).json({
         success: false,
         message: "Access denied to this chat group",
