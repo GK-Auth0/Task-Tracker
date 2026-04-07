@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { appConfig } from "../config";
+import { appConfig } from "../config/app";
 
 const ENCRYPTION_PREFIX = "enc:v1:";
 const ALGORITHM = "aes-256-gcm";
