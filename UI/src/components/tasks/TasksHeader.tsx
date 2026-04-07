@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { DashboardSummary } from "./types";
 
 interface TasksHeaderProps {
@@ -39,4 +39,4 @@ const TasksHeader: React.FC<TasksHeaderProps> = ({
   );
 };
 
-export default TasksHeader;
+export default memo(TasksHeader);

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { ProjectStatus } from "../../enums";
 
 type ProjectStatusFilter = "all" | ProjectStatus;
@@ -89,4 +89,4 @@ const ProjectsFilters: React.FC<ProjectsFiltersProps> = ({
   );
 };
 
-export default ProjectsFilters;
+export default memo(ProjectsFilters);

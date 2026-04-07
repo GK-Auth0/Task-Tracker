@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { projectService } from "../services/projectService";
 import { tasksAPI } from "../services/dashboard";
@@ -36,21 +36,7 @@ const Projects: React.FC = () => {
   const [savingView, setSavingView] = useState(false);
   const canCreateProject = canManageWorkspaceContent(user?.role);
 
-  useEffect(() => {
-    fetchProjects();
-    fetchInsights();
-    fetchPinnedProjects();
-    fetchSavedViews();
-  }, []);
-
-  useEffect(() => {
-    const query = searchParams.get("q");
-    if (query !== null) {
-      setSearchTerm(query);
-    }
-  }, [searchParams]);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
       const response = await projectService.getProjects();
@@ -66,9 +52,9 @@ const Projects: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchInsights = async () => {
+  const fetchInsights = useCallback(async () => {
     try {
       setInsightsLoading(true);
       setInsightsError("");
@@ -86,27 +72,41 @@ const Projects: React.FC = () => {
     } finally {
       setInsightsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchPinnedProjects = async () => {
+  const fetchPinnedProjects = useCallback(async () => {
     try {
       const pins = await preferencesAPI.getPins("project");
       setPinnedProjectIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
     } catch (error) {
       console.error("Failed to load pinned projects:", error);
     }
-  };
+  }, []);
 
-  const fetchSavedViews = async () => {
+  const fetchSavedViews = useCallback(async () => {
     try {
       const views = await preferencesAPI.getSavedViews("projects");
       setSavedViews(views);
     } catch (error) {
       console.error("Failed to load saved views:", error);
     }
-  };
+  }, []);
 
-  const handleCreateProject = async (projectData: CreateProjectRequest) => {
+  useEffect(() => {
+    fetchProjects();
+    fetchInsights();
+    fetchPinnedProjects();
+    fetchSavedViews();
+  }, [fetchInsights, fetchPinnedProjects, fetchProjects, fetchSavedViews]);
+
+  useEffect(() => {
+    const query = searchParams.get("q");
+    if (query !== null) {
+      setSearchTerm(query);
+    }
+  }, [searchParams]);
+
+  const handleCreateProject = useCallback(async (projectData: CreateProjectRequest) => {
     if (!canCreateProject) return null;
     try {
       const response = await projectService.createProject(projectData);
@@ -127,7 +127,7 @@ const Projects: React.FC = () => {
         error.response?.data?.message || error.message || "Unknown error";
       throw new Error(errorMessage);
     }
-  };
+  }, [canCreateProject, fetchProjects]);
 
   const filteredProjects = projects.filter((project) => {
     const projectName = String(project?.name ?? "");
@@ -143,7 +143,7 @@ const Projects: React.FC = () => {
     return matchesSearch && matchesStatus && matchesPinned;
   });
 
-  const handleToggleProjectPin = async (projectId: string, shouldPin: boolean) => {
+  const handleToggleProjectPin = useCallback(async (projectId: string, shouldPin: boolean) => {
     try {
       if (shouldPin) {
         await preferencesAPI.addPin("project", projectId);
@@ -163,9 +163,9 @@ const Projects: React.FC = () => {
     } catch (error) {
       console.error("Failed to update project pin:", error);
     }
-  };
+  }, []);
 
-  const applySavedView = () => {
+  const applySavedView = useCallback(() => {
     if (!selectedViewId) return;
     const view = savedViews.find((item) => item.id === selectedViewId);
     if (!view) return;
@@ -183,9 +183,9 @@ const Projects: React.FC = () => {
       setStatusFilter(status as ProjectStatusFilter);
     }
     setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
-  };
+  }, [savedViews, selectedViewId]);
 
-  const saveCurrentView = async () => {
+  const saveCurrentView = useCallback(async () => {
     if (!newViewName.trim()) return;
     try {
       setSavingView(true);
@@ -205,9 +205,9 @@ const Projects: React.FC = () => {
     } finally {
       setSavingView(false);
     }
-  };
+  }, [fetchSavedViews, newViewName, searchTerm, showPinnedOnly, statusFilter]);
 
-  const deleteSelectedView = async () => {
+  const deleteSelectedView = useCallback(async () => {
     if (!selectedViewId) return;
     try {
       await preferencesAPI.deleteSavedView(selectedViewId);
@@ -216,7 +216,19 @@ const Projects: React.FC = () => {
     } catch (error) {
       console.error("Failed to delete saved project view:", error);
     }
-  };
+  }, [fetchSavedViews, selectedViewId]);
+
+  const handleOpenCreateProject = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
+
+  const handleCloseCreateProject = useCallback(() => {
+    setShowCreateModal(false);
+  }, []);
+
+  const handleTogglePinnedOnly = useCallback(() => {
+    setShowPinnedOnly((previous) => !previous);
+  }, []);
 
   if (loading) {
     return (
@@ -230,7 +242,7 @@ const Projects: React.FC = () => {
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="min-h-full p-8">
         <ProjectsHeader
-          onCreate={() => setShowCreateModal(true)}
+          onCreate={handleOpenCreateProject}
           canCreate={canCreateProject}
         />
 
@@ -253,7 +265,7 @@ const Projects: React.FC = () => {
           showPinnedOnly={showPinnedOnly}
           onSearchChange={setSearchTerm}
           onStatusChange={setStatusFilter}
-          onTogglePinnedOnly={() => setShowPinnedOnly((previous) => !previous)}
+          onTogglePinnedOnly={handleTogglePinnedOnly}
         />
 
         <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
@@ -325,7 +337,7 @@ const Projects: React.FC = () => {
 
         <ProjectsGrid
           projects={filteredProjects}
-          onCreate={() => setShowCreateModal(true)}
+          onCreate={handleOpenCreateProject}
           pinnedProjectIds={pinnedProjectIds}
           onProjectPinToggle={handleToggleProjectPin}
           canCreate={canCreateProject}
@@ -337,7 +349,7 @@ const Projects: React.FC = () => {
       {/* Create Project Modal */}
       {canCreateProject && showCreateModal && (
         <CreateProjectModal
-          onClose={() => setShowCreateModal(false)}
+          onClose={handleCloseCreateProject}
           onSubmit={handleCreateProject}
         />
       )}

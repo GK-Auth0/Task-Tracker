@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { dashboardAPI, tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
@@ -55,24 +55,7 @@ export default function Tasks() {
   const itemsPerPage = 12;
   const canCreateTask = canManageWorkspaceContent(user?.role);
 
-  useEffect(() => {
-    fetchData();
-  }, [filter, priorityFilter, statusFilter, currentPage]);
-
-  useEffect(() => {
-    fetchPinnedTasks();
-    fetchSavedViews();
-  }, []);
-
-  useEffect(() => {
-    const query = searchParams.get("q");
-    if (query !== null) {
-      setSearchTerm(query);
-      setCurrentPage(1);
-    }
-  }, [searchParams]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const filters: any = {
         page: currentPage,
@@ -95,31 +78,48 @@ export default function Tasks() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, filter, itemsPerPage, priorityFilter, statusFilter]);
 
-  const handleTaskCreated = () => {
-    fetchData();
-  };
-
-  const fetchPinnedTasks = async () => {
+  const fetchPinnedTasks = useCallback(async () => {
     try {
       const pins = await preferencesAPI.getPins("task");
       setPinnedTaskIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
     } catch (error) {
       console.error("Failed to load pinned tasks:", error);
     }
-  };
+  }, []);
 
-  const fetchSavedViews = async () => {
+  const fetchSavedViews = useCallback(async () => {
     try {
       const views = await preferencesAPI.getSavedViews("tasks");
       setSavedViews(views);
     } catch (error) {
       console.error("Failed to load saved views:", error);
     }
-  };
+  }, []);
 
-  const handleTaskToggle = async (taskId: string, completed: boolean) => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchPinnedTasks();
+    fetchSavedViews();
+  }, [fetchPinnedTasks, fetchSavedViews]);
+
+  useEffect(() => {
+    const query = searchParams.get("q");
+    if (query !== null) {
+      setSearchTerm(query);
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+
+  const handleTaskCreated = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleTaskToggle = useCallback(async (taskId: string, completed: boolean) => {
     if (!canCreateTask) return;
     try {
       await tasksAPI.updateTask(taskId, {
@@ -129,7 +129,7 @@ export default function Tasks() {
     } catch (error) {
       console.error("Failed to update task:", error);
     }
-  };
+  }, [canCreateTask, fetchData]);
 
   const visibleTasks = tasks
     .filter((task) =>
@@ -199,7 +199,7 @@ export default function Tasks() {
     ? Math.round((doneVisible / sortedTasks.length) * 100)
     : 0;
 
-  const handleToggleTaskPin = async (taskId: string, shouldPin: boolean) => {
+  const handleToggleTaskPin = useCallback(async (taskId: string, shouldPin: boolean) => {
     try {
       if (shouldPin) {
         await preferencesAPI.addPin("task", taskId);
@@ -219,9 +219,9 @@ export default function Tasks() {
     } catch (error) {
       console.error("Failed to update task pin:", error);
     }
-  };
+  }, []);
 
-  const applySavedView = () => {
+  const applySavedView = useCallback(() => {
     if (!selectedViewId) return;
     const view = savedViews.find((item) => item.id === selectedViewId);
     if (!view) return;
@@ -238,9 +238,9 @@ export default function Tasks() {
     setSortBy(String(filters.sortBy ?? "recent") as TaskSortOption);
     setGroupBy(String(filters.groupBy ?? "none") as TaskGroupOption);
     setCurrentPage(1);
-  };
+  }, [savedViews, selectedViewId]);
 
-  const saveCurrentView = async () => {
+  const saveCurrentView = useCallback(async () => {
     if (!newViewName.trim()) return;
     try {
       setSavingView(true);
@@ -266,9 +266,21 @@ export default function Tasks() {
     } finally {
       setSavingView(false);
     }
-  };
+  }, [
+    compactMode,
+    fetchSavedViews,
+    filter,
+    groupBy,
+    newViewName,
+    priorityFilter,
+    searchTerm,
+    showCompleted,
+    showPinnedOnly,
+    sortBy,
+    statusFilter,
+  ]);
 
-  const deleteSelectedView = async () => {
+  const deleteSelectedView = useCallback(async () => {
     if (!selectedViewId) return;
     try {
       await preferencesAPI.deleteSavedView(selectedViewId);
@@ -277,9 +289,9 @@ export default function Tasks() {
     } catch (error) {
       console.error("Failed to delete saved view:", error);
     }
-  };
+  }, [fetchSavedViews, selectedViewId]);
 
-  const buildDailyPlan = async () => {
+  const buildDailyPlan = useCallback(async () => {
     if (!canCreateTask) return;
     try {
       setPlanning(true);
@@ -299,7 +311,37 @@ export default function Tasks() {
     } finally {
       setPlanning(false);
     }
-  };
+  }, [canCreateTask, visibleTasks]);
+
+  const handleCreateTask = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
+
+  const handlePriorityFilterChange = useCallback((value: string) => {
+    setPriorityFilter(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleStatusFilterChange = useCallback((value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleClearAllFilters = useCallback(() => {
+    setFilter("");
+    setPriorityFilter("");
+    setStatusFilter("");
+    setSearchTerm("");
+    setShowCompleted(true);
+    setCompactMode(false);
+    setSortBy("recent");
+    setGroupBy("none");
+    setCurrentPage(1);
+  }, []);
+
+  const handleTaskClick = useCallback((taskId: string) => {
+    navigate(`/task/${taskId}`);
+  }, [navigate]);
 
   if (loading) {
     return (
@@ -315,7 +357,7 @@ export default function Tasks() {
         <TasksHeader
           summary={summary}
           visibleCount={sortedTasks.length}
-          onCreate={() => setShowCreateModal(true)}
+          onCreate={handleCreateTask}
           canCreate={canCreateTask}
         />
 
@@ -329,30 +371,14 @@ export default function Tasks() {
           sortBy={sortBy}
           groupBy={groupBy}
           onFilterChange={setFilter}
-          onPriorityFilterChange={(value) => {
-            setPriorityFilter(value);
-            setCurrentPage(1);
-          }}
-          onStatusFilterChange={(value) => {
-            setStatusFilter(value);
-            setCurrentPage(1);
-          }}
+          onPriorityFilterChange={handlePriorityFilterChange}
+          onStatusFilterChange={handleStatusFilterChange}
           onSearchChange={setSearchTerm}
           onShowCompletedChange={setShowCompleted}
           onCompactModeChange={setCompactMode}
           onSortByChange={setSortBy}
           onGroupByChange={setGroupBy}
-          onClearAll={() => {
-            setFilter("");
-            setPriorityFilter("");
-            setStatusFilter("");
-            setSearchTerm("");
-            setShowCompleted(true);
-            setCompactMode(false);
-            setSortBy("recent");
-            setGroupBy("none");
-            setCurrentPage(1);
-          }}
+          onClearAll={handleClearAllFilters}
         />
 
         <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
@@ -498,9 +524,9 @@ export default function Tasks() {
             pagination={pagination}
             currentPage={currentPage}
             itemsPerPage={itemsPerPage}
-            onCreateTask={() => setShowCreateModal(true)}
+            onCreateTask={handleCreateTask}
             onTaskToggle={handleTaskToggle}
-            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
+            onTaskClick={handleTaskClick}
             onTaskPinToggle={handleToggleTaskPin}
             onPageChange={setCurrentPage}
           />
@@ -509,14 +535,14 @@ export default function Tasks() {
         {activeTab === "board" && (
           <TasksBoardTab
             tasks={sortedTasks}
-            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
+            onTaskClick={handleTaskClick}
           />
         )}
 
         {activeTab === "timeline" && (
           <TasksTimelineTab
             tasks={sortedTasks}
-            onTaskClick={(taskId) => navigate(`/task/${taskId}`)}
+            onTaskClick={handleTaskClick}
           />
         )}
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import ProjectCard from "../ProjectCard";
 import { Project } from "../../types/project";
 
@@ -41,4 +41,4 @@ const ProjectsGrid: React.FC<ProjectsGridProps> = ({
   );
 };
 
-export default ProjectsGrid;
+export default memo(ProjectsGrid);

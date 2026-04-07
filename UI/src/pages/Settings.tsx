@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { projectService } from "../services/projectService";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import type {
   ProjectConfidentialAccessConfig,
   ProjectConfidentialAccessProjectSummary,
@@ -43,6 +44,7 @@ export default function Settings() {
   const [userSearch, setUserSearch] = useState("");
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [userOptions, setUserOptions] = useState<SearchUser[]>([]);
+  const debouncedUserSearch = useDebouncedValue(userSearch, 300);
 
   useEffect(() => {
     if (!canManageProjectAccess) return;
@@ -129,22 +131,48 @@ export default function Settings() {
     }));
   };
 
-  const handleUserSearch = async (value: string) => {
-    setUserSearch(value);
-    const query = value.trim();
+  useEffect(() => {
+    if (!canManageProjectAccess) return;
+
+    const query = debouncedUserSearch.trim();
     if (!query) {
       setUserOptions([]);
+      setUserSearchLoading(false);
       return;
     }
 
-    try {
-      setUserSearchLoading(true);
-      const response = await projectService.getProjectUsers(query);
-      setUserOptions(response.success ? response.data || [] : []);
-    } catch {
-      setUserOptions([]);
-    } finally {
+    let cancelled = false;
+
+    const loadUserOptions = async () => {
+      try {
+        setUserSearchLoading(true);
+        const response = await projectService.getProjectUsers(query);
+        if (!cancelled) {
+          setUserOptions(response.success ? response.data || [] : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setUserOptions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setUserSearchLoading(false);
+        }
+      }
+    };
+
+    loadUserOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageProjectAccess, debouncedUserSearch]);
+
+  const handleUserSearch = (value: string) => {
+    setUserSearch(value);
+    if (!value.trim()) {
       setUserSearchLoading(false);
+      setUserOptions([]);
     }
   };
 

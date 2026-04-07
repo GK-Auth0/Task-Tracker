@@ -1,5 +1,4 @@
-import React from "react";
-import { useState } from "react";
+import React, { memo, useState } from "react";
 
 interface SavedViewOption {
   id: string;
@@ -99,4 +98,4 @@ const SavedViewsBar: React.FC<SavedViewsBarProps> = ({
   );
 };
 
-export default SavedViewsBar;
+export default memo(SavedViewsBar);

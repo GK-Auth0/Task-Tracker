@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { TaskGroupOption, TaskSortOption } from "./types";
 
 interface TasksFiltersBarProps {
@@ -207,4 +207,4 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
   );
 };
 
-export default TasksFiltersBar;
+export default memo(TasksFiltersBar);

@@ -13,6 +13,7 @@ import { projectsAPI, ActivityLog } from "../services/dashboard";
 import { projectService } from "../services/projectService";
 import { taskService } from "../services/taskService";
 import { sprintsAPI } from "../services/sprints";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { Project, ProjectConfidentialAccessConfig } from "../types/project";
 import { isWorkspaceAdmin } from "../types/roles";
 import { Task } from "../types/task";
@@ -77,6 +78,9 @@ const ProjectDetail: React.FC = () => {
   const [managementMessage, setManagementMessage] = useState<string>("");
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [showConfidentialPanel, setShowConfidentialPanel] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const debouncedManagementSearch = useDebouncedValue(memberSearchQuery, 300);
+  const debouncedConfigSearch = useDebouncedValue(configSearch, 300);
 
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [offset, setOffset] = useState(0);
@@ -103,6 +107,76 @@ const ProjectDetail: React.FC = () => {
       setActiveTab("tasks");
     }
   }, [project, activeTab]);
+
+  useEffect(() => {
+    const keyword = debouncedManagementSearch.trim();
+    if (!keyword) {
+      setSearchedUsers([]);
+      setSearchingUsers(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const searchUsers = async () => {
+      try {
+        setSearchingUsers(true);
+        const response = await projectService.getProjectUsers(keyword);
+        if (!cancelled) {
+          setSearchedUsers(response.success ? response.data || [] : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setSearchedUsers([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchingUsers(false);
+        }
+      }
+    };
+
+    searchUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedManagementSearch]);
+
+  useEffect(() => {
+    const keyword = debouncedConfigSearch.trim();
+    if (!keyword) {
+      setConfigUserOptions([]);
+      setConfigSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const searchConfigUsers = async () => {
+      try {
+        setConfigSearchLoading(true);
+        const response = await projectService.getProjectUsers(keyword);
+        if (!cancelled) {
+          setConfigUserOptions(response.success ? response.data || [] : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setConfigUserOptions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setConfigSearchLoading(false);
+        }
+      }
+    };
+
+    searchConfigUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedConfigSearch]);
 
   useEffect(() => {
     if (!id || !project) return;
@@ -383,39 +457,18 @@ const ProjectDetail: React.FC = () => {
     setActiveTab(tab);
   };
 
-  const handleSearchUsers = async (query: string) => {
-    const keyword = query.trim();
-    if (!keyword) {
+  const handleSearchUsers = (query: string) => {
+    setMemberSearchQuery(query);
+    if (!query.trim()) {
       setSearchedUsers([]);
-      return;
-    }
-
-    try {
-      setSearchingUsers(true);
-      const response = await projectService.getProjectUsers(keyword);
-      setSearchedUsers(response.success ? response.data || [] : []);
-    } catch {
-      setSearchedUsers([]);
-    } finally {
       setSearchingUsers(false);
     }
   };
 
-  const handleConfigSearch = async (query: string) => {
+  const handleConfigSearch = (query: string) => {
     setConfigSearch(query);
-    const keyword = query.trim();
-    if (!keyword) {
+    if (!query.trim()) {
       setConfigUserOptions([]);
-      return;
-    }
-
-    try {
-      setConfigSearchLoading(true);
-      const response = await projectService.getProjectUsers(keyword);
-      setConfigUserOptions(response.success ? response.data || [] : []);
-    } catch {
-      setConfigUserOptions([]);
-    } finally {
       setConfigSearchLoading(false);
     }
   };
