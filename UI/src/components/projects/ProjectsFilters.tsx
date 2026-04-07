@@ -2,14 +2,17 @@ import React, { memo } from "react";
 import { ProjectStatus } from "../../enums";
 
 type ProjectStatusFilter = "all" | ProjectStatus;
+type ViewMode = "table" | "grid";
 
 interface ProjectsFiltersProps {
   searchTerm: string;
   statusFilter: ProjectStatusFilter;
   showPinnedOnly: boolean;
+  viewMode?: ViewMode;
   onSearchChange: (value: string) => void;
   onStatusChange: (status: ProjectStatusFilter) => void;
   onTogglePinnedOnly: () => void;
+  onViewModeChange?: (value: ViewMode) => void;
 }
 
 const STATUS_FILTERS: ProjectStatusFilter[] = [
@@ -35,9 +38,11 @@ const ProjectsFilters: React.FC<ProjectsFiltersProps> = ({
   searchTerm,
   statusFilter,
   showPinnedOnly,
+  viewMode = "grid",
   onSearchChange,
   onStatusChange,
   onTogglePinnedOnly,
+  onViewModeChange,
 }) => {
   return (
     <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -72,7 +77,7 @@ const ProjectsFilters: React.FC<ProjectsFiltersProps> = ({
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           className={`h-10 rounded-lg border px-3 text-sm font-semibold whitespace-nowrap ${
@@ -84,9 +89,38 @@ const ProjectsFilters: React.FC<ProjectsFiltersProps> = ({
         >
           {showPinnedOnly ? "Showing Pinned Projects" : "Show Pinned Projects Only"}
         </button>
+
+        {/* View Mode Toggle - Desktop Only */}
+        {onViewModeChange && (
+          <div className="hidden lg:flex items-center border border-slate-200 rounded-lg bg-white">
+            <button
+              onClick={() => onViewModeChange("table")}
+              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-l-lg transition-colors ${
+                viewMode === "table"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+              title="Table view"
+            >
+              <span className="material-symbols-outlined text-sm">table_rows</span>
+            </button>
+            <button
+              onClick={() => onViewModeChange("grid")}
+              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-r-lg transition-colors ${
+                viewMode === "grid"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+              title="Grid view"
+            >
+              <span className="material-symbols-outlined text-sm">grid_view</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
+export type { ViewMode };
 export default memo(ProjectsFilters);

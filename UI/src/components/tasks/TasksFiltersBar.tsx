@@ -1,6 +1,8 @@
 import React, { memo } from "react";
 import { TaskGroupOption, TaskSortOption } from "./types";
 
+type ViewMode = "table" | "grid";
+
 interface TasksFiltersBarProps {
   filter: string;
   priorityFilter: string;
@@ -10,6 +12,7 @@ interface TasksFiltersBarProps {
   compactMode: boolean;
   sortBy: TaskSortOption;
   groupBy: TaskGroupOption;
+  viewMode?: ViewMode;
   onFilterChange: (value: string) => void;
   onPriorityFilterChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
@@ -18,6 +21,7 @@ interface TasksFiltersBarProps {
   onCompactModeChange: (value: boolean) => void;
   onSortByChange: (value: TaskSortOption) => void;
   onGroupByChange: (value: TaskGroupOption) => void;
+  onViewModeChange?: (value: ViewMode) => void;
   onClearAll: () => void;
 }
 
@@ -30,6 +34,7 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
   compactMode,
   sortBy,
   groupBy,
+  viewMode = "table",
   onFilterChange,
   onPriorityFilterChange,
   onStatusFilterChange,
@@ -38,6 +43,7 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
   onCompactModeChange,
   onSortByChange,
   onGroupByChange,
+  onViewModeChange,
   onClearAll,
 }) => {
   const activeFiltersCount =
@@ -50,42 +56,28 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
     Number(groupBy !== "none");
 
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-          Task Controls
-        </span>
-        <button
-          className="text-blue-700 text-xs font-bold hover:underline"
-          onClick={onClearAll}
-        >
-          Reset View
-          {activeFiltersCount > 0 && (
-            <span className="ml-1 text-[10px] text-slate-500">
-              ({activeFiltersCount})
-            </span>
-          )}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        <div className="relative lg:col-span-4">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">
+    <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      {/* Single row with all controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
             search
           </span>
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search task title..."
-            className="h-10 w-full rounded-xl bg-white border border-slate-200 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+            placeholder="Search tasks..."
+            className="h-8 w-full rounded-lg bg-white border border-slate-200 pl-9 pr-3 text-xs outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
+        {/* Dropdowns */}
         <select
           value={priorityFilter}
           onChange={(e) => onPriorityFilterChange(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:col-span-2"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
         >
           <option value="">All Priorities</option>
           <option value="High">High</option>
@@ -96,7 +88,7 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
         <select
           value={statusFilter}
           onChange={(e) => onStatusFilterChange(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:col-span-2"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
         >
           <option value="">All Status</option>
           <option value="To Do">To Do</option>
@@ -107,104 +99,94 @@ const TasksFiltersBar: React.FC<TasksFiltersBarProps> = ({
         <select
           value={sortBy}
           onChange={(e) => onSortByChange(e.target.value as TaskSortOption)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:col-span-2"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
         >
-          <option value="recent">Sort: Recently Added</option>
-          <option value="due_asc">Sort: Due Soonest</option>
-          <option value="due_desc">Sort: Due Latest</option>
-          <option value="priority_desc">Sort: Priority High-Low</option>
-          <option value="priority_asc">Sort: Priority Low-High</option>
-          <option value="title_asc">Sort: Title A-Z</option>
+          <option value="recent">Recently Added</option>
+          <option value="due_asc">Due Soonest</option>
+          <option value="due_desc">Due Latest</option>
+          <option value="priority_desc">Priority High-Low</option>
+          <option value="priority_asc">Priority Low-High</option>
+          <option value="title_asc">Title A-Z</option>
         </select>
 
         <select
           value={groupBy}
           onChange={(e) => onGroupByChange(e.target.value as TaskGroupOption)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:col-span-2"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700"
         >
-          <option value="none">Group: None</option>
-          <option value="status">Group: Status</option>
-          <option value="priority">Group: Priority</option>
-          <option value="due">Group: Due Bucket</option>
+          <option value="none">No Grouping</option>
+          <option value="status">Group by Status</option>
+          <option value="priority">Group by Priority</option>
+          <option value="due">Group by Due Date</option>
         </select>
-      </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <button
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${
-              filter === "In Progress"
-                ? "bg-blue-600/10 text-blue-700"
-                : "bg-slate-100 text-slate-500"
-            }`}
-            onClick={() =>
-              onFilterChange(filter === "In Progress" ? "" : "In Progress")
-            }
-          >
-            In Progress
-          </button>
-          <button
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${
-              filter === "High Priority"
-                ? "bg-rose-600/10 text-rose-700"
-                : "bg-slate-100 text-slate-500"
-            }`}
-            onClick={() =>
-              onFilterChange(filter === "High Priority" ? "" : "High Priority")
-            }
-          >
-            High Priority
-          </button>
-          <button
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${
-              filter === "Due Soon"
-                ? "bg-amber-600/10 text-amber-700"
-                : "bg-slate-100 text-slate-500"
-            }`}
-            onClick={() => onFilterChange(filter === "Due Soon" ? "" : "Due Soon")}
-          >
-            Due Soon
-          </button>
-        </div>
+        {/* Toggle buttons */}
+        <button
+          type="button"
+          className={`h-8 rounded-lg border px-2 text-xs font-medium ${
+            !showCompleted
+              ? "border-amber-300 bg-amber-50 text-amber-700"
+              : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+          onClick={() => onShowCompletedChange(!showCompleted)}
+          title={showCompleted ? "Hide completed tasks" : "Show completed tasks"}
+        >
+          {showCompleted ? "Hide Done" : "Show Done"}
+        </button>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={`h-9 rounded-lg border px-3 text-xs font-semibold ${
-              showCompleted
-                ? "border-slate-300 bg-white text-slate-700"
-                : "border-amber-300 bg-amber-50 text-amber-800"
-            }`}
-            onClick={() => onShowCompletedChange(!showCompleted)}
-          >
-            {showCompleted ? "Hide Completed: Off" : "Hide Completed: On"}
-          </button>
-          <button
-            type="button"
-            className={`h-9 rounded-lg border px-3 text-xs font-semibold ${
-              compactMode
-                ? "border-blue-300 bg-blue-50 text-blue-800"
-                : "border-slate-300 bg-white text-slate-700"
-            }`}
-            onClick={() => onCompactModeChange(!compactMode)}
-          >
-            {compactMode ? "Compact Mode: On" : "Compact Mode: Off"}
-          </button>
-          <button
-            type="button"
-            className={`h-9 rounded-lg border px-3 text-xs font-semibold ${
-              filter
-                ? "border-slate-300 bg-white text-slate-700"
-                : "border-blue-300 bg-blue-50 text-blue-800"
-            }`}
-            onClick={() => onFilterChange(filter ? "" : "My Focus")}
-          >
-            {filter ? "Focus Mode: Off" : "Focus Mode: On"}
-          </button>
-        </div>
+        <button
+          type="button"
+          className={`h-8 rounded-lg border px-2 text-xs font-medium ${
+            compactMode
+              ? "border-blue-300 bg-blue-50 text-blue-700"
+              : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+          onClick={() => onCompactModeChange(!compactMode)}
+          title={compactMode ? "Disable compact mode" : "Enable compact mode"}
+        >
+          {compactMode ? "Compact" : "Normal"}
+        </button>
+
+        {/* View Mode Toggle - Desktop Only */}
+        {onViewModeChange && (
+          <div className="hidden lg:flex items-center border border-slate-200 rounded-lg bg-white">
+            <button
+              onClick={() => onViewModeChange("table")}
+              className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-l-lg transition-colors ${
+                viewMode === "table"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+              title="Table view"
+            >
+              <span className="material-symbols-outlined text-sm">table_rows</span>
+            </button>
+            <button
+              onClick={() => onViewModeChange("grid")}
+              className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-r-lg transition-colors ${
+                viewMode === "grid"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+              title="Grid view"
+            >
+              <span className="material-symbols-outlined text-sm">grid_view</span>
+            </button>
+          </div>
+        )}
+
+        {/* Reset button */}
+        <button
+          className="h-8 px-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
+          onClick={onClearAll}
+          title="Reset all filters"
+        >
+          Reset{activeFiltersCount > 0 && ` (${activeFiltersCount})`}
+        </button>
       </div>
     </div>
   );
 };
 
+export type { ViewMode };
 export default memo(TasksFiltersBar);

@@ -7,10 +7,9 @@ import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
 import { Project, CreateProjectRequest } from "../types/project";
 import CreateProjectModal from "../components/CreateProjectModal";
 import ProjectsHeader from "../components/projects/ProjectsHeader";
-import ProjectsFilters from "../components/projects/ProjectsFilters";
-import ProjectsGrid from "../components/projects/ProjectsGrid";
+import ProjectsFiltersBar, { ViewMode } from "../components/projects/ProjectsFiltersBar";
+import ProjectsList from "../components/projects/ProjectsList";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
-import SavedViewsBar from "../components/preferences/SavedViewsBar";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWorkspaceContent } from "../types/roles";
 import { ProjectStatus } from "../enums";
@@ -34,6 +33,7 @@ const Projects: React.FC = () => {
   const [selectedViewId, setSelectedViewId] = useState("");
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const canCreateProject = canManageWorkspaceContent(user?.role);
 
   const fetchProjects = useCallback(async () => {
@@ -246,26 +246,24 @@ const Projects: React.FC = () => {
           canCreate={canCreateProject}
         />
 
-        <SavedViewsBar
-          title="Project Saved Views"
-          views={savedViews.map((view) => ({ id: view.id, name: view.name }))}
-          selectedId={selectedViewId}
-          viewName={newViewName}
-          onSelectedIdChange={setSelectedViewId}
-          onViewNameChange={setNewViewName}
-          onApply={applySavedView}
-          onSave={saveCurrentView}
-          onDelete={deleteSelectedView}
-          saving={savingView}
-        />
-
-        <ProjectsFilters
+        <ProjectsFiltersBar
           searchTerm={searchTerm}
           statusFilter={statusFilter}
           showPinnedOnly={showPinnedOnly}
+          viewMode={viewMode}
+          savedViews={savedViews.map((view) => ({ id: view.id, name: view.name }))}
+          selectedViewId={selectedViewId}
+          newViewName={newViewName}
+          savingView={savingView}
           onSearchChange={setSearchTerm}
           onStatusChange={setStatusFilter}
           onTogglePinnedOnly={handleTogglePinnedOnly}
+          onViewModeChange={setViewMode}
+          onSelectedViewIdChange={setSelectedViewId}
+          onViewNameChange={setNewViewName}
+          onApplyView={applySavedView}
+          onSaveView={saveCurrentView}
+          onDeleteView={deleteSelectedView}
         />
 
         <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
@@ -335,12 +333,13 @@ const Projects: React.FC = () => {
           )}
         </section>
 
-        <ProjectsGrid
+        <ProjectsList
           projects={filteredProjects}
           onCreate={handleOpenCreateProject}
           pinnedProjectIds={pinnedProjectIds}
           onProjectPinToggle={handleToggleProjectPin}
           canCreate={canCreateProject}
+          viewMode={viewMode}
         />
 
         {filteredProjects.length === 0 && <ProjectsEmptyState />}

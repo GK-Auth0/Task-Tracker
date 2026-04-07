@@ -36,47 +36,53 @@ const TaskTrends: React.FC<TaskTrendsProps> = ({ tasks }) => {
     });
 
     const maxValue = Math.max(...weeks.map((week) => Math.max(week.completed, week.created, 1)));
-    return { weeks, maxValue };
+    const totalActivity = weeks.reduce((sum, week) => sum + week.completed + week.created, 0);
+    return { weeks, maxValue, totalActivity };
   }, [tasks]);
 
+  // Don't render if there's no meaningful activity
+  if (trendData.totalActivity === 0) {
+    return null;
+  }
+
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-slate-900">Task Trends</h3>
         <p className="text-xs text-slate-500">Last 6 weeks</p>
       </div>
 
-      <div className="mt-4 grid grid-cols-6 gap-2">
+      <div className="mt-3 grid grid-cols-6 gap-1.5">
         {trendData.weeks.map((week) => {
-          const createdHeight = Math.max(8, (week.created / trendData.maxValue) * 92);
-          const completedHeight = Math.max(8, (week.completed / trendData.maxValue) * 92);
+          const createdHeight = Math.max(6, (week.created / trendData.maxValue) * 60);
+          const completedHeight = Math.max(6, (week.completed / trendData.maxValue) * 60);
 
           return (
-            <div key={week.label} className="flex flex-col items-center gap-2">
-              <div className="h-28 w-full rounded-md bg-slate-50 border border-slate-100 px-1.5 py-2 flex items-end justify-center gap-1">
+            <div key={week.label} className="flex flex-col items-center gap-1.5">
+              <div className="h-16 w-full rounded bg-slate-50 border border-slate-100 px-1 py-1.5 flex items-end justify-center gap-0.5">
                 <div
-                  className="w-2.5 rounded-t bg-blue-300"
+                  className="w-2 rounded-t bg-blue-400"
                   style={{ height: `${createdHeight}%` }}
                   title={`Created: ${week.created}`}
                 />
                 <div
-                  className="w-2.5 rounded-t bg-emerald-500"
+                  className="w-2 rounded-t bg-emerald-500"
                   style={{ height: `${completedHeight}%` }}
                   title={`Completed: ${week.completed}`}
                 />
               </div>
-              <span className="text-[10px] font-medium text-slate-500">{week.label}</span>
+              <span className="text-[9px] font-medium text-slate-500">{week.label}</span>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-3 flex items-center gap-4 text-xs text-slate-600">
+      <div className="mt-2 flex items-center gap-3 text-xs text-slate-600">
         <span className="inline-flex items-center gap-1">
-          <span className="size-2 rounded-full bg-blue-300" /> Created
+          <span className="size-1.5 rounded-full bg-blue-400" /> Created
         </span>
         <span className="inline-flex items-center gap-1">
-          <span className="size-2 rounded-full bg-emerald-500" /> Completed
+          <span className="size-1.5 rounded-full bg-emerald-500" /> Completed
         </span>
       </div>
     </section>
