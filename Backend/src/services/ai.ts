@@ -26,6 +26,12 @@ export interface AiAssistantReply {
   contextSnapshot?: string;
   quickActions?: string[];
   provider?: string;
+  sources?: Array<{
+    id?: string;
+    type?: string;
+    title: string;
+    snippet?: string;
+  }>;
 }
 
 export interface AiConversationTurn {
@@ -69,6 +75,19 @@ const normalizeQuickActions = (value: unknown): string[] => {
   return value
     .map((item) => String(item || "").trim())
     .filter(Boolean)
+    .slice(0, 4);
+};
+
+const normalizeSources = (value: unknown): AiAssistantReply["sources"] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      id: typeof item.id === "string" ? item.id : undefined,
+      type: typeof item.type === "string" ? item.type : undefined,
+      title: String(item.title || "").trim() || "Workspace item",
+      snippet: typeof item.snippet === "string" ? item.snippet.trim() : undefined,
+    }))
     .slice(0, 4);
 };
 
@@ -133,6 +152,7 @@ export const getAiAssistantReply = async (
           response_mode: responseMode,
           tasks: (userContext?.recentTasks as unknown[]) || [],
           projects: (userContext?.projects as unknown[]) || [],
+          knowledge: (userContext?.knowledge as unknown[]) || [],
           history,
         },
         {
@@ -151,6 +171,7 @@ export const getAiAssistantReply = async (
               ? data.context_snapshot
               : undefined,
           quickActions: normalizeQuickActions(data?.quick_actions),
+          sources: normalizeSources(data?.sources),
           provider: "ai-service",
         });
       }

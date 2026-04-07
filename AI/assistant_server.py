@@ -392,6 +392,7 @@ class Handler(BaseHTTPRequestHandler):
             tasks = payload.get("tasks", [])
             projects = payload.get("projects", [])
             history = payload.get("history", [])
+            knowledge = payload.get("knowledge", [])
             if not message:
                 self._send_json_timed(
                     400,
@@ -424,6 +425,14 @@ class Handler(BaseHTTPRequestHandler):
                     started,
                 )
                 return
+            if not isinstance(knowledge, list):
+                self._send_json_timed(
+                    400,
+                    {"error": "Field 'knowledge' must be an array."},
+                    path,
+                    started,
+                )
+                return
             if response_mode not in {"concise", "balanced", "detailed"}:
                 response_mode = "balanced"
             normalized_history = [
@@ -434,6 +443,17 @@ class Handler(BaseHTTPRequestHandler):
                 for item in history[:8]
                 if isinstance(item, dict) and str(item.get("text", "")).strip()
             ]
+            normalized_knowledge = [
+                {
+                    "id": str(item.get("id", "")).strip(),
+                    "type": str(item.get("type", "")).strip() or "note",
+                    "title": str(item.get("title", "")).strip() or "Workspace item",
+                    "content": str(item.get("content", "")).strip(),
+                    "metadata": item.get("metadata", {}) if isinstance(item.get("metadata"), dict) else {},
+                }
+                for item in knowledge[:24]
+                if isinstance(item, dict) and str(item.get("content", "")).strip()
+            ]
             result = assistant_chat(
                 message=message,
                 route_context=route_context,
@@ -441,6 +461,7 @@ class Handler(BaseHTTPRequestHandler):
                 projects=projects,
                 response_mode=response_mode,
                 history=normalized_history,
+                knowledge=normalized_knowledge,
             )
             response_payload = {"success": True, "data": result}
             if cache_key:

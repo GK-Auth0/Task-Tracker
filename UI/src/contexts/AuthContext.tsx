@@ -7,6 +7,8 @@ import {
 } from "react";
 import {
   authAPI,
+  clearStoredAccessToken,
+  setStoredAccessToken,
 } from "../services/auth";
 import type {
   AuthenticatedUser,
@@ -88,9 +90,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        await authAPI.refreshSession();
         const response = await authAPI.getCurrentUser();
         setUser(normalizeUser(response.data));
       } catch (error) {
+        clearStoredAccessToken();
         setUser(null);
       }
 
@@ -117,9 +121,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const authenticatedData = data as Extract<
       typeof data,
-      { user: AuthenticatedUser }
+      { user: AuthenticatedUser; token?: string }
     >;
-    const { user } = authenticatedData;
+    const { user, token } = authenticatedData;
+    if (token) setStoredAccessToken(token);
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
     return normalizedUser;
@@ -129,9 +134,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const response = await authAPI.loginWithAuth0(accessToken);
     const authenticatedData = response.data as Extract<
       typeof response.data,
-      { user: AuthenticatedUser }
+      { user: AuthenticatedUser; token?: string }
     >;
-    const { user } = authenticatedData;
+    const { user, token } = authenticatedData;
+    if (token) setStoredAccessToken(token);
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
     return normalizedUser;
@@ -156,9 +162,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const response = await authAPI.verifyOtp(otpSessionId, otp);
     const authenticatedData = response.data as Extract<
       typeof response.data,
-      { user: AuthenticatedUser }
+      { user: AuthenticatedUser; token?: string }
     >;
-    const { user } = authenticatedData;
+    const { user, token } = authenticatedData;
+    if (token) setStoredAccessToken(token);
     const normalizedUser = normalizeUser(user);
     setUser(normalizedUser);
     return normalizedUser;
@@ -184,6 +191,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = () => {
     void authAPI.logout().catch(() => undefined);
+    clearStoredAccessToken();
     setUser(null);
   };
 

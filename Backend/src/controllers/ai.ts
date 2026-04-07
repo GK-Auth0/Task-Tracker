@@ -54,6 +54,7 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
         attributes: [
           "id",
           "title",
+          "description",
           "status",
           "priority",
           "due_date",
@@ -83,7 +84,7 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
       projectIds.length > 0
         ? await Project.findAll({
             where: { id: { [Op.in]: projectIds } },
-            attributes: ["id", "name", "status", "priority", "updated_at"],
+            attributes: ["id", "name", "description", "status", "priority", "updated_at"],
             order: [["updated_at", "DESC"]],
             limit: 30,
           })
@@ -96,6 +97,7 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
             attributes: [
               "id",
               "title",
+              "description",
               "status",
               "priority",
               "due_date",
@@ -137,12 +139,14 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
       projects: projectRows.slice(0, 12).map((p) => ({
         id: p.id,
         name: p.name,
+        description: p.description,
         status: p.status,
         priority: p.priority,
       })),
       recentTasks: mergedTasks.slice(0, 24).map((t) => ({
         id: t.id,
         title: t.title,
+        description: t.description,
         status: t.status,
         priority: t.priority,
         due_date: t.due_date,
@@ -150,10 +154,38 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
         project_name:
           projectRows.find((project) => project.id === t.project_id)?.name || undefined,
       })),
+      knowledge: [
+        ...projectRows.slice(0, 12).map((project) => ({
+          id: `project:${project.id}`,
+          type: "project",
+          title: project.name,
+          content: String(project.description || "").trim(),
+          metadata: {
+            status: project.status,
+            priority: project.priority,
+          },
+        })),
+        ...mergedTasks
+          .slice(0, 24)
+          .map((task) => ({
+            id: `task:${task.id}`,
+            type: "task",
+            title: task.title,
+            content: String(task.description || "").trim(),
+            metadata: {
+              status: task.status,
+              priority: task.priority,
+              due_date: task.due_date,
+              project_name:
+                projectRows.find((project) => project.id === task.project_id)?.name || undefined,
+            },
+          })),
+      ].filter((item) => item.content),
       routeProject: routeProject
         ? {
             id: routeProject.id,
             name: routeProject.name,
+            description: routeProject.description,
             status: routeProject.status,
             priority: routeProject.priority,
           }

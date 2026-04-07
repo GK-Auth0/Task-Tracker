@@ -12,6 +12,12 @@ export interface AiChatResponse {
     contextSnapshot?: string;
     quickActions?: string[];
     provider?: string;
+    sources?: Array<{
+      id?: string;
+      type?: string;
+      title: string;
+      snippet?: string;
+    }>;
   };
 }
 

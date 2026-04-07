@@ -95,6 +95,13 @@ def _tokenize(text: str) -> list[str]:
     ]
 
 
+def _snippet(text: str, limit: int = 220) -> str:
+    clean = " ".join(str(text or "").split()).strip()
+    if len(clean) <= limit:
+        return clean
+    return clean[: limit - 3].rstrip() + "..."
+
+
 def _iso_after(days: int) -> str:
     return (date.today() + timedelta(days=days)).isoformat()
 
@@ -507,6 +514,57 @@ def _dynamic_quick_actions(route_context: str, tasks: list[dict[str, Any]], proj
         if action not in deduped:
             deduped.append(action)
     return deduped[:4]
+
+
+def _knowledge_score(item: dict[str, Any], query_tokens: set[str]) -> float:
+    title = str(item.get("title", "")).strip()
+    content = str(item.get("content", "")).strip()
+    haystack_tokens = set(_tokenize(f"{title} {content}"))
+    overlap = len(query_tokens.intersection(haystack_tokens))
+    score = overlap * 10
+    metadata = item.get("metadata", {})
+    if isinstance(metadata, dict):
+      score += len(query_tokens.intersection(set(_tokenize(" ".join(str(v) for v in metadata.values()))))) * 3
+    if str(item.get("type")) == "task":
+        score += 2
+    if content:
+        score += min(5, len(content) / 120)
+    return float(score)
+
+
+def _retrieve_knowledge(
+    message: str,
+    knowledge: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+    projects: list[dict[str, Any]],
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    query_tokens = set(_tokenize(message))
+    if not query_tokens:
+        query_tokens = set(
+            _tokenize(
+                " ".join(
+                    [_task_title(task) for task in _top_tasks(tasks, 2)]
+                    + [str(project.get("name", "")) for project in projects[:2]]
+                )
+            )
+        )
+
+    ranked: list[tuple[float, dict[str, Any]]] = []
+    for item in knowledge:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title", "")).strip()
+        content = str(item.get("content", "")).strip()
+        if not title and not content:
+            continue
+        score = _knowledge_score(item, query_tokens)
+        if score <= 0:
+            continue
+        ranked.append((score, item))
+
+    ranked.sort(key=lambda entry: -entry[0])
+    return [item for _, item in ranked[:limit]]
 
 
 @dataclass
@@ -1036,12 +1094,15 @@ def assistant_chat(
     projects: list[dict[str, Any]] | None = None,
     response_mode: str = "balanced",
     history: list[dict[str, Any]] | None = None,
+    knowledge: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     projects = projects or []
     history = history or []
+    knowledge = knowledge or []
     clean_message = str(message or "").strip()
     insights = auto_insights(route_context, tasks, projects)
     relevant_tasks = _select_relevant_tasks(clean_message, tasks, limit=6)
+    relevant_knowledge = _retrieve_knowledge(clean_message, knowledge, tasks, projects)
 
     reply = _rule_based_reply(
         message=clean_message,
@@ -1060,6 +1121,7 @@ def assistant_chat(
         relevant_tasks=relevant_tasks,
         projects=projects,
         history=history,
+        knowledge=relevant_knowledge,
     )
     if gemini_reply:
         reply = gemini_reply
@@ -1071,6 +1133,15 @@ def assistant_chat(
         "quick_actions": insights["quick_actions"],
         "intent": _detect_intent(clean_message, route_context),
         "relevant_tasks": [_compact_task(task) for task in relevant_tasks[:4]],
+        "sources": [
+            {
+                "id": item.get("id"),
+                "type": item.get("type"),
+                "title": str(item.get("title", "Workspace item")).strip() or "Workspace item",
+                "snippet": _snippet(str(item.get("content", "")).strip()),
+            }
+            for item in relevant_knowledge[:4]
+        ],
     }
 
 
@@ -1082,6 +1153,7 @@ def _generate_gemini_reply(
     relevant_tasks: list[dict[str, Any]],
     projects: list[dict[str, Any]],
     history: list[dict[str, Any]],
+    knowledge: list[dict[str, Any]],
 ) -> str | None:
     if not message:
         return None
@@ -1104,6 +1176,11 @@ def _generate_gemini_reply(
         for turn in history[-8:]
         if str(turn.get("text", "")).strip()
     )
+    knowledge_block = "\n".join(
+        f"- [{str(item.get('type', 'note'))}] {str(item.get('title', 'Workspace item')).strip()}: {_snippet(str(item.get('content', '')).strip(), 260)}"
+        for item in knowledge[:4]
+        if str(item.get("content", "")).strip()
+    )
 
     prompt = (
         f"Route: {route_context or '/dashboard'}\n"
@@ -1113,9 +1190,10 @@ def _generate_gemini_reply(
         f"Recommendations: {', '.join(insights.get('recommendations', [])[:3]) or 'None'}\n"
         f"Relevant tasks:\n{chr(10).join(task_lines) if task_lines else '- No relevant tasks'}\n"
         f"Projects: {project_preview}\n"
+        f"Relevant knowledge:\n{knowledge_block or 'No matching workspace snippets'}\n"
         f"Recent conversation:\n{history_block or 'No prior turns'}\n"
         f"User message: {message}\n"
-        "Respond as a hands-on project assistant. Mention concrete tasks when useful and avoid generic filler."
+        "Respond as a hands-on project assistant. Mention concrete tasks and workspace snippets when useful and avoid generic filler."
     )
 
     return _gemini_text(prompt=prompt, mode_instruction=mode_instruction, max_tokens=700)

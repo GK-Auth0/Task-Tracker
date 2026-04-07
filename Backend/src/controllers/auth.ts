@@ -224,7 +224,10 @@ export const login = async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: buildSessionUserPayload(result),
+      data: {
+        ...buildSessionUserPayload(result),
+        ...((result as any)?.token ? { token: (result as any).token } : {}),
+      },
     });
   } catch (error) {
     return res.status(401).json({
@@ -272,7 +275,10 @@ export const auth0Login = async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: "Auth0 login successful",
-      data: buildSessionUserPayload(result),
+      data: {
+        ...buildSessionUserPayload(result),
+        token: result.token,
+      },
     });
   } catch (error) {
     return res.status(401).json({
@@ -297,7 +303,10 @@ export const verifyOtp = async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully",
-      data: buildSessionUserPayload(result),
+      data: {
+        ...buildSessionUserPayload(result),
+        token: result.token,
+      },
     });
   } catch (error) {
     return res.status(400).json({
@@ -418,6 +427,7 @@ export const refreshSession = async (req: Request, res: Response) => {
       success: true,
       message: "Session refreshed",
       data: {
+        token: result.token,
         user: result.user,
       },
     });

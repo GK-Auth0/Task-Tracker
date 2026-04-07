@@ -6,6 +6,8 @@ import axios, {
 
 import { API_BASE_URL } from "../config/api";
 
+const ACCESS_TOKEN_STORAGE_KEY = "task_tracker_session_token";
+
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
@@ -21,6 +23,23 @@ const createBaseClient = (baseURL: string) =>
     withCredentials: true,
     headers: buildDefaultHeaders(),
   });
+
+const canUseSessionStorage = () => typeof window !== "undefined";
+
+export const getStoredAccessToken = () => {
+  if (!canUseSessionStorage()) return "";
+  return window.sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || "";
+};
+
+export const setStoredAccessToken = (token: string) => {
+  if (!canUseSessionStorage()) return;
+  window.sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+};
+
+export const clearStoredAccessToken = () => {
+  if (!canUseSessionStorage()) return;
+  window.sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+};
 
 const isBrowserAuthRoute = () => {
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
@@ -55,11 +74,23 @@ const refreshClient = createBaseClient(API_BASE_URL);
 let refreshRequest: Promise<boolean> | null = null;
 
 const refreshAccessToken = async () => {
-  await refreshClient.post("/api/auth/refresh");
+  const response = await refreshClient.post("/api/auth/refresh");
+  const nextToken = String(response.data?.data?.token || "").trim();
+  if (nextToken) {
+    setStoredAccessToken(nextToken);
+  }
   return true;
 };
 
 export const applyAuthInterceptors = (client: AxiosInstance) => {
+  client.interceptors.request.use((config) => {
+    const token = getStoredAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+
   client.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
@@ -88,12 +119,14 @@ export const applyAuthInterceptors = (client: AxiosInstance) => {
             return client(originalRequest);
           }
         } catch {
+          clearStoredAccessToken();
           redirectToLogin();
           return Promise.reject(error);
         }
       }
 
       if (status === 401 || status === 403) {
+        clearStoredAccessToken();
         redirectToLogin();
       }
 
@@ -161,6 +194,7 @@ export interface OtpChallengeResponse {
 export type LoginResponseData =
   | {
       user: AuthenticatedUser;
+      token?: string;
     }
   | { requiresPasswordChange: true; email: string }
   | OtpChallenge;
