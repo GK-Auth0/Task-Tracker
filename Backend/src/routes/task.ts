@@ -12,6 +12,7 @@ import {
   createTaskSubtask,
   updateTaskSubtask,
   removeTaskSubtask,
+  uploadTaskAttachment,
 } from "../controllers/task";
 import {
   createSubtaskSchema,
@@ -21,6 +22,7 @@ import {
 } from "../validators/task";
 import { authenticateToken } from "../middleware/auth";
 import { requireWorkspaceRole } from "../middleware/rbac";
+import { upload } from "../middleware/upload";
 
 const router = express.Router();
 
@@ -36,6 +38,13 @@ router.get("/:id", authenticateToken, getTask);
 router.get("/:id/activity", authenticateToken, getTaskActivityLogs);
 router.get("/:id/pull-requests", authenticateToken, getTaskPRs);
 router.get("/:id/commits", authenticateToken, getTaskCommitHistory);
+router.post(
+  "/:id/attachments",
+  authenticateToken,
+  requireWorkspaceRole("Member"),
+  upload.single("file"),
+  uploadTaskAttachment,
+);
 router.post(
   "/:id/subtasks",
   authenticateToken,

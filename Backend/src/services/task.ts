@@ -1,4 +1,4 @@
-import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit, Defect, Sprint } from "../models";
+import { Task, Project, ProjectMember, User, Subtask, Comment, PullRequest, Commit, Defect, Sprint, TaskFile } from "../models";
 import { Op } from "sequelize";
 import type {
   CreateSubtaskDto,
@@ -56,6 +56,51 @@ const getAccessibleTask = async (taskId: string, userId: string, organizationId:
       },
     ],
   });
+
+const subtaskInclude = {
+  model: Subtask,
+  as: "subtasks",
+  attributes: [
+    "id",
+    "title",
+    "is_completed",
+    "position",
+    "assignee_id",
+    "linked_task_id",
+  ],
+  include: [
+    {
+      model: User,
+      as: "assignee",
+      attributes: ["id", "full_name", "email"],
+    },
+    {
+      model: Task,
+      as: "linked_task",
+      attributes: ["id", "status", "assignee_id"],
+    },
+  ],
+};
+
+const syncLinkedTaskToSubtask = async (linkedTaskId: string) => {
+  const linkedTask = await Task.findByPk(linkedTaskId, {
+    attributes: ["id", "title", "status", "assignee_id"],
+  });
+
+  if (!linkedTask) return;
+
+  const subtask = await Subtask.findOne({
+    where: { linked_task_id: linkedTaskId },
+  });
+
+  if (!subtask) return;
+
+  await subtask.update({
+    title: linkedTask.title,
+    is_completed: linkedTask.status === "Done",
+    assignee_id: linkedTask.assignee_id || null,
+  });
+};
 
 export async function getAllTasks(
   userId: string,
@@ -278,10 +323,27 @@ export async function createTask(dto: CreateTaskDto) {
         attributes: ["id", "name"],
       },
       {
-        model: Subtask,
-        as: "subtasks",
-        attributes: ["id", "title", "is_completed", "position"],
+        model: TaskFile,
+        as: "attachments",
+        attributes: [
+          "id",
+          "filename",
+          "original_name",
+          "file_url",
+          "file_size",
+          "mime_type",
+          "uploaded_by",
+          "created_at",
+        ],
+        include: [
+          {
+            model: User,
+            as: "uploader",
+            attributes: ["id", "full_name", "email"],
+          },
+        ],
       },
+      subtaskInclude,
     ],
   });
 
@@ -338,10 +400,27 @@ export async function getTaskById(taskId: string, userId: string) {
         attributes: ["id", "name"],
       },
       {
-        model: Subtask,
-        as: "subtasks",
-        attributes: ["id", "title", "is_completed", "position"],
+        model: TaskFile,
+        as: "attachments",
+        attributes: [
+          "id",
+          "filename",
+          "original_name",
+          "file_url",
+          "file_size",
+          "mime_type",
+          "uploaded_by",
+          "created_at",
+        ],
+        include: [
+          {
+            model: User,
+            as: "uploader",
+            attributes: ["id", "full_name", "email"],
+          },
+        ],
       },
+      subtaskInclude,
       {
         model: Comment,
         as: "comments",
@@ -493,13 +572,12 @@ export async function updateTask(
         as: "sprint",
         attributes: ["id", "name"],
       },
-      {
-        model: Subtask,
-        as: "subtasks",
-        attributes: ["id", "title", "is_completed", "position"],
-      },
+      subtaskInclude,
     ],
+    order: [[{ model: Subtask, as: "subtasks" }, "position", "ASC"]],
   });
+
+  await syncLinkedTaskToSubtask(taskId);
 
   return updatedTask?.get({ plain: true });
 }
@@ -519,14 +597,56 @@ export async function createSubtask(
     throw new Error("Task not found or access denied");
   }
 
+  if (dto.assignee_id) {
+    const assignee = await User.findOne({
+      where: {
+        id: dto.assignee_id,
+        organization_id: organizationId,
+      },
+      attributes: ["id"],
+    });
+
+    if (!assignee) {
+      throw new Error("Assignee must belong to the same organization");
+    }
+  }
+
   const position = await Subtask.count({ where: { task_id: taskId } });
+  const linkedTask = await Task.create({
+    project_id: task.project.id,
+    title: dto.title,
+    description: `Subtask for ${task.title}. Open this item for the full task workflow.`,
+    status: "To Do",
+    priority: "Medium",
+    issue_type: "Task",
+    creator_id: userId,
+    assignee_id: dto.assignee_id || null,
+    sprint_id: task.get("sprint_id") || null,
+  });
   const subtask = await Subtask.create({
     task_id: taskId,
     title: dto.title,
     position,
+    assignee_id: dto.assignee_id || null,
+    linked_task_id: linkedTask.id,
   });
 
-  return subtask.get({ plain: true });
+  const subtaskWithRelations = await Subtask.findByPk(subtask.id, {
+    include: [
+      {
+        model: User,
+        as: "assignee",
+        attributes: ["id", "full_name", "email"],
+      },
+      {
+        model: Task,
+        as: "linked_task",
+        attributes: ["id", "status", "assignee_id"],
+      },
+    ],
+  });
+
+  return subtaskWithRelations?.get({ plain: true });
 }
 
 export async function updateSubtask(
@@ -545,6 +665,20 @@ export async function updateSubtask(
     throw new Error("Task not found or access denied");
   }
 
+  if (dto.assignee_id) {
+    const assignee = await User.findOne({
+      where: {
+        id: dto.assignee_id,
+        organization_id: organizationId,
+      },
+      attributes: ["id"],
+    });
+
+    if (!assignee) {
+      throw new Error("Assignee must belong to the same organization");
+    }
+  }
+
   const subtask = await Subtask.findOne({
     where: {
       id: subtaskId,
@@ -559,9 +693,40 @@ export async function updateSubtask(
   await subtask.update({
     ...(dto.title !== undefined ? { title: dto.title } : {}),
     ...(dto.is_completed !== undefined ? { is_completed: dto.is_completed } : {}),
+    ...(dto.assignee_id !== undefined ? { assignee_id: dto.assignee_id || null } : {}),
   });
 
-  return subtask.get({ plain: true });
+  if (subtask.linked_task_id) {
+    await Task.update(
+      {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.is_completed !== undefined
+          ? { status: dto.is_completed ? "Done" : "To Do" }
+          : {}),
+        ...(dto.assignee_id !== undefined ? { assignee_id: dto.assignee_id || null } : {}),
+      },
+      {
+        where: { id: subtask.linked_task_id },
+      },
+    );
+  }
+
+  const subtaskWithRelations = await Subtask.findByPk(subtask.id, {
+    include: [
+      {
+        model: User,
+        as: "assignee",
+        attributes: ["id", "full_name", "email"],
+      },
+      {
+        model: Task,
+        as: "linked_task",
+        attributes: ["id", "status", "assignee_id"],
+      },
+    ],
+  });
+
+  return subtaskWithRelations?.get({ plain: true });
 }
 
 export async function deleteSubtask(
@@ -590,7 +755,29 @@ export async function deleteSubtask(
     throw new Error("Subtask not found");
   }
 
+  const linkedTaskId = subtask.linked_task_id;
   await subtask.destroy();
+  if (linkedTaskId) {
+    await Task.destroy({ where: { id: linkedTaskId } });
+  }
+}
+
+export async function getTaskForUpload(taskId: string, userId: string) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("Task not found or access denied");
+  }
+
+  const task = await getAccessibleTask(taskId, userId, organizationId);
+  if (!task) {
+    throw new Error("Task not found or access denied");
+  }
+
+  return task;
+}
+
+export async function syncSubtaskForLinkedTask(taskId: string) {
+  await syncLinkedTaskToSubtask(taskId);
 }
 
 export async function deleteTask(taskId: string, userId: string) {
@@ -625,7 +812,31 @@ export async function deleteTask(taskId: string, userId: string) {
     throw new Error("Task not found or access denied");
   }
 
+  const childSubtasks = await Subtask.findAll({
+    where: { task_id: taskId },
+    attributes: ["linked_task_id"],
+  });
+  const linkedChildTaskIds = childSubtasks
+    .map((subtask) => subtask.linked_task_id)
+    .filter((value): value is string => Boolean(value));
+
+  const linkedSubtask = await Subtask.findOne({
+    where: { linked_task_id: taskId },
+  });
+
+  if (linkedSubtask) {
+    await linkedSubtask.destroy();
+  }
+
   await task.destroy();
+
+  if (linkedChildTaskIds.length > 0) {
+    await Task.destroy({
+      where: {
+        id: linkedChildTaskIds,
+      },
+    });
+  }
 }
 
 export async function getTaskPullRequests(taskId: string, userId: string) {

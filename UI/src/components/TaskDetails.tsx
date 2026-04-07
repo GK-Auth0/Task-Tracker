@@ -5,6 +5,7 @@ import {
   PullRequest,
   Commit,
   ActivityLog,
+  usersAPI,
 } from "../services/dashboard";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
@@ -17,11 +18,31 @@ interface TaskDetails {
   priority: "Low" | "Medium" | "High";
   issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;
+  attachments?: Array<{
+    id: string;
+    original_name: string;
+    file_url: string;
+    file_size: number;
+    mime_type: string;
+    created_at: string;
+    uploader?: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
+  }>;
   subtasks?: Array<{
     id: string;
     title: string;
     is_completed: boolean;
     position?: number;
+    assignee_id?: string;
+    linked_task_id?: string;
+    assignee?: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
   }>;
   project: {
     id: string;
@@ -128,9 +149,15 @@ export default function TaskDetails() {
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState("");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState("");
   const [subtaskSaving, setSubtaskSaving] = useState(false);
   const [subtaskError, setSubtaskError] = useState("");
+  const [workspaceUsers, setWorkspaceUsers] = useState<
+    Array<{ id: string; full_name: string; email: string }>
+  >([]);
 
   const [prForm, setPrForm] = useState({
     title: "",
@@ -160,6 +187,7 @@ export default function TaskDetails() {
   useEffect(() => {
     if (id) {
       fetchTask();
+      fetchWorkspaceUsers();
     }
   }, [id]);
 
@@ -208,6 +236,23 @@ export default function TaskDetails() {
       setAiSuggestion(null);
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const fetchWorkspaceUsers = async () => {
+    try {
+      const response = await usersAPI.getUsers({ limit: 100 });
+      if (response.success) {
+        setWorkspaceUsers(
+          response.data.map((user) => ({
+            id: user.id,
+            full_name: user.full_name,
+            email: user.email,
+          })),
+        );
+      }
+    } catch (error) {
+      console.error("Failed to fetch workspace users:", error);
     }
   };
 
@@ -309,6 +354,7 @@ export default function TaskDetails() {
       setSubtaskError("");
       const response = await tasksAPI.createSubtask(task.id, {
         title: newSubtaskTitle.trim(),
+        assignee_id: newSubtaskAssigneeId || undefined,
       });
 
       if (response.success) {
@@ -317,12 +363,45 @@ export default function TaskDetails() {
           subtasks: [...(task.subtasks || []), response.data],
         });
         setNewSubtaskTitle("");
+        setNewSubtaskAssigneeId("");
       }
     } catch (error: any) {
       setSubtaskError(
         error?.response?.data?.error ||
           error?.response?.data?.message ||
           "Failed to create subtask.",
+      );
+    } finally {
+      setSubtaskSaving(false);
+    }
+  };
+
+  const handleSubtaskAssigneeChange = async (
+    subtaskId: string,
+    assigneeId: string,
+  ) => {
+    if (!task) return;
+
+    try {
+      setSubtaskSaving(true);
+      setSubtaskError("");
+      const response = await tasksAPI.updateSubtask(task.id, subtaskId, {
+        assignee_id: assigneeId || undefined,
+      });
+
+      if (response.success) {
+        setTask({
+          ...task,
+          subtasks: (task.subtasks || []).map((subtask) =>
+            subtask.id === subtaskId ? response.data : subtask,
+          ),
+        });
+      }
+    } catch (error: any) {
+      setSubtaskError(
+        error?.response?.data?.error ||
+          error?.response?.data?.message ||
+          "Failed to update subtask assignee.",
       );
     } finally {
       setSubtaskSaving(false);
@@ -380,6 +459,34 @@ export default function TaskDetails() {
       );
     } finally {
       setSubtaskSaving(false);
+    }
+  };
+
+  const handleAttachmentUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!task || !file) return;
+
+    try {
+      setAttachmentUploading(true);
+      setAttachmentError("");
+      const response = await tasksAPI.uploadAttachment(task.id, file);
+      if (response.success) {
+        setTask({
+          ...task,
+          attachments: [response.data, ...(task.attachments || [])],
+        });
+      }
+    } catch (error: any) {
+      setAttachmentError(
+        error?.response?.data?.error ||
+          error?.response?.data?.message ||
+          "Failed to upload attachment.",
+      );
+    } finally {
+      setAttachmentUploading(false);
+      event.target.value = "";
     }
   };
 
@@ -905,18 +1012,33 @@ export default function TaskDetails() {
                         </p>
                       </div>
                       <div className="flex w-full gap-2 sm:w-auto">
-                        <input
-                          value={newSubtaskTitle}
-                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleCreateSubtask();
-                            }
-                          }}
-                          placeholder="Add a subtask"
-                          className="h-10 flex-1 rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
-                        />
+                        <div className="flex flex-1 flex-col gap-2 sm:min-w-[380px] sm:flex-row">
+                          <input
+                            value={newSubtaskTitle}
+                            onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCreateSubtask();
+                              }
+                            }}
+                            placeholder="Add a subtask"
+                            className="h-10 flex-1 rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                          />
+                          <select
+                            value={newSubtaskAssigneeId}
+                            onChange={(e) => setNewSubtaskAssigneeId(e.target.value)}
+                            className="h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                            aria-label="New subtask assignee"
+                          >
+                            <option value="">Assign user</option>
+                            {workspaceUsers.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.full_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <button
                           type="button"
                           onClick={handleCreateSubtask}
@@ -939,35 +1061,71 @@ export default function TaskDetails() {
                         {task.subtasks.map((subtask) => (
                           <div
                             key={subtask.id}
-                            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
+                            className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center"
                           >
-                            <input
-                              type="checkbox"
-                              checked={subtask.is_completed}
-                              onChange={(e) =>
-                                handleToggleSubtask(subtask.id, e.target.checked)
-                              }
-                              className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <p
-                              className={`flex-1 text-sm ${
-                                subtask.is_completed
-                                  ? "text-slate-400 line-through"
-                                  : "text-slate-800"
-                              }`}
-                            >
-                              {subtask.title}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSubtask(subtask.id)}
-                              className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                              aria-label="Delete subtask"
-                            >
-                              <span className="material-symbols-outlined text-base">
-                                delete
-                              </span>
-                            </button>
+                            <div className="flex items-center gap-3 sm:flex-1">
+                              <input
+                                type="checkbox"
+                                checked={subtask.is_completed}
+                                onChange={(e) =>
+                                  handleToggleSubtask(subtask.id, e.target.checked)
+                                }
+                                className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  subtask.linked_task_id &&
+                                  navigate(`/task/${subtask.linked_task_id}`)
+                                }
+                                className={`flex-1 text-left text-sm ${
+                                  subtask.is_completed
+                                    ? "text-slate-400 line-through"
+                                    : "text-slate-800 hover:text-blue-700"
+                                }`}
+                              >
+                                {subtask.title}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 sm:w-auto">
+                              <select
+                                value={subtask.assignee_id || ""}
+                                onChange={(e) =>
+                                  handleSubtaskAssigneeChange(subtask.id, e.target.value)
+                                }
+                                className="h-9 min-w-[150px] rounded-lg border border-slate-300 px-3 text-xs text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                aria-label="Subtask assignee"
+                              >
+                                <option value="">Unassigned</option>
+                                {workspaceUsers.map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                              {subtask.linked_task_id ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/task/${subtask.linked_task_id}`)}
+                                  className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                                  aria-label="Open subtask"
+                                >
+                                  <span className="material-symbols-outlined text-base">
+                                    open_in_new
+                                  </span>
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSubtask(subtask.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                aria-label="Delete subtask"
+                              >
+                                <span className="material-symbols-outlined text-base">
+                                  delete
+                                </span>
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1472,38 +1630,79 @@ export default function TaskDetails() {
                         <span className="material-symbols-outlined text-lg">
                           upload
                         </span>
-                        Upload File
+                        {attachmentUploading ? "Uploading..." : "Upload File"}
                         <input
                           type="file"
                           className="hidden"
-                          onChange={() => {}}
+                          onChange={handleAttachmentUpload}
+                          disabled={attachmentUploading}
                         />
                       </label>
                     </div>
                   </div>
+                  {attachmentError ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                      {attachmentError}
+                    </div>
+                  ) : null}
 
-                  <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
-                    <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">
-                      attach_file
-                    </span>
-                    <h3 className="text-lg font-semibold text-slate-600 mb-2">
-                      No Attachments Yet
-                    </h3>
-                    <p className="text-slate-500 mb-4">
-                      Upload files related to this task.
-                    </p>
-                    <label className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all cursor-pointer">
-                      <span className="material-symbols-outlined text-[18px]">
-                        upload
+                  {task.attachments && task.attachments.length > 0 ? (
+                    <div className="space-y-3">
+                      {task.attachments.map((attachment) => (
+                        <a
+                          key={attachment.id}
+                          href={attachment.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 hover:border-blue-200 hover:bg-blue-50"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="material-symbols-outlined text-slate-500">
+                              attach_file
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {attachment.original_name}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {(attachment.file_size / 1024).toFixed(1)} KB
+                                {attachment.uploader
+                                  ? ` • ${attachment.uploader.full_name}`
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="material-symbols-outlined text-slate-400">
+                            open_in_new
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
+                      <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">
+                        attach_file
                       </span>
-                      Upload First File
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={() => {}}
-                      />
-                    </label>
-                  </div>
+                      <h3 className="text-lg font-semibold text-slate-600 mb-2">
+                        No Attachments Yet
+                      </h3>
+                      <p className="text-slate-500 mb-4">
+                        Upload files related to this task.
+                      </p>
+                      <label className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[18px]">
+                          upload
+                        </span>
+                        {attachmentUploading ? "Uploading..." : "Upload First File"}
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleAttachmentUpload}
+                          disabled={attachmentUploading}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

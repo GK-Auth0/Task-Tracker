@@ -105,11 +105,31 @@ export interface Task {
   priority: "Low" | "Medium" | "High";
   issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;
+  attachments?: Array<{
+    id: string;
+    original_name: string;
+    file_url: string;
+    file_size: number;
+    mime_type: string;
+    created_at: string;
+    uploader?: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
+  }>;
   subtasks?: Array<{
     id: string;
     title: string;
     is_completed: boolean;
     position?: number;
+    assignee_id?: string;
+    linked_task_id?: string;
+    assignee?: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
   }>;
   project: {
     id: string;
@@ -423,9 +443,38 @@ export const tasksAPI = {
     return response.data;
   },
 
+  uploadAttachment: async (
+    taskId: string,
+    file: File,
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      original_name: string;
+      file_url: string;
+      file_size: number;
+      mime_type: string;
+      created_at: string;
+      uploader?: {
+        id: string;
+        full_name: string;
+        email: string;
+      };
+    };
+  }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`/api/v1/tasks/${taskId}/attachments`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
   createSubtask: async (
     taskId: string,
-    data: { title: string },
+    data: { title: string; assignee_id?: string },
   ): Promise<{
     success: boolean;
     data: {
@@ -433,6 +482,13 @@ export const tasksAPI = {
       title: string;
       is_completed: boolean;
       position?: number;
+      assignee_id?: string;
+      linked_task_id?: string;
+      assignee?: {
+        id: string;
+        full_name: string;
+        email: string;
+      };
     };
   }> => {
     const response = await api.post(`/api/v1/tasks/${taskId}/subtasks`, data);
@@ -442,7 +498,7 @@ export const tasksAPI = {
   updateSubtask: async (
     taskId: string,
     subtaskId: string,
-    data: { title?: string; is_completed?: boolean },
+    data: { title?: string; is_completed?: boolean; assignee_id?: string },
   ): Promise<{
     success: boolean;
     data: {
@@ -450,6 +506,13 @@ export const tasksAPI = {
       title: string;
       is_completed: boolean;
       position?: number;
+      assignee_id?: string;
+      linked_task_id?: string;
+      assignee?: {
+        id: string;
+        full_name: string;
+        email: string;
+      };
     };
   }> => {
     const response = await api.patch(

@@ -36,9 +36,11 @@ export interface UpdateTaskDto {
 
 export interface CreateSubtaskDto {
   title: string;
+  assignee_id?: string;
 }
 
 export interface UpdateSubtaskDto {
   title?: string;
   is_completed?: boolean;
+  assignee_id?: string;
 }

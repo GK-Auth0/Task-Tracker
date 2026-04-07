@@ -81,6 +81,7 @@ export default function CreateTaskModal({
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() =>
     buildLocalAiSuggestion("", ""),
@@ -101,6 +102,7 @@ export default function CreateTaskModal({
     setInvitees([]);
     setDescriptionError("");
     setSubmitError("");
+    setAttachments([]);
     setAiError("");
     setAiLoading(false);
     setAiSuggestion(buildLocalAiSuggestion("", ""));
@@ -253,7 +255,7 @@ export default function CreateTaskModal({
 
     setLoading(true);
     try {
-      await tasksAPI.createTask({
+      const createResponse = await tasksAPI.createTask({
         title: title.trim(),
         description: description.trim(),
         project_id: projectId,
@@ -265,6 +267,13 @@ export default function CreateTaskModal({
         issue_type: issueType,
         invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
       });
+
+      const createdTaskId = createResponse.data?.id;
+      if (createdTaskId && attachments.length > 0) {
+        await Promise.all(
+          attachments.map((file) => tasksAPI.uploadAttachment(createdTaskId, file)),
+        );
+      }
 
       resetForm();
       onTaskCreated();
@@ -302,6 +311,10 @@ export default function CreateTaskModal({
 
   const removeInvitee = (email: string) => {
     setInvitees((prev) => prev.filter((item) => item.email !== email));
+  };
+
+  const removeAttachment = (targetName: string) => {
+    setAttachments((prev) => prev.filter((file) => file.name !== targetName));
   };
 
   const availableDefects = defects.filter(
@@ -349,8 +362,8 @@ export default function CreateTaskModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-[760px] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
+    <div className="fixed inset-0 z-50 bg-slate-900/45 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-[760px] max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
         <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -374,7 +387,7 @@ export default function CreateTaskModal({
         </div>
 
         {/* Modal Body (Form) */}
-        <div className="px-6 py-4 overflow-y-auto max-h-[80vh]">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 [scrollbar-gutter:stable] [will-change:scroll-position]">
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
@@ -883,20 +896,60 @@ export default function CreateTaskModal({
             </div>
 
             {/* Attachments Placeholder */}
-            <div className="p-4 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center gap-2 text-slate-400 hover:border-blue-600/50 hover:text-blue-600 transition-all cursor-pointer">
-              <span className="material-symbols-outlined">attach_file</span>
-              <span className="text-sm font-medium">
-                Drop files to attach or click to browse
-              </span>
-              <input 
-                type="file" 
-                className="sr-only" 
-                multiple 
+            <label className="block rounded-lg border-2 border-dashed border-slate-200 p-4 text-slate-400 hover:border-blue-600/50 hover:text-blue-600 transition-all cursor-pointer">
+              <div className="flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined">attach_file</span>
+                <span className="text-sm font-medium">
+                  Drop files to attach or click to browse
+                </span>
+              </div>
+              <input
+                type="file"
+                className="sr-only"
+                multiple
                 title="Attach files to this task"
                 aria-label="File attachment"
-                placeholder="Select files to attach"
+                onChange={(e) => {
+                  const selected = Array.from(e.target.files || []);
+                  if (selected.length) {
+                    setAttachments((prev) => {
+                      const seen = new Set(prev.map((file) => `${file.name}-${file.size}`));
+                      const next = [...prev];
+                      selected.forEach((file) => {
+                        const key = `${file.name}-${file.size}`;
+                        if (!seen.has(key)) {
+                          next.push(file);
+                        }
+                      });
+                      return next;
+                    });
+                  }
+                  e.currentTarget.value = "";
+                }}
               />
-            </div>
+            </label>
+            {attachments.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((file) => (
+                  <div
+                    key={`${file.name}-${file.size}`}
+                    className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                  >
+                    <span className="truncate max-w-[220px]">{file.name}</span>
+                    <span className="text-slate-400">
+                      {(file.size / (1024 * 1024)).toFixed(1)} MB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(file.name)}
+                      className="material-symbols-outlined text-[14px]"
+                    >
+                      close
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </form>
         </div>
 

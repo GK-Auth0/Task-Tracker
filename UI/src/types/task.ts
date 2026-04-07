@@ -3,6 +3,13 @@ export interface TaskSubtask {
   title: string;
   is_completed: boolean;
   position?: number;
+  assignee_id?: string;
+  linked_task_id?: string;
+  assignee?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
 }
 
 export interface Task {

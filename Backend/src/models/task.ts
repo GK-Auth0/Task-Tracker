@@ -12,7 +12,7 @@ import {
   CreatedAt,
   UpdatedAt,
 } from "sequelize-typescript";
-import { User, Project, Subtask, Comment, Label, TaskLabel } from "./index";
+import { User, Project, Subtask, Comment, Label, TaskLabel, TaskFile } from "./index";
 import Sprint from "./sprint";
 
 @Table({
@@ -127,6 +127,9 @@ export default class Task extends Model {
 
   @HasMany(() => Comment, "task_id")
   comments!: Comment[];
+
+  @HasMany(() => TaskFile, "task_id")
+  attachments!: TaskFile[];
 
   @BelongsToMany(() => Label, () => TaskLabel)
   labels!: Label[];

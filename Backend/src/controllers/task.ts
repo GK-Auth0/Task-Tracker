@@ -11,11 +11,14 @@ import {
   createSubtask,
   updateSubtask,
   deleteSubtask,
+  getTaskForUpload,
 } from "../services/task";
 import { createAuditLog, getAuditLogs } from "../services/auditService";
 import { processInvites } from "../services/invitation";
 import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
+import cloudinary from "../config/cloudinary";
+import { TaskFile, User } from "../models";
 
 const normalizeTaskPriority = (value: unknown): string | undefined => {
   if (value === undefined || value === null) return undefined;
@@ -308,7 +311,10 @@ export const createTaskSubtask = async (req: Request, res: Response) => {
 
     const subtask = await createSubtask(
       taskId,
-      { title: String(req.body.title).trim() },
+      {
+        title: String(req.body.title).trim(),
+        assignee_id: req.body.assignee_id,
+      },
       userId,
     );
 
@@ -349,6 +355,7 @@ export const updateTaskSubtask = async (req: Request, res: Response) => {
         title:
           req.body.title === undefined ? undefined : String(req.body.title).trim(),
         is_completed: req.body.is_completed,
+        assignee_id: req.body.assignee_id,
       },
       userId,
     );
@@ -391,6 +398,68 @@ export const removeTaskSubtask = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to delete subtask",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const uploadTaskAttachment = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+    const file = (req as any).file;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file provided",
+      });
+    }
+
+    await getTaskForUpload(taskId, userId);
+
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: `task-tracker/tasks/${taskId}`,
+      resource_type: "auto",
+    });
+
+    const attachment = await TaskFile.create({
+      task_id: taskId,
+      filename: result.public_id,
+      original_name: file.originalname,
+      file_url: result.secure_url,
+      file_size: file.size,
+      mime_type: file.mimetype,
+      uploaded_by: userId,
+    });
+
+    const attachmentWithUploader = await TaskFile.findByPk(attachment.id, {
+      include: [
+        {
+          model: User,
+          as: "uploader",
+          attributes: ["id", "full_name", "email"],
+        },
+      ],
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Attachment uploaded successfully",
+      data: attachmentWithUploader,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to upload attachment",
       error: (error as any).message,
     });
   }

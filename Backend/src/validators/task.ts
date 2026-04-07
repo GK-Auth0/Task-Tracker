@@ -199,6 +199,12 @@ export const createSubtaskSchema = {
       errorMessage: "Subtask title must be between 2 and 255 characters",
     },
   },
+  assignee_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Assignee ID must be a valid UUID",
+    },
+  },
 };
 
 export const updateSubtaskSchema = {
@@ -214,6 +220,12 @@ export const updateSubtaskSchema = {
     optional: true,
     isBoolean: {
       errorMessage: "is_completed must be a boolean",
+    },
+  },
+  assignee_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Assignee ID must be a valid UUID",
     },
   },
 };

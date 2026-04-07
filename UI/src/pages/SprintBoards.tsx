@@ -21,12 +21,12 @@ type BoardTab = "dev" | "qa";
 type MonitoringTab = "health" | "risks";
 
 type SprintDraft = {
-  name: string;
+  sprintNumber: string;
   goal: string;
   release: string;
   squad: string;
   owner: string;
-  projectId: string;
+  projectIds: string[];
   capacity: string;
   startDate: string;
   endDate: string;
@@ -85,12 +85,12 @@ const monitoringTabs = [
 ] as const;
 
 const defaultDraft: SprintDraft = {
-  name: "Sprint 25",
+  sprintNumber: "",
   goal: "Finish release validation and close remaining blocker defects",
   release: SPRINT_CREATE_CONTEXT.releaseOptions[0],
   squad: SPRINT_CREATE_CONTEXT.squadOptions[4],
   owner: "",
-  projectId: "",
+  projectIds: [],
   capacity: "44",
   startDate: "2026-04-06",
   endDate: "2026-04-17",
@@ -141,6 +141,13 @@ const uniqueSprintNames = (defects: Defect[], testCases: TestCaseRecord[]) => {
   return Array.from(new Set(names));
 };
 
+const SPRINT_NAME_PATTERN = /^Sprint[-\s]?(\d+)$/i;
+
+const getSprintNumber = (name?: string | null) => {
+  const match = String(name || "").match(SPRINT_NAME_PATTERN);
+  return match ? Number.parseInt(match[1], 10) : null;
+};
+
 export default function SprintBoards() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<MainTab>("planning");
@@ -158,6 +165,10 @@ export default function SprintBoards() {
   const [savingSprint, setSavingSprint] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createMessage, setCreateMessage] = useState("");
+  const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
   const [loading, setLoading] = useState(true);
   const createTabRequested = searchParams.get("tab") === "create";
   const requestedProjectId = searchParams.get("projectId") || "";
@@ -196,7 +207,12 @@ export default function SprintBoards() {
           setProjects(projectsResponse.data);
           setDraft((current) => ({
             ...current,
-            projectId: current.projectId || projectsResponse.data[0]?.id || "",
+            projectIds:
+              current.projectIds.length > 0
+                ? current.projectIds
+                : projectsResponse.data[0]?.id
+                  ? [projectsResponse.data[0].id]
+                  : [],
           }));
         }
         if (usersResponse.success) {
@@ -220,12 +236,35 @@ export default function SprintBoards() {
     if (!requestedProjectId) return;
     setDraft((current) => ({
       ...current,
-      projectId: requestedProjectId,
+      projectIds: [requestedProjectId],
     }));
   }, [requestedProjectId]);
 
   const updateDraft = (field: keyof SprintDraft, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const toggleProjectSelection = (projectId: string) => {
+    setDraft((current) => {
+      const alreadySelected = current.projectIds.includes(projectId);
+      const nextProjectIds = alreadySelected
+        ? current.projectIds.filter((id) => id !== projectId)
+        : [...current.projectIds, projectId];
+
+      return {
+        ...current,
+        projectIds: nextProjectIds,
+      };
+    });
+
+    setSelectedTaskIds((current) =>
+      current.filter((taskId) => {
+        const task = tasks.find((item) => item.id === taskId);
+        const taskProjectId = task?.project?.id;
+        if (!taskProjectId) return false;
+        return taskProjectId !== projectId || !draft.projectIds.includes(projectId);
+      }),
+    );
   };
 
   const activeSprintRecord = sprints[0] || null;
@@ -237,12 +276,108 @@ export default function SprintBoards() {
     testCases.find((item) => item.project?.name)?.project?.name ||
     "Current Release";
 
+  const selectedProjects = useMemo(
+    () => projects.filter((project) => draft.projectIds.includes(project.id)),
+    [draft.projectIds, projects],
+  );
+
+  const nextSprintNumber = useMemo(() => {
+    const scopedProjectIds = draft.projectIds.length
+      ? draft.projectIds
+      : requestedProjectId
+        ? [requestedProjectId]
+        : projects.map((project) => project.id);
+
+    const sprintNumbers = sprints
+      .filter((sprint) => !scopedProjectIds.length || scopedProjectIds.includes(sprint.project_id))
+      .map((sprint) => getSprintNumber(sprint.name))
+      .filter((value): value is number => Number.isFinite(value ?? NaN));
+
+    return sprintNumbers.length ? Math.max(...sprintNumbers) + 1 : 1;
+  }, [draft.projectIds, projects, requestedProjectId, sprints]);
+
+  const sprintNumberOptions = useMemo(() => {
+    const upperBound = Math.max(nextSprintNumber + 5, 12);
+    return Array.from({ length: upperBound }, (_, index) => index + 1);
+  }, [nextSprintNumber]);
+
+  useEffect(() => {
+    setDraft((current) => {
+      const currentNumber = Number(current.sprintNumber);
+      if (currentNumber > 0) return current;
+      return {
+        ...current,
+        sprintNumber: String(nextSprintNumber),
+      };
+    });
+  }, [nextSprintNumber]);
+
   const selectedProjectTasks = useMemo(
     () =>
       tasks.filter(
-        (task) => !draft.projectId || task.project?.id === draft.projectId,
+        (task) =>
+          !draft.projectIds.length ||
+          (task.project?.id ? draft.projectIds.includes(task.project.id) : false),
       ),
-    [draft.projectId, tasks],
+    [draft.projectIds, tasks],
+  );
+
+  const selectedTaskProjectMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    selectedTaskIds.forEach((taskId) => {
+      const task = tasks.find((item) => item.id === taskId);
+      const projectId = task?.project?.id;
+      if (!projectId) return;
+      map.set(projectId, [...(map.get(projectId) || []), taskId]);
+    });
+    return map;
+  }, [selectedTaskIds, tasks]);
+
+  const selectedScopeSummary = useMemo(() => {
+    const scopedTasks = selectedProjectTasks.filter((task) => selectedTaskIds.includes(task.id));
+    return {
+      tasks: scopedTasks.length,
+      unassigned: scopedTasks.filter((task) => !task.assignee?.id).length,
+      highPriority: scopedTasks.filter((task) => task.priority === "High").length,
+      inProgress: scopedTasks.filter((task) => task.status === "In Progress").length,
+    };
+  }, [selectedProjectTasks, selectedTaskIds]);
+
+  const readinessChecks = useMemo(
+    () => [
+      {
+        label: "Projects linked",
+        complete: draft.projectIds.length > 0,
+        detail:
+          draft.projectIds.length > 0
+            ? `${draft.projectIds.length} project${draft.projectIds.length > 1 ? "s" : ""} selected`
+            : "Pick at least one project",
+      },
+      {
+        label: "Sprint owner",
+        complete: Boolean(draft.owner),
+        detail: draft.owner
+          ? users.find((user) => user.id === draft.owner)?.full_name || "Owner selected"
+          : "Assign an owner",
+      },
+      {
+        label: "Timeline set",
+        complete: Boolean(draft.startDate && draft.endDate),
+        detail:
+          draft.startDate && draft.endDate
+            ? `${draft.startDate} to ${draft.endDate}`
+            : "Add start and end dates",
+      },
+      {
+        label: "Scope committed",
+        complete: selectedTaskIds.length > 0,
+        detail:
+          selectedTaskIds.length > 0
+            ? `${selectedTaskIds.length} task${selectedTaskIds.length > 1 ? "s" : ""} linked`
+            : "Link backlog items for this sprint",
+      },
+    ],
+    [draft.endDate, draft.owner, draft.projectIds.length, draft.startDate, selectedTaskIds.length, users],
   );
 
   const handleToggleTaskSelection = (taskId: string) => {
@@ -253,9 +388,56 @@ export default function SprintBoards() {
     );
   };
 
+  const handleCreateInlineProject = async () => {
+    if (!newProjectName.trim()) {
+      setCreateError("Project name is required before creating a sprint project.");
+      return;
+    }
+
+    try {
+      setCreatingProject(true);
+      setCreateError("");
+
+      const response = await projectsAPI.createProject({
+        name: newProjectName.trim(),
+        description: newProjectDescription.trim() || undefined,
+      });
+
+      if (response.success) {
+        setProjects((current) => [...current, response.data]);
+        setDraft((current) => ({
+          ...current,
+          projectIds: current.projectIds.includes(response.data.id)
+            ? current.projectIds
+            : [...current.projectIds, response.data.id],
+        }));
+        setNewProjectName("");
+        setNewProjectDescription("");
+        setShowCreateProjectForm(false);
+        setCreateMessage(`Project ${response.data.name} created and added to this sprint draft.`);
+      }
+    } catch (error: any) {
+      console.error("Failed to create project:", error);
+      setCreateError(error?.response?.data?.message || "Failed to create project");
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   const handleCreateSprint = async () => {
-    if (!draft.name.trim() || !draft.projectId) {
-      setCreateError("Sprint name and project are required");
+    if (!draft.projectIds.length) {
+      setCreateError("Select at least one project before creating a sprint.");
+      return;
+    }
+
+    if (!draft.owner) {
+      setCreateError("Sprint owner is required.");
+      return;
+    }
+
+    const sprintNumber = Number(draft.sprintNumber || nextSprintNumber);
+    if (!Number.isFinite(sprintNumber) || sprintNumber < 1) {
+      setCreateError("Select a valid sprint number.");
       return;
     }
 
@@ -263,30 +445,54 @@ export default function SprintBoards() {
       setSavingSprint(true);
       setCreateError("");
       setCreateMessage("");
-      const response = await sprintsAPI.createSprint({
-        name: draft.name.trim(),
-        goal: draft.goal.trim() || undefined,
-        release: draft.release || undefined,
-        squad: draft.squad || undefined,
-        project_id: draft.projectId,
-        owner_id: draft.owner || undefined,
-        capacity: draft.capacity ? Number(draft.capacity) : undefined,
-        start_date: draft.startDate || undefined,
-        end_date: draft.endDate || undefined,
-        status: "Active",
-        task_ids: selectedTaskIds,
-      });
-      if (response.success) {
-        setCreateMessage(`Sprint ${response.data.name} created successfully.`);
-        const sprintResponse = await sprintsAPI.getSprints();
-        if (sprintResponse.success) {
-          setSprints(sprintResponse.data);
-        }
-        const tasksResponse = await tasksAPI.getTasks({ limit: 200 });
-        if (tasksResponse.success) {
-          setTasks(tasksResponse.data);
-        }
-        setSelectedTaskIds([]);
+      const sprintName = `Sprint-${sprintNumber}`;
+      const results = await Promise.allSettled(
+        draft.projectIds.map((projectId) =>
+          sprintsAPI.createSprint({
+            name: sprintName,
+            goal: draft.goal.trim() || undefined,
+            release: draft.release || undefined,
+            squad: draft.squad || undefined,
+            project_id: projectId,
+            owner_id: draft.owner || undefined,
+            capacity: draft.capacity ? Number(draft.capacity) : undefined,
+            start_date: draft.startDate || undefined,
+            end_date: draft.endDate || undefined,
+            status: "Active",
+            task_ids: selectedTaskProjectMap.get(projectId) || [],
+          }),
+        ),
+      );
+
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failureCount = results.length - successCount;
+
+      if (!successCount) {
+        throw new Error("Failed to create sprint");
+      }
+
+      const sprintResponse = await sprintsAPI.getSprints();
+      if (sprintResponse.success) {
+        setSprints(sprintResponse.data);
+      }
+      const tasksResponse = await tasksAPI.getTasks({ limit: 200 });
+      if (tasksResponse.success) {
+        setTasks(tasksResponse.data);
+      }
+      setSelectedTaskIds([]);
+      setDraft((current) => ({
+        ...current,
+        sprintNumber: String(sprintNumber + 1),
+      }));
+
+      setCreateMessage(
+        successCount === 1
+          ? `${sprintName} created successfully for ${selectedProjects[0]?.name || "the selected project"}.`
+          : `${sprintName} created for ${successCount} projects.${failureCount ? ` ${failureCount} project request${failureCount > 1 ? "s" : ""} failed.` : ""}`,
+      );
+
+      if (failureCount) {
+        setCreateError("Some selected projects could not be added. Review access and retry.");
       }
     } catch (error: any) {
       console.error("Failed to create sprint:", error);
@@ -948,14 +1154,39 @@ export default function SprintBoards() {
               ) : null}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block">
-                  <span className="text-xs font-medium text-slate-700">Sprint name</span>
-                  <input
-                    type="text"
-                    value={draft.name}
-                    onChange={(e) => updateDraft("name", e.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+                  <span className="text-xs font-medium text-slate-700">Sprint number</span>
+                  <div className="mt-2 flex overflow-hidden rounded-lg border border-slate-300 bg-white">
+                    <span className="inline-flex items-center border-r border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-600">
+                      Sprint
+                    </span>
+                    <select
+                      value={draft.sprintNumber}
+                      onChange={(e) => updateDraft("sprintNumber", e.target.value)}
+                      className="w-full border-0 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-100"
+                    >
+                      {sprintNumberOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Next suggested number: Sprint {nextSprintNumber}
+                  </p>
                 </label>
+
+                <div className="block">
+                  <span className="text-xs font-medium text-slate-700">Sprint preview</span>
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Sprint-{draft.sprintNumber || nextSprintNumber}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">
+                      The sprint label stays fixed and only the number changes, like Jira.
+                    </p>
+                  </div>
+                </div>
 
                 <label className="block">
                   <span className="text-xs font-medium text-slate-700">Release</span>
@@ -972,24 +1203,89 @@ export default function SprintBoards() {
                   </select>
                 </label>
 
-                <label className="block">
-                  <span className="text-xs font-medium text-slate-700">Project</span>
-                  <select
-                    value={draft.projectId}
-                    onChange={(e) => {
-                      updateDraft("projectId", e.target.value);
-                      setSelectedTaskIds([]);
-                    }}
-                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option value="">Select project</option>
-                    {projects.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="block md:col-span-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-700">Projects</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateProjectForm((current) => !current)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      {showCreateProjectForm ? "Close project creator" : "Create project inline"}
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {projects.map((option) => {
+                      const selected = draft.projectIds.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => toggleProjectSelection(option.id)}
+                          className={`rounded-lg border px-3 py-3 text-left transition ${
+                            selected
+                              ? "border-blue-500 bg-blue-50 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {option.name}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Add this project to the sprint scope
+                              </p>
+                            </div>
+                            <span
+                              className={`material-symbols-outlined text-lg ${
+                                selected ? "text-blue-600" : "text-slate-300"
+                              }`}
+                            >
+                              {selected ? "check_circle" : "radio_button_unchecked"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {!projects.length ? (
+                    <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                      No projects found yet. Create one here to continue with sprint planning.
+                    </div>
+                  ) : null}
+
+                  {showCreateProjectForm || !projects.length ? (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">Create project</p>
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                        <input
+                          type="text"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          placeholder="Project name"
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <input
+                          type="text"
+                          value={newProjectDescription}
+                          onChange={(e) => setNewProjectDescription(e.target.value)}
+                          placeholder="Short description"
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateInlineProject}
+                          disabled={creatingProject}
+                          className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {creatingProject ? "Creating..." : "Create"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
 
                 <label className="block">
                   <span className="text-xs font-medium text-slate-700">Owner</span>
@@ -1066,36 +1362,146 @@ export default function SprintBoards() {
                 <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Jira Planning Checks
+                    </p>
+                    <span className="text-[11px] text-slate-500">
+                      {readinessChecks.filter((item) => item.complete).length}/
+                      {readinessChecks.length} ready
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {readinessChecks.map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`material-symbols-outlined text-base ${
+                              item.complete ? "text-emerald-600" : "text-amber-500"
+                            }`}
+                          >
+                            {item.complete ? "check_circle" : "pending"}
+                          </span>
+                          <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Scope Summary
+                    </p>
+                    <span className="text-[11px] text-slate-500">
+                      {selectedProjects.length} project{selectedProjects.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                        Tasks
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {selectedScopeSummary.tasks}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                        Unassigned
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {selectedScopeSummary.unassigned}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                        High Priority
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {selectedScopeSummary.highPriority}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                        In Progress
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {selectedScopeSummary.inProgress}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Link Existing Tasks
                     </p>
                     <span className="text-[11px] text-slate-500">
                       {selectedTaskIds.length} selected
                     </span>
                   </div>
-                  <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+                  <div className="mt-3 max-h-64 space-y-3 overflow-y-auto pr-1">
                     {selectedProjectTasks.length ? (
-                      selectedProjectTasks.map((task) => (
-                        <label
-                          key={task.id}
-                          className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedTaskIds.includes(task.id)}
-                            onChange={() => handleToggleTaskSelection(task.id)}
-                            className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {task.status} • {task.priority}
-                            </p>
+                      selectedProjects.map((project) => {
+                        const projectTasks = selectedProjectTasks.filter(
+                          (task) => task.project?.id === project.id,
+                        );
+
+                        return (
+                          <div
+                            key={project.id}
+                            className="rounded-lg border border-slate-200 bg-white"
+                          >
+                            <div className="border-b border-slate-100 px-3 py-2.5">
+                              <p className="text-sm font-semibold text-slate-900">
+                                {project.name}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                {projectTasks.length} backlog item
+                                {projectTasks.length === 1 ? "" : "s"} available
+                              </p>
+                            </div>
+                            <div className="space-y-2 p-3">
+                              {projectTasks.length ? (
+                                projectTasks.map((task) => (
+                                  <label
+                                    key={task.id}
+                                    className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedTaskIds.includes(task.id)}
+                                      onChange={() => handleToggleTaskSelection(task.id)}
+                                      className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-slate-900">
+                                        {task.title}
+                                      </p>
+                                      <p className="mt-1 text-xs text-slate-500">
+                                        {task.status} • {task.priority} •{" "}
+                                        {task.assignee?.full_name || "Unassigned"}
+                                      </p>
+                                    </div>
+                                  </label>
+                                ))
+                              ) : (
+                                <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-5 text-center text-xs text-slate-500">
+                                  No tasks available for this project yet.
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </label>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-xs text-slate-500">
-                        Select a project to choose existing tasks for this sprint.
+                        Select one or more projects to choose existing tasks for this sprint.
                       </div>
                     )}
                   </div>
@@ -1105,11 +1511,15 @@ export default function SprintBoards() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Preview
                   </p>
-                  <h3 className="mt-2 text-sm font-semibold text-slate-900">{draft.name}</h3>
+                  <h3 className="mt-2 text-sm font-semibold text-slate-900">
+                    Sprint-{draft.sprintNumber || nextSprintNumber}
+                  </h3>
                   <p className="mt-1.5 text-xs leading-5 text-slate-600">{draft.goal}</p>
                   <p className="mt-2 text-[11px] text-slate-500">
                     {users.find((user) => user.id === draft.owner)?.full_name || "Owner"} •{" "}
-                    {projects.find((project) => project.id === draft.projectId)?.name || "Project"} •{" "}
+                    {selectedProjects.length
+                      ? selectedProjects.map((project) => project.name).join(", ")
+                      : "Project"} •{" "}
                     {draft.squad} • {draft.capacity} pts
                   </p>
                 </div>

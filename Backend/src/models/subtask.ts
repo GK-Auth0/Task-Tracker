@@ -8,7 +8,7 @@ import {
   ForeignKey,
   BelongsTo,
 } from "sequelize-typescript";
-import { Task } from "./index";
+import { Task, User } from "./index";
 
 @Table({
   tableName: "subtasks",
@@ -47,6 +47,26 @@ export default class Subtask extends Model {
   })
   position!: number;
 
+  @ForeignKey(() => User)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  assignee_id?: string;
+
+  @ForeignKey(() => Task)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  linked_task_id?: string;
+
   @BelongsTo(() => Task, "task_id")
   task!: Task;
+
+  @BelongsTo(() => User, "assignee_id")
+  assignee?: User;
+
+  @BelongsTo(() => Task, "linked_task_id")
+  linked_task?: Task;
 }

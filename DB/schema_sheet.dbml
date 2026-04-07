@@ -72,6 +72,21 @@ Table subtasks {
   title varchar(255) [not null]
   is_completed boolean
   position integer [not null]
+  assignee_id uuid
+  linked_task_id uuid
+}
+
+Table task_files {
+  id uuid [pk]
+  task_id uuid [not null]
+  filename varchar(255) [not null]
+  original_name varchar(255) [not null]
+  file_url text [not null]
+  file_size bigint [not null]
+  mime_type varchar(100) [not null]
+  uploaded_by uuid [not null]
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table comments {
@@ -438,6 +453,10 @@ Ref: tasks.assignee_id > users.id
 Ref: tasks.defect_id > defects.id
 Ref: tasks.sprint_id > sprints.id
 Ref: subtasks.task_id > tasks.id
+Ref: subtasks.assignee_id > users.id
+Ref: subtasks.linked_task_id > tasks.id
+Ref: task_files.task_id > tasks.id
+Ref: task_files.uploaded_by > users.id
 Ref: comments.task_id > tasks.id
 Ref: comments.user_id > users.id
 Ref: task_labels.task_id > tasks.id
