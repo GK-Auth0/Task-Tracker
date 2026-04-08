@@ -168,12 +168,13 @@ export const createNewTask = async (req: Request, res: Response) => {
 export const getTask = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const organizationId = (req as any).user?.organization_id;
     const taskId = req.params.id as string;
 
-    if (!userId) {
+    if (!userId || !organizationId) {
       return res.status(401).json({
         success: false,
-        message: "User ID required",
+        message: "User context required",
         error: "UNAUTHORIZED",
       });
     }
@@ -569,12 +570,13 @@ export const getTaskCommitHistory = async (req: Request, res: Response) => {
 export const getTaskActivityLogs = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const organizationId = (req as any).user?.organization_id;
     const taskId = req.params.id as string;
 
-    if (!userId) {
+    if (!userId || !organizationId) {
       return res.status(401).json({
         success: false,
-        message: "User ID required",
+        message: "User context required",
         error: "UNAUTHORIZED",
       });
     }
@@ -583,7 +585,7 @@ export const getTaskActivityLogs = async (req: Request, res: Response) => {
     await getTaskById(taskId, userId);
 
     const limit = parseBoundedInt(req.query.limit, 50, 1, 200);
-    const logs = await getAuditLogs("task", taskId, limit);
+    const logs = await getAuditLogs(organizationId, "task", taskId, limit);
 
     return res.status(200).json({
       success: true,

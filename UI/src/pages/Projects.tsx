@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "react-query";
 import { projectService } from "../services/projectService";
 import { tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
@@ -20,46 +21,42 @@ type ProjectStatusFilter = "all" | ProjectStatus;
 
 const Projects: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [insights, setInsights] = useState<AiProjectInsights | null>(null);
-  const [insightsLoading, setInsightsLoading] = useState(false);
-  const [insightsError, setInsightsError] = useState("");
-  const [pinnedProjectIds, setPinnedProjectIds] = useState<Set<string>>(new Set());
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState("");
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const canCreateProject = canManageWorkspaceContent(user?.role);
 
-  const fetchProjects = useCallback(async () => {
-    try {
-      setLoading(true);
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>(
+    ["projects-list"],
+    async () => {
       const response = await projectService.getProjects();
       const payload = Array.isArray((response as any)?.data)
         ? (response as any).data
         : Array.isArray((response as any)?.data?.data)
           ? (response as any).data.data
           : [];
-      setProjects(payload);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return payload;
+    },
+    {
+      staleTime: 30_000,
+    },
+  );
 
-  const fetchInsights = useCallback(async () => {
-    try {
-      setInsightsLoading(true);
-      setInsightsError("");
+  const {
+    data: insights = null,
+    isLoading: insightsLoading,
+    error: insightsQueryError,
+    refetch: refetchInsights,
+  } = useQuery<AiProjectInsights | null>(
+    ["project-insights"],
+    async () => {
       const tasksRes = await tasksAPI.getTasks({ limit: 200 });
       const payload = tasksRes.data.map((task) => ({
         title: task.title,
@@ -67,39 +64,37 @@ const Projects: React.FC = () => {
         status: task.status,
         due_date: task.due_date,
       }));
-      const result = await aiAssistantAPI.projectInsights(payload);
-      setInsights(result);
-    } catch (error) {
-      setInsightsError("AI insights currently unavailable.");
-    } finally {
-      setInsightsLoading(false);
+      if (payload.length === 0) {
+        return null;
+      }
+      return aiAssistantAPI.projectInsights(payload);
+    },
+    {
+      staleTime: 30_000,
     }
-  }, []);
+  );
 
-  const fetchPinnedProjects = useCallback(async () => {
-    try {
-      const pins = await preferencesAPI.getPins("project");
-      setPinnedProjectIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
-    } catch (error) {
-      console.error("Failed to load pinned projects:", error);
-    }
-  }, []);
+  const { data: pins = [] } = useQuery<PinnedItem[]>(
+    ["project-pins"],
+    () => preferencesAPI.getPins("project"),
+    {
+      staleTime: 30_000,
+    },
+  );
 
-  const fetchSavedViews = useCallback(async () => {
-    try {
-      const views = await preferencesAPI.getSavedViews("projects");
-      setSavedViews(views);
-    } catch (error) {
-      console.error("Failed to load saved views:", error);
-    }
-  }, []);
+  const { data: savedViews = [] } = useQuery<SavedView[]>(
+    ["saved-project-views"],
+    () => preferencesAPI.getSavedViews("projects"),
+    {
+      staleTime: 30_000,
+    },
+  );
 
-  useEffect(() => {
-    fetchProjects();
-    fetchInsights();
-    fetchPinnedProjects();
-    fetchSavedViews();
-  }, [fetchInsights, fetchPinnedProjects, fetchProjects, fetchSavedViews]);
+  const pinnedProjectIds = useMemo(
+    () => new Set(pins.map((pin) => pin.entity_id)),
+    [pins],
+  );
+  const insightsError = insightsQueryError ? "AI insights currently unavailable." : "";
 
   useEffect(() => {
     const query = searchParams.get("q");
@@ -167,7 +162,10 @@ const Projects: React.FC = () => {
       }
 
       setShowCreateModal(false);
-      await fetchProjects();
+      await Promise.all([
+        queryClient.invalidateQueries(["projects-list"]),
+        queryClient.invalidateQueries(["project-insights"]),
+      ]);
       return {
         id: response.data.id,
         name: response.data.name,
@@ -180,7 +178,7 @@ const Projects: React.FC = () => {
         error.response?.data?.message || error.message || "Unknown error";
       throw new Error(errorMessage);
     }
-  }, [canCreateProject, fetchProjects]);
+  }, [canCreateProject, queryClient]);
 
   const filteredProjects = projects.filter((project) => {
     const projectName = String(project?.name ?? "");
@@ -203,20 +201,11 @@ const Projects: React.FC = () => {
       } else {
         await preferencesAPI.removePin("project", projectId);
       }
-
-      setPinnedProjectIds((prev) => {
-        const next = new Set(prev);
-        if (shouldPin) {
-          next.add(projectId);
-        } else {
-          next.delete(projectId);
-        }
-        return next;
-      });
+      await queryClient.invalidateQueries(["project-pins"]);
     } catch (error) {
       console.error("Failed to update project pin:", error);
     }
-  }, []);
+  }, [queryClient]);
 
   const applySavedView = useCallback(() => {
     if (!selectedViewId) return;
@@ -252,24 +241,24 @@ const Projects: React.FC = () => {
         },
       });
       setNewViewName("");
-      await fetchSavedViews();
+      await queryClient.invalidateQueries(["saved-project-views"]);
     } catch (error) {
       console.error("Failed to save current project view:", error);
     } finally {
       setSavingView(false);
     }
-  }, [fetchSavedViews, newViewName, searchTerm, showPinnedOnly, statusFilter]);
+  }, [newViewName, queryClient, searchTerm, showPinnedOnly, statusFilter]);
 
   const deleteSelectedView = useCallback(async () => {
     if (!selectedViewId) return;
     try {
       await preferencesAPI.deleteSavedView(selectedViewId);
       setSelectedViewId("");
-      await fetchSavedViews();
+      await queryClient.invalidateQueries(["saved-project-views"]);
     } catch (error) {
       console.error("Failed to delete saved project view:", error);
     }
-  }, [fetchSavedViews, selectedViewId]);
+  }, [queryClient, selectedViewId]);
 
   const handleOpenCreateProject = useCallback(() => {
     setShowCreateModal(true);
@@ -283,7 +272,7 @@ const Projects: React.FC = () => {
     setShowPinnedOnly((previous) => !previous);
   }, []);
 
-  if (loading) {
+  if (projectsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         Loading...
@@ -334,7 +323,7 @@ const Projects: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={fetchInsights}
+              onClick={() => void refetchInsights()}
               disabled={insightsLoading}
               className="h-9 px-4 rounded-lg bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800 disabled:opacity-50"
             >

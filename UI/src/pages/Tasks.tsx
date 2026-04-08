@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { GridRowSelectionModel } from "@mui/x-data-grid";
+import { useQuery, useQueryClient } from "react-query";
 import { dashboardAPI, tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
-import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
+import preferencesAPI, { PinnedItem } from "../services/preferences";
 import { useAuth } from "../contexts/AuthContext";
 import RingLoader from "../components/RingLoader";
 import CreateTaskModal from "../components/CreateTaskModal";
@@ -16,21 +17,17 @@ import TasksOverviewTab from "../components/tasks/TasksOverviewTab";
 import TasksTabs, { TasksTabKey } from "../components/tasks/TasksTabs";
 import TableExportActions, { TableExportColumn } from "../components/TableExportActions";
 import {
-  DashboardSummary,
   TaskGroupOption,
   TaskItem,
   TaskSortOption,
-  TasksPagination as TasksPageData,
 } from "../components/tasks/types";
 import { canManageWorkspaceContent } from "../types/roles";
 
 export default function Tasks() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<string>("");
@@ -42,13 +39,10 @@ export default function Tasks() {
   const [groupBy, setGroupBy] = useState<TaskGroupOption>("none");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [pagination, setPagination] = useState<TasksPageData | null>(null);
   const [dayPlan, setDayPlan] = useState<AiDayPlan | null>(null);
   const [planning, setPlanning] = useState(false);
   const [planError, setPlanError] = useState("");
-  const [pinnedTaskIds, setPinnedTaskIds] = useState<Set<string>>(new Set());
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState("");
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
@@ -62,57 +56,65 @@ export default function Tasks() {
   });
   const canCreateTask = canManageWorkspaceContent(user?.role);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const filters: any = {
-        page: currentPage,
-        limit: itemsPerPage,
-      };
-      if (filter === "In Progress") filters.status = "In Progress";
-      if (filter === "High Priority") filters.priority = "High";
-      if (priorityFilter) filters.priority = priorityFilter;
-      if (statusFilter) filters.status = statusFilter;
-
-      const [summaryRes, tasksRes] = await Promise.all([
-        dashboardAPI.getSummary(),
-        tasksAPI.getTasks(filters),
-      ]);
-      setSummary(summaryRes.data);
-      setTasks(tasksRes.data);
-      setPagination(tasksRes.pagination || null);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
-    } finally {
-      setLoading(false);
-    }
+  const taskFilters = useMemo(() => {
+    const filters: Record<string, string | number> = {
+      page: currentPage,
+      limit: itemsPerPage,
+    };
+    if (filter === "In Progress") filters.status = "In Progress";
+    if (filter === "High Priority") filters.priority = "High";
+    if (priorityFilter) filters.priority = priorityFilter;
+    if (statusFilter) filters.status = statusFilter;
+    return filters;
   }, [currentPage, filter, itemsPerPage, priorityFilter, statusFilter]);
 
-  const fetchPinnedTasks = useCallback(async () => {
-    try {
-      const pins = await preferencesAPI.getPins("task");
-      setPinnedTaskIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
-    } catch (error) {
-      console.error("Failed to load pinned tasks:", error);
-    }
-  }, []);
+  const { data: summary = null } = useQuery(
+    ["dashboard-summary"],
+    async () => {
+      const response = await dashboardAPI.getSummary();
+      return response.data;
+    },
+    {
+      staleTime: 30_000,
+    },
+  );
 
-  const fetchSavedViews = useCallback(async () => {
-    try {
-      const views = await preferencesAPI.getSavedViews("tasks");
-      setSavedViews(views);
-    } catch (error) {
-      console.error("Failed to load saved views:", error);
-    }
-  }, []);
+  const { data: tasksQueryData, isLoading: tasksLoading } = useQuery(
+    ["tasks-page-data", taskFilters],
+    async () => {
+      const response = await tasksAPI.getTasks(taskFilters);
+      return {
+        tasks: response.data,
+        pagination: response.pagination || null,
+      };
+    },
+    {
+      keepPreviousData: true,
+    },
+  );
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data: pins = [] } = useQuery(
+    ["task-pins"],
+    () => preferencesAPI.getPins("task"),
+    {
+      staleTime: 30_000,
+    },
+  );
 
-  useEffect(() => {
-    fetchPinnedTasks();
-    fetchSavedViews();
-  }, [fetchPinnedTasks, fetchSavedViews]);
+  const { data: savedViews = [] } = useQuery(
+    ["saved-task-views"],
+    () => preferencesAPI.getSavedViews("tasks"),
+    {
+      staleTime: 30_000,
+    },
+  );
+
+  const tasks = tasksQueryData?.tasks || [];
+  const pagination = tasksQueryData?.pagination || null;
+  const pinnedTaskIds = useMemo(
+    () => new Set(pins.map((pin: PinnedItem) => pin.entity_id)),
+    [pins],
+  );
 
   useEffect(() => {
     const query = searchParams.get("q");
@@ -123,8 +125,9 @@ export default function Tasks() {
   }, [searchParams]);
 
   const handleTaskCreated = useCallback(() => {
-    fetchData();
-  }, [fetchData]);
+    queryClient.invalidateQueries(["tasks-page-data"]);
+    queryClient.invalidateQueries(["dashboard-summary"]);
+  }, [queryClient]);
 
   const handleTaskToggle = useCallback(async (taskId: string, completed: boolean) => {
     if (!canCreateTask) return;
@@ -132,11 +135,14 @@ export default function Tasks() {
       await tasksAPI.updateTask(taskId, {
         status: completed ? "Done" : "To Do",
       });
-      fetchData();
+      await Promise.all([
+        queryClient.invalidateQueries(["tasks-page-data"]),
+        queryClient.invalidateQueries(["dashboard-summary"]),
+      ]);
     } catch (error) {
       console.error("Failed to update task:", error);
     }
-  }, [canCreateTask, fetchData]);
+  }, [canCreateTask, queryClient]);
 
   const visibleTasks = tasks
     .filter((task) =>
@@ -242,20 +248,11 @@ export default function Tasks() {
       } else {
         await preferencesAPI.removePin("task", taskId);
       }
-
-      setPinnedTaskIds((prev) => {
-        const next = new Set(prev);
-        if (shouldPin) {
-          next.add(taskId);
-        } else {
-          next.delete(taskId);
-        }
-        return next;
-      });
+      await queryClient.invalidateQueries(["task-pins"]);
     } catch (error) {
       console.error("Failed to update task pin:", error);
     }
-  }, []);
+  }, [queryClient]);
 
   const applySavedView = useCallback(() => {
     if (!selectedViewId) return;
@@ -296,7 +293,7 @@ export default function Tasks() {
         },
       });
       setNewViewName("");
-      await fetchSavedViews();
+      await queryClient.invalidateQueries(["saved-task-views"]);
     } catch (error) {
       console.error("Failed to save current view:", error);
     } finally {
@@ -304,10 +301,10 @@ export default function Tasks() {
     }
   }, [
     compactMode,
-    fetchSavedViews,
     filter,
     groupBy,
     newViewName,
+    queryClient,
     priorityFilter,
     searchTerm,
     showCompleted,
@@ -321,11 +318,11 @@ export default function Tasks() {
     try {
       await preferencesAPI.deleteSavedView(selectedViewId);
       setSelectedViewId("");
-      await fetchSavedViews();
+      await queryClient.invalidateQueries(["saved-task-views"]);
     } catch (error) {
       console.error("Failed to delete saved view:", error);
     }
-  }, [fetchSavedViews, selectedViewId]);
+  }, [queryClient, selectedViewId]);
 
   const buildDailyPlan = useCallback(async () => {
     if (!canCreateTask) return;
@@ -379,7 +376,7 @@ export default function Tasks() {
     navigate(`/task/${taskId}`);
   }, [navigate]);
 
-  if (loading) {
+  if (tasksLoading && !tasksQueryData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <RingLoader size="lg" />

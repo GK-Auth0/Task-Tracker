@@ -22,6 +22,7 @@ interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     role: string;
+    organization_id?: string;
   };
 }
 
@@ -1716,7 +1717,16 @@ export class ProjectController {
         });
       }
 
-      const logs = await getAuditLogs("project", id as string, limit);
+      const organizationId = req.user?.organization_id;
+      if (!organizationId) {
+        return res.status(401).json({
+          success: false,
+          message: "Organization context required",
+          error: "UNAUTHORIZED",
+        });
+      }
+
+      const logs = await getAuditLogs(organizationId, "project", id as string, limit);
       return res.status(200).json({
         success: true,
         message: "Project activity logs retrieved successfully",
