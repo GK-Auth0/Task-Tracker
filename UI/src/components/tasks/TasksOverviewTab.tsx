@@ -24,6 +24,7 @@ interface TasksOverviewTabProps {
   onTaskClick: (taskId: string) => void;
   onTaskPinToggle: (taskId: string, shouldPin: boolean) => void;
   onPageChange: (page: number) => void;
+  onItemsPerPageChange: (itemsPerPage: number) => void;
 }
 
 const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
@@ -41,6 +42,7 @@ const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
   onTaskClick,
   onTaskPinToggle,
   onPageChange,
+  onItemsPerPageChange,
 }) => {
   return (
     <>
@@ -55,17 +57,24 @@ const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
           compactMode={compactMode}
           groupBy={groupBy}
           viewMode={viewMode}
+          pagination={pagination}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          onPageChange={onPageChange}
+          onItemsPerPageChange={onItemsPerPageChange}
         />
       ) : (
         <TasksEmptyState onCreateTask={onCreateTask} canCreate={canCreateTask} />
       )}
 
-      <TasksPagination
-        pagination={pagination}
-        currentPage={currentPage}
-        itemsPerPage={itemsPerPage}
-        onPageChange={onPageChange}
-      />
+      <div className={viewMode === "table" ? "lg:hidden" : ""}>
+        <TasksPagination
+          pagination={pagination}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          onPageChange={onPageChange}
+        />
+      </div>
     </>
   );
 };

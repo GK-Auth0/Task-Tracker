@@ -16,6 +16,13 @@ interface TasksListProps {
   compactMode?: boolean;
   groupBy?: TaskGroupOption;
   viewMode?: ViewMode;
+  pagination?: {
+    total: number;
+  } | null;
+  currentPage?: number;
+  itemsPerPage?: number;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (itemsPerPage: number) => void;
 }
 
 const getPriorityColor = (priority: string) => {
@@ -41,6 +48,55 @@ const getPriorityAccent = (priority: string) => {
       return "bg-blue-500";
     default:
       return "bg-slate-300";
+  }
+};
+
+const getPriorityTone = (priority: string) => {
+  switch (priority) {
+    case "High":
+      return {
+        background: "rgba(254, 226, 226, 0.95)",
+        border: "rgba(248, 113, 113, 0.28)",
+        color: "rgb(185, 28, 28)",
+      };
+    case "Medium":
+      return {
+        background: "rgba(255, 237, 213, 0.95)",
+        border: "rgba(251, 146, 60, 0.28)",
+        color: "rgb(194, 65, 12)",
+      };
+    default:
+      return {
+        background: "rgba(219, 234, 254, 0.95)",
+        border: "rgba(96, 165, 250, 0.28)",
+        color: "rgb(29, 78, 216)",
+      };
+  }
+};
+
+const getStatusPillTone = (status: string) => {
+  switch (status) {
+    case "Done":
+      return {
+        dot: "rgb(34, 197, 94)",
+        background: "rgba(220, 252, 231, 0.92)",
+        border: "rgba(74, 222, 128, 0.35)",
+        color: "rgb(21, 128, 61)",
+      };
+    case "In Progress":
+      return {
+        dot: "rgb(59, 130, 246)",
+        background: "rgba(219, 234, 254, 0.92)",
+        border: "rgba(96, 165, 250, 0.35)",
+        color: "rgb(29, 78, 216)",
+      };
+    default:
+      return {
+        dot: "rgb(148, 163, 184)",
+        background: "rgba(241, 245, 249, 0.96)",
+        border: "rgba(203, 213, 225, 0.7)",
+        color: "rgb(71, 85, 105)",
+      };
   }
 };
 
@@ -94,6 +150,11 @@ const TasksList: React.FC<TasksListProps> = ({
   compactMode = false,
   groupBy = "none",
   viewMode = "table",
+  pagination = null,
+  currentPage = 1,
+  itemsPerPage = 10,
+  onPageChange,
+  onItemsPerPageChange,
 }) => {
   const getInitials = (name: string) => {
     return name
@@ -148,27 +209,36 @@ const TasksList: React.FC<TasksListProps> = ({
     {
       field: "status",
       headerName: "STATUS",
-      width: 140,
+      width: 170,
       headerAlign: "center",
       align: "center",
       renderCell: (params) => {
-        const statusColor =
-          params.value === "Done"
-            ? "rgb(34, 197, 94)"
-            : params.value === "In Progress"
-              ? "rgb(59, 130, 246)"
-              : "rgb(148, 163, 184)";
+        const tone = getStatusPillTone(params.value);
         return (
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{
+              px: 1.25,
+              py: 0.5,
+              borderRadius: "999px",
+              border: `1px solid ${tone.border}`,
+              bgcolor: tone.background,
+            }}
+          >
             <Box
               sx={{
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                bgcolor: statusColor,
+                bgcolor: tone.dot,
               }}
             />
-            <Typography variant="body2" sx={{ fontWeight: 500, color: "rgb(15, 23, 42)", fontSize: "0.75rem" }}>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 700, color: tone.color, fontSize: "0.72rem" }}
+            >
               {params.value}
             </Typography>
           </Stack>
@@ -182,24 +252,23 @@ const TasksList: React.FC<TasksListProps> = ({
       headerAlign: "center",
       align: "center",
       renderCell: (params) => {
-        const priorityColor = getPriorityColor(params.value);
+        const tone = getPriorityTone(params.value);
         return (
           <Chip
-            label={params.value.charAt(0)}
+            label={params.value}
             size="small"
             variant="filled"
             sx={{
-              fontSize: "0.65rem",
+              fontSize: "0.68rem",
               fontWeight: 700,
-              height: 20,
-              minWidth: 20,
+              height: 24,
+              borderRadius: "999px",
+              border: `1px solid ${tone.border}`,
               "& .MuiChip-label": {
-                px: 0.5,
+                px: 1.1,
               },
-              bgcolor: priorityColor.includes("red") ? "rgb(254, 226, 226)" : 
-                      priorityColor.includes("orange") ? "rgb(255, 237, 213)" : "rgb(219, 234, 254)",
-              color: priorityColor.includes("red") ? "rgb(220, 38, 38)" : 
-                     priorityColor.includes("orange") ? "rgb(234, 88, 12)" : "rgb(37, 99, 235)",
+              bgcolor: tone.background,
+              color: tone.color,
             }}
           />
         );
@@ -216,12 +285,13 @@ const TasksList: React.FC<TasksListProps> = ({
           return (
             <Avatar
               sx={{
-                bgcolor: "rgb(226, 232, 240)",
+                bgcolor: "rgb(241, 245, 249)",
                 color: "rgb(100, 116, 139)",
                 fontWeight: 700,
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 fontSize: "0.65rem",
+                border: "1px solid rgb(226, 232, 240)",
               }}
             >
               ??
@@ -229,17 +299,18 @@ const TasksList: React.FC<TasksListProps> = ({
           );
         }
         return (
-          <Avatar
-            sx={{
-              bgcolor: "rgba(37, 99, 235, 0.1)",
-              color: "rgb(37, 99, 235)",
-              fontWeight: 700,
-              width: 28,
-              height: 28,
-              fontSize: "0.65rem",
-            }}
-          >
-            {getInitials(params.value.full_name)}
+            <Avatar
+              sx={{
+                bgcolor: "rgba(59, 130, 246, 0.12)",
+                color: "rgb(29, 78, 216)",
+                fontWeight: 700,
+                width: 32,
+                height: 32,
+                fontSize: "0.65rem",
+                border: "1px solid rgba(96, 165, 250, 0.18)",
+              }}
+            >
+              {getInitials(params.value.full_name)}
           </Avatar>
         );
       },
@@ -276,7 +347,7 @@ const TasksList: React.FC<TasksListProps> = ({
               variant="body2"
               sx={{
                 fontSize: "0.75rem",
-                fontWeight: dateInfo.isOverdue || dateInfo.isToday ? 600 : 400,
+                fontWeight: dateInfo.isOverdue || dateInfo.isToday ? 700 : 500,
                 color: dateInfo.isOverdue
                   ? "rgb(239, 68, 68)"
                   : dateInfo.isToday
@@ -310,7 +381,9 @@ const TasksList: React.FC<TasksListProps> = ({
             }}
             sx={{
               color: isPinned ? "rgb(245, 158, 11)" : "rgb(203, 213, 225)",
+              borderRadius: "10px",
               "&:hover": {
+                backgroundColor: "rgba(248, 250, 252, 0.95)",
                 color: isPinned ? "rgb(217, 119, 6)" : "rgb(100, 116, 139)",
               },
             }}
@@ -596,29 +669,44 @@ const TasksList: React.FC<TasksListProps> = ({
       {/* Desktop Views */}
       <div className="hidden lg:block">
         {viewMode === "table" ? (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-32px_rgba(15,23,42,0.25)]">
             <DataGrid
               rows={tableRows}
               columns={columns}
               pageSizeOptions={[10, 25, 50]}
-              initialState={{
-                pagination: {
-                  paginationModel: { page: 0, pageSize: 10 },
-                },
+              autoHeight
+              pagination
+              paginationMode="server"
+              rowCount={pagination?.total ?? tableRows.length}
+              paginationModel={{
+                page: currentPage - 1,
+                pageSize: itemsPerPage,
+              }}
+              onPaginationModelChange={(model) => {
+                if (model.pageSize !== itemsPerPage) {
+                  onItemsPerPageChange?.(model.pageSize);
+                }
+                if (model.page + 1 !== currentPage) {
+                  onPageChange?.(model.page + 1);
+                }
               }}
               disableRowSelectionOnClick
-              rowHeight={48}
-              columnHeaderHeight={40}
+              rowHeight={62}
+              columnHeaderHeight={52}
               sx={{
                 border: 0,
-                height: 600,
+                background:
+                  "linear-gradient(180deg, rgba(248,250,252,0.45) 0%, rgba(255,255,255,1) 16%)",
+                "& .MuiDataGrid-main": {
+                  backgroundColor: "transparent",
+                },
                 "& .MuiDataGrid-columnHeaders": {
-                  backgroundColor: "rgba(248, 250, 252, 0.8)",
-                  color: "rgb(15, 23, 42)",
+                  backgroundColor: "rgba(248, 250, 252, 0.92)",
+                  color: "rgb(51, 65, 85)",
                   fontSize: 11,
-                  fontWeight: 700,
+                  fontWeight: 800,
                   textTransform: "uppercase",
-                  letterSpacing: "0.08em",
+                  letterSpacing: "0.12em",
                   borderBottom: "1px solid rgb(226, 232, 240)",
                 },
                 "& .MuiDataGrid-cell": {
@@ -626,17 +714,39 @@ const TasksList: React.FC<TasksListProps> = ({
                   borderRight: "none",
                   display: "flex",
                   alignItems: "center",
-                  padding: "8px 12px",
+                  padding: "10px 14px",
                 },
                 "& .MuiDataGrid-row": {
-                  minHeight: "48px !important",
-                  maxHeight: "48px !important",
+                  minHeight: "62px !important",
+                  maxHeight: "62px !important",
+                  cursor: "pointer",
                   "&:hover": {
-                    backgroundColor: "rgba(248, 250, 252, 0.8)",
+                    backgroundColor: "rgba(248, 250, 252, 0.78)",
                   },
+                },
+                "& .MuiDataGrid-row.Mui-selected": {
+                  backgroundColor: "rgba(239, 246, 255, 0.8)",
+                },
+                "& .MuiDataGrid-row.Mui-selected:hover": {
+                  backgroundColor: "rgba(239, 246, 255, 0.96)",
                 },
                 "& .MuiDataGrid-columnSeparator": {
                   display: "none",
+                },
+                "& .MuiDataGrid-footerContainer": {
+                  minHeight: 56,
+                  borderTop: "1px solid rgb(226, 232, 240)",
+                  backgroundColor: "rgba(248, 250, 252, 0.72)",
+                },
+                "& .MuiTablePagination-root": {
+                  color: "rgb(71, 85, 105)",
+                },
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                },
+                "& .MuiIconButton-root": {
+                  borderRadius: "10px",
                 },
               }}
             />

@@ -39,6 +39,7 @@ export default function Tasks() {
   const [sortBy, setSortBy] = useState<TaskSortOption>("recent");
   const [groupBy, setGroupBy] = useState<TaskGroupOption>("none");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [pagination, setPagination] = useState<TasksPageData | null>(null);
   const [dayPlan, setDayPlan] = useState<AiDayPlan | null>(null);
   const [planning, setPlanning] = useState(false);
@@ -53,7 +54,6 @@ export default function Tasks() {
   const [showManageViews, setShowManageViews] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const itemsPerPage = 12;
   const canCreateTask = canManageWorkspaceContent(user?.role);
 
   const fetchData = useCallback(async () => {
@@ -533,6 +533,7 @@ export default function Tasks() {
             onTaskClick={handleTaskClick}
             onTaskPinToggle={handleToggleTaskPin}
             onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
           />
         )}
 
