@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { GridRowSelectionModel } from "@mui/x-data-grid";
 import { dashboardAPI, tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiDayPlan } from "../services/aiAssistant";
 import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
@@ -13,6 +14,7 @@ import TasksTimelineTab from "../components/tasks/TasksTimelineTab";
 import TasksAiTab from "../components/tasks/TasksAiTab";
 import TasksOverviewTab from "../components/tasks/TasksOverviewTab";
 import TasksTabs, { TasksTabKey } from "../components/tasks/TasksTabs";
+import TableExportActions, { TableExportColumn } from "../components/TableExportActions";
 import {
   DashboardSummary,
   TaskGroupOption,
@@ -54,6 +56,10 @@ export default function Tasks() {
   const [showManageViews, setShowManageViews] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [selectedRowIds, setSelectedRowIds] = useState<GridRowSelectionModel>({
+    type: "include",
+    ids: new Set(),
+  });
   const canCreateTask = canManageWorkspaceContent(user?.role);
 
   const fetchData = useCallback(async () => {
@@ -196,6 +202,35 @@ export default function Tasks() {
     (task) => task.status === "In Progress",
   ).length;
   const doneVisible = sortedTasks.filter((task) => task.status === "Done").length;
+  const selectedTasks = sortedTasks.filter((task) =>
+    selectedRowIds.type === "include"
+      ? selectedRowIds.ids.has(task.id)
+      : !selectedRowIds.ids.has(task.id),
+  );
+  const exportColumns: TableExportColumn<TaskItem>[] = [
+    { key: "title", label: "Task", value: (task) => task.title },
+    { key: "status", label: "Status", value: (task) => task.status },
+    { key: "priority", label: "Priority", value: (task) => task.priority },
+    {
+      key: "assignee",
+      label: "Assignee",
+      value: (task) => task.assignee?.full_name || "Unassigned",
+    },
+    {
+      key: "due_date",
+      label: "Due Date",
+      value: (task) => {
+        if (!task.due_date) return "No due date";
+        const date = new Date(task.due_date);
+        if (Number.isNaN(date.getTime())) return "No due date";
+        return date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      },
+    },
+  ];
   const completionVisibleRate = sortedTasks.length
     ? Math.round((doneVisible / sortedTasks.length) * 100)
     : 0;
@@ -446,6 +481,15 @@ export default function Tasks() {
               <TasksTabs activeTab={activeTab} onTabChange={setActiveTab} />
             </div>
             <div className="flex flex-wrap items-center justify-end gap-1">
+              {activeTab === "overview" && viewMode === "table" && (
+                <TableExportActions
+                  rows={sortedTasks}
+                  selectedRows={selectedTasks}
+                  columns={exportColumns}
+                  fileNamePrefix="tasks"
+                  variant="inline"
+                />
+              )}
               <button
                 type="button"
                 className={`h-8 rounded-md border px-2 text-xs font-medium ${
@@ -534,6 +578,8 @@ export default function Tasks() {
             onTaskPinToggle={handleToggleTaskPin}
             onPageChange={setCurrentPage}
             onItemsPerPageChange={setItemsPerPage}
+            selectedRowIds={selectedRowIds}
+            onSelectedRowIdsChange={setSelectedRowIds}
           />
         )}
 

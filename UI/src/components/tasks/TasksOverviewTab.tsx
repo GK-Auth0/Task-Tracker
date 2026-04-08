@@ -1,4 +1,5 @@
 import React from "react";
+import { GridRowSelectionModel } from "@mui/x-data-grid";
 import TasksEmptyState from "./TasksEmptyState";
 import TasksList from "./TasksList";
 import TasksPagination from "./TasksPagination";
@@ -25,6 +26,8 @@ interface TasksOverviewTabProps {
   onTaskPinToggle: (taskId: string, shouldPin: boolean) => void;
   onPageChange: (page: number) => void;
   onItemsPerPageChange: (itemsPerPage: number) => void;
+  selectedRowIds: GridRowSelectionModel;
+  onSelectedRowIdsChange: (selection: GridRowSelectionModel) => void;
 }
 
 const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
@@ -43,6 +46,8 @@ const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
   onTaskPinToggle,
   onPageChange,
   onItemsPerPageChange,
+  selectedRowIds,
+  onSelectedRowIdsChange,
 }) => {
   return (
     <>
@@ -62,6 +67,8 @@ const TasksOverviewTab: React.FC<TasksOverviewTabProps> = ({
           itemsPerPage={itemsPerPage}
           onPageChange={onPageChange}
           onItemsPerPageChange={onItemsPerPageChange}
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={onSelectedRowIdsChange}
         />
       ) : (
         <TasksEmptyState onCreateTask={onCreateTask} canCreate={canCreateTask} />
