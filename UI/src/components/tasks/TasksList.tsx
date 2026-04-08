@@ -1,9 +1,10 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { TaskGroupOption, TaskItem } from "./types";
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
 import { Avatar, Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { ViewMode } from "./TasksFiltersBar";
 import TaskTooltip from "../TaskTooltip";
+import TableExportActions, { TableExportColumn } from "../TableExportActions";
 import { getTaskStatusTone, isDoneTaskStatus } from "../../utils/taskStatus";
 
 interface TasksListProps {
@@ -140,6 +141,13 @@ const dueBucket = (task: TaskItem) => {
   return "Later";
 };
 
+const formatExportDate = (dateString?: string) => {
+  if (!dateString) return "No due date";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "No due date";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+};
+
 const TasksList: React.FC<TasksListProps> = ({
   tasks,
   onTaskToggle,
@@ -156,6 +164,11 @@ const TasksList: React.FC<TasksListProps> = ({
   onPageChange,
   onItemsPerPageChange,
 }) => {
+  const [selectedRowIds, setSelectedRowIds] = useState<GridRowSelectionModel>({
+    type: "include",
+    ids: new Set(),
+  });
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -168,8 +181,9 @@ const TasksList: React.FC<TasksListProps> = ({
     {
       field: "title",
       headerName: "TASK",
-      flex: 1,
-      minWidth: 300,
+      flex: 0.78,
+      minWidth: 240,
+      maxWidth: 360,
       headerAlign: "left",
       align: "left",
       renderCell: (params) => {
@@ -407,6 +421,48 @@ const TasksList: React.FC<TasksListProps> = ({
       due_date: task.due_date,
     }));
   }, [tasks]);
+
+  const selectedTasks = useMemo(
+    () =>
+      tasks.filter((task) =>
+        selectedRowIds.type === "include"
+          ? selectedRowIds.ids.has(task.id)
+          : !selectedRowIds.ids.has(task.id),
+      ),
+    [selectedRowIds, tasks],
+  );
+
+  const exportColumns: TableExportColumn<TaskItem>[] = useMemo(
+    () => [
+      {
+        key: "title",
+        label: "Task",
+        value: (task) => task.title,
+      },
+      {
+        key: "status",
+        label: "Status",
+        value: (task) => task.status,
+      },
+      {
+        key: "priority",
+        label: "Priority",
+        value: (task) => task.priority,
+      },
+      {
+        key: "assignee",
+        label: "Assignee",
+        value: (task) => task.assignee?.full_name || "Unassigned",
+      },
+      {
+        key: "due_date",
+        label: "Due Date",
+        value: (task) => formatExportDate(task.due_date),
+      },
+    ],
+    [],
+  );
+
   const groupedEntries: Array<{ label: string; items: TaskItem[] }> = (() => {
     if (groupBy === "none") return [{ label: "", items: tasks }];
 
@@ -670,14 +726,25 @@ const TasksList: React.FC<TasksListProps> = ({
       <div className="hidden lg:block">
         {viewMode === "table" ? (
           <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-32px_rgba(15,23,42,0.25)]">
+            <TableExportActions
+              title="Task Table"
+              description="Export all visible rows or only the rows you select."
+              rows={tasks}
+              selectedRows={selectedTasks}
+              columns={exportColumns}
+              fileNamePrefix="tasks"
+            />
             <DataGrid
               rows={tableRows}
               columns={columns}
               pageSizeOptions={[10, 25, 50]}
               autoHeight
+              checkboxSelection
               pagination
               paginationMode="server"
               rowCount={pagination?.total ?? tableRows.length}
+              rowSelectionModel={selectedRowIds}
+              onRowSelectionModelChange={(model) => setSelectedRowIds(model)}
               paginationModel={{
                 page: currentPage - 1,
                 pageSize: itemsPerPage,
@@ -716,6 +783,11 @@ const TasksList: React.FC<TasksListProps> = ({
                   alignItems: "center",
                   padding: "10px 14px",
                 },
+                "& .MuiDataGrid-cellCheckbox, & .MuiDataGrid-columnHeaderCheckbox": {
+                  width: 52,
+                  minWidth: "52px !important",
+                  maxWidth: "52px !important",
+                },
                 "& .MuiDataGrid-row": {
                   minHeight: "62px !important",
                   maxHeight: "62px !important",
@@ -737,6 +809,9 @@ const TasksList: React.FC<TasksListProps> = ({
                   minHeight: 56,
                   borderTop: "1px solid rgb(226, 232, 240)",
                   backgroundColor: "rgba(248, 250, 252, 0.72)",
+                },
+                "& .MuiCheckbox-root.Mui-checked": {
+                  color: "rgb(37, 99, 235)",
                 },
                 "& .MuiTablePagination-root": {
                   color: "rgb(71, 85, 105)",
