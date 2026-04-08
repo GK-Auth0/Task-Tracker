@@ -3,6 +3,31 @@ import { Request, Response } from "express";
 import { Op } from "sequelize";
 import { Project, ProjectMember, Sprint, Task, TestCase, User } from "../models";
 import cloudinary from "../config/cloudinary";
+import { tableHasColumn } from "../utils/runtimeSchema";
+
+const TEST_CASE_TABLE = "test_cases";
+const TEST_CASE_ATTRIBUTES = [
+  "id",
+  "reference_code",
+  "title",
+  "project_id",
+  "linked_task_id",
+  "owner_id",
+  "suite",
+  "module",
+  "sprint_name",
+  "sprint_id",
+  "priority",
+  "status",
+  "automation",
+  "tags",
+  "preconditions",
+  "steps",
+  "linked_items",
+  "execution_history",
+  "created_at",
+  "updated_at",
+] as const;
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -103,6 +128,17 @@ const serializeTestCase = (testCase: any) => ({
     : null,
 });
 
+const getTestCaseQueryMetadata = async () => {
+  const supportsSprintId = await tableHasColumn(TEST_CASE_TABLE, "sprint_id");
+
+  return {
+    supportsSprintId,
+    attributes: supportsSprintId
+      ? [...TEST_CASE_ATTRIBUTES]
+      : TEST_CASE_ATTRIBUTES.filter((attribute) => attribute !== "sprint_id"),
+  };
+};
+
 export const listTestCases = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -132,6 +168,7 @@ export const listTestCases = async (req: AuthenticatedRequest, res: Response) =>
       return res.status(200).json({ success: true, data: [] });
     }
 
+    const { supportsSprintId, attributes } = await getTestCaseQueryMetadata();
     const where: any = {
       project_id: {
         [Op.in]: projectIds,
@@ -141,16 +178,19 @@ export const listTestCases = async (req: AuthenticatedRequest, res: Response) =>
     if (req.query.project_id) where.project_id = String(req.query.project_id);
     if (req.query.status) where.status = String(req.query.status);
     if (req.query.automation) where.automation = String(req.query.automation);
-    if (req.query.sprint_id) where.sprint_id = String(req.query.sprint_id);
+    if (req.query.sprint_id && supportsSprintId) where.sprint_id = String(req.query.sprint_id);
     if (req.query.linked_task_id) where.linked_task_id = String(req.query.linked_task_id);
 
     const testCases = await TestCase.findAll({
+      attributes,
       where,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
-        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
       ],
       order: [["updated_at", "DESC"]],
     });
@@ -347,14 +387,14 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       resolvedSprintName = sprint.name;
     }
 
-    const testCase = await TestCase.create({
+    const { supportsSprintId, attributes } = await getTestCaseQueryMetadata();
+    const testCasePayload: Record<string, unknown> = {
       title: String(req.body.title || "").trim(),
       project_id: projectId,
       linked_task_id: linkedTaskId,
       owner_id: userId,
       suite: String(req.body.suite || "").trim(),
       module: String(req.body.module || "").trim(),
-      sprint_id: sprintId,
       sprint_name: resolvedSprintName,
       priority: req.body.priority,
       status: req.body.status || "Draft",
@@ -366,14 +406,23 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       execution_history: Array.isArray(req.body.execution_history)
         ? req.body.execution_history
         : [],
-    });
+    };
+
+    if (supportsSprintId) {
+      testCasePayload.sprint_id = sprintId;
+    }
+
+    const testCase = await TestCase.create(testCasePayload);
 
     const created = await TestCase.findByPk(testCase.id, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
-        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
       ],
     });
 
@@ -399,7 +448,8 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
     }
 
     const testCaseId = String(req.params.id || "");
-    const testCase = await TestCase.findByPk(testCaseId);
+    const { supportsSprintId, attributes } = await getTestCaseQueryMetadata();
+    const testCase = await TestCase.findByPk(testCaseId, { attributes });
     if (!testCase) {
       return res.status(404).json({ success: false, message: "Test case not found" });
     }
@@ -451,7 +501,9 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
     testCase.linked_task_id = linkedTaskId;
     testCase.suite = String(req.body.suite || "").trim();
     testCase.module = String(req.body.module || "").trim();
-    testCase.sprint_id = sprintId as any;
+    if (supportsSprintId) {
+      testCase.sprint_id = sprintId as any;
+    }
     testCase.sprint_name = resolvedSprintName as any;
     testCase.priority = req.body.priority;
     testCase.status = req.body.status || testCase.status;
@@ -463,11 +515,14 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
     await testCase.save();
 
     const updated = await TestCase.findByPk(testCase.id, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
-        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
       ],
     });
 
@@ -493,11 +548,16 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
     }
 
     const testCaseId = String(req.params.id || "");
+    const { supportsSprintId, attributes } = await getTestCaseQueryMetadata();
     const testCase = await TestCase.findByPk(testCaseId, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
       ],
     });
 
@@ -556,11 +616,14 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
     await testCase.save();
 
     const updated = await TestCase.findByPk(testCase.id, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
-        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
       ],
     });
 

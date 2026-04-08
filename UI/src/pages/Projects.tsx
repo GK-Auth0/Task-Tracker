@@ -11,6 +11,7 @@ import ProjectsFiltersBar, { ViewMode } from "../components/projects/ProjectsFil
 import ProjectsList from "../components/projects/ProjectsList";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
 import { testCaseModulesAPI } from "../services/testCases";
+import { sprintsAPI } from "../services/sprints";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWorkspaceContent } from "../types/roles";
 import { ProjectStatus } from "../enums";
@@ -109,7 +110,26 @@ const Projects: React.FC = () => {
 
   const handleCreateProject = useCallback(async (
     projectData: CreateProjectRequest,
-    options?: { modules: string[] },
+    options?: {
+      modules: string[];
+      sprintSetup?:
+        | { mode: "none" }
+        | { mode: "create_new" }
+        | {
+            mode: "existing";
+            sprintTemplate: {
+              name: string;
+              goal?: string | null;
+              release?: string | null;
+              squad?: string | null;
+              owner_id?: string;
+              capacity?: number | null;
+              start_date?: string | null;
+              end_date?: string | null;
+              status: "Planning" | "Active" | "Completed";
+            };
+          };
+    },
   ) => {
     if (!canCreateProject) return null;
     try {
@@ -128,6 +148,22 @@ const Projects: React.FC = () => {
             }),
           ),
         );
+      }
+
+      if (options?.sprintSetup?.mode === "existing") {
+        const template = options.sprintSetup.sprintTemplate;
+        await sprintsAPI.createSprint({
+          name: template.name,
+          goal: template.goal || undefined,
+          release: template.release || undefined,
+          squad: template.squad || undefined,
+          project_id: response.data.id,
+          owner_id: template.owner_id,
+          capacity: template.capacity ?? undefined,
+          start_date: template.start_date || undefined,
+          end_date: template.end_date || undefined,
+          status: template.status,
+        });
       }
 
       setShowCreateModal(false);

@@ -2,10 +2,39 @@ import { Request, Response } from "express";
 import { Op } from "sequelize";
 import { Defect, Project, ProjectMember, Sprint, Task, User } from "../models";
 import { createTask } from "../services/task";
+import { tableHasColumn } from "../utils/runtimeSchema";
 
 const DEFECT_STATUSES = ["Open", "Approved", "Rejected", "In Progress", "Resolved"] as const;
 const DEFECT_SEVERITIES = ["Critical", "High", "Medium", "Low"] as const;
 const DEFECT_PRIORITIES = ["Critical", "High", "Medium", "Low"] as const;
+const DEFECT_TABLE = "defects";
+const DEFECT_ATTRIBUTES = [
+  "id",
+  "reference_code",
+  "title",
+  "description",
+  "reproduction_steps",
+  "severity",
+  "priority",
+  "status",
+  "project_id",
+  "linked_task_id",
+  "created_task_id",
+  "creator_id",
+  "assignee_id",
+  "sprint_id",
+  "sprint_name",
+  "linked_run",
+  "linked_case",
+  "environment",
+  "rejection_reason",
+  "approved_at",
+  "approved_by",
+  "rejected_at",
+  "rejected_by",
+  "created_at",
+  "updated_at",
+] as const;
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -130,6 +159,17 @@ const ensureProjectAccess = async (projectId: string, userId: string, role?: str
   return membership ? project : null;
 };
 
+const getDefectQueryMetadata = async () => {
+  const supportsSprintId = await tableHasColumn(DEFECT_TABLE, "sprint_id");
+
+  return {
+    supportsSprintId,
+    attributes: supportsSprintId
+      ? [...DEFECT_ATTRIBUTES]
+      : DEFECT_ATTRIBUTES.filter((attribute) => attribute !== "sprint_id"),
+  };
+};
+
 export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -142,12 +182,14 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(200).json({ success: true, data: [] });
     }
 
+    const { supportsSprintId, attributes } = await getDefectQueryMetadata();
     const where: any = {};
     if (req.query.project_id) where.project_id = String(req.query.project_id);
     if (req.query.status) where.status = String(req.query.status);
-    if (req.query.sprint_id) where.sprint_id = String(req.query.sprint_id);
+    if (req.query.sprint_id && supportsSprintId) where.sprint_id = String(req.query.sprint_id);
 
     const defects = await Defect.findAll({
+      attributes,
       where,
       include: [
         {
@@ -173,11 +215,15 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
           as: "assignee",
           attributes: ["id", "full_name", "email"],
         },
-        {
-          model: Sprint,
-          as: "sprint",
-          attributes: ["id", "name", "status"],
-        },
+        ...(supportsSprintId
+          ? [
+              {
+                model: Sprint,
+                as: "sprint",
+                attributes: ["id", "name", "status"],
+              },
+            ]
+          : []),
         {
           model: Task,
           as: "linked_task",
@@ -272,7 +318,8 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
       resolvedSprintName = sprint.name;
     }
 
-    const defect = await Defect.create({
+    const { supportsSprintId, attributes } = await getDefectQueryMetadata();
+    const defectPayload: Record<string, unknown> = {
       title: String(req.body.title || "").trim(),
       description: String(req.body.description || "").trim(),
       reproduction_steps: Array.isArray(req.body.reproduction_steps)
@@ -285,12 +332,17 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
       linked_task_id: linkedTaskId,
       creator_id: userId,
       assignee_id: assigneeId,
-      sprint_id: sprintId,
       sprint_name: resolvedSprintName,
       linked_run: req.body.linked_run ? String(req.body.linked_run) : null,
       linked_case: req.body.linked_case ? String(req.body.linked_case) : null,
       environment: req.body.environment ? String(req.body.environment) : null,
-    });
+    };
+
+    if (supportsSprintId) {
+      defectPayload.sprint_id = sprintId;
+    }
+
+    const defect = await Defect.create(defectPayload);
 
     if (linkedTaskId) {
       await Task.update(
@@ -302,11 +354,14 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
     }
 
     const created = await Defect.findByPk(defect.id, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
         { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
-        { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         { model: Task, as: "created_task", attributes: ["id", "title"] },
       ],
@@ -335,7 +390,9 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
 
     const defectId = String(req.params.id || "");
 
+    const { supportsSprintId, attributes } = await getDefectQueryMetadata();
     const defect = await Defect.findByPk(defectId, {
+      attributes,
       include: [
         {
           model: Project,
@@ -361,7 +418,6 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
       "description",
       "severity",
       "priority",
-      "sprint_id",
       "sprint_name",
       "linked_run",
       "linked_case",
@@ -375,6 +431,10 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
         updates[field] = req.body[field];
       }
     });
+
+    if (supportsSprintId && req.body.sprint_id !== undefined) {
+      updates.sprint_id = req.body.sprint_id;
+    }
 
     if (req.body.reproduction_steps !== undefined) {
       updates.reproduction_steps = Array.isArray(req.body.reproduction_steps)
@@ -445,10 +505,14 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
     }
 
     const updated = await Defect.findByPk(defect.id, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
         { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         { model: Task, as: "created_task", attributes: ["id", "title"] },
       ],
@@ -477,7 +541,9 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
 
     const defectId = String(req.params.id || "");
 
+    const { supportsSprintId, attributes } = await getDefectQueryMetadata();
     const defect = await Defect.findByPk(defectId, {
+      attributes,
       include: [
         {
           model: Project,
@@ -562,10 +628,14 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
     }
 
     const reviewed = await Defect.findByPk(defect.id, {
+      attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
         { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
         { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+        ...(supportsSprintId
+          ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
+          : []),
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         { model: Task, as: "created_task", attributes: ["id", "title"] },
       ],
