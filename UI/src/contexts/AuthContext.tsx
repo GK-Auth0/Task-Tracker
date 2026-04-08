@@ -8,6 +8,7 @@ import {
 import {
   authAPI,
   clearStoredAccessToken,
+  getStoredAccessToken,
   setStoredAccessToken,
 } from "../services/auth";
 import type {
@@ -89,10 +90,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     const initAuth = async () => {
+      const currentPath =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      const isAuthPage =
+        currentPath.startsWith("/login") ||
+        currentPath.startsWith("/register") ||
+        currentPath.startsWith("/forgot-password") ||
+        currentPath.startsWith("/reset-password") ||
+        currentPath.startsWith("/auth/callback");
+
       try {
-        await authAPI.refreshSession();
-        const response = await authAPI.getCurrentUser();
-        setUser(normalizeUser(response.data));
+        const storedToken = getStoredAccessToken();
+
+        if (storedToken) {
+          const response = await authAPI.getCurrentUser();
+          setUser(normalizeUser(response.data));
+          return;
+        }
+
+        if (!isAuthPage) {
+          const response = await authAPI.refreshSession();
+          const authenticatedData = response.data as Extract<
+            typeof response.data,
+            { user: AuthenticatedUser; token?: string }
+          >;
+          const { user, token } = authenticatedData;
+          if (token) {
+            setStoredAccessToken(token);
+          }
+          if (user) {
+            setUser(normalizeUser(user));
+            return;
+          }
+        }
+
+        setUser(null);
       } catch (error) {
         clearStoredAccessToken();
         setUser(null);

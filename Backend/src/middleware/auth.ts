@@ -24,7 +24,7 @@ export const authenticateToken = (
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader && authHeader.split(" ")[1];
   const cookieToken = readCookie(req, appConfig.jwt.accessCookieName);
-  const token = cookieToken || bearerToken;
+  const token = bearerToken || cookieToken;
 
   if (!token) {
     return res.status(401).json({
