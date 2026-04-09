@@ -117,7 +117,7 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
           </div>
 
           <div
-            className="grid grid-cols-7 divide-x divide-y divide-slate-200"
+            className="grid grid-cols-7 border-b border-slate-200 divide-x divide-y divide-slate-200"
             style={{ gridAutoRows: "minmax(84px, auto)" }}
           >
             {days.map((day, index) => {

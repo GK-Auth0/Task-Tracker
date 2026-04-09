@@ -26,7 +26,7 @@ export const validateProject = [
   body('priority')
     .optional()
     .isIn(['low', 'medium', 'high'])
-    .withMessage('Priority must be one of: low, medium, high'),
+    .withMessage('Priority must be one of: low, medium, high Giri'),
   
   body('startDate')
     .optional()

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import RingLoader from "../components/RingLoader";
-import StaticDataBanner from "../components/StaticDataBanner";
+import SprintStatStrip from "../components/sprint/SprintStatStrip";
+import SprintTabs from "../components/sprint/SprintTabs";
+import WorkspacePageHeader from "../components/WorkspacePageHeader";
 import {
   dashboardAPI,
   tasksAPI,
@@ -21,6 +23,8 @@ type TrendPoint = {
   label: string;
   value: number;
 };
+
+type AnalyticsTab = "overview" | "delivery" | "quality" | "risk";
 
 const TREND_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TEST_CASE_TREND: TrendPoint[] = [
@@ -104,6 +108,7 @@ const riskTone = (risk: "High" | "Medium" | "Low") => {
 export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("overview");
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [insights, setInsights] = useState<DashboardInsights | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -255,6 +260,43 @@ export default function Analytics() {
     [overview],
   );
 
+  const summaryItems = useMemo(
+    () => [
+      {
+        label: "Completion",
+        value: spotlight.completion,
+        detail: "Workspace-wide task completion",
+        icon: "task_alt",
+      },
+      {
+        label: "Open tasks",
+        value: String(spotlight.openTasks),
+        detail: "Still active across tracked work",
+        icon: "checklist",
+      },
+      {
+        label: "Due this week",
+        value: String(spotlight.dueThisWeek),
+        detail: "Upcoming delivery pressure",
+        icon: "event_upcoming",
+      },
+      {
+        label: "Projects",
+        value: String(projects.length),
+        detail: "Currently included in analytics",
+        icon: "folder_open",
+      },
+    ],
+    [projects.length, spotlight],
+  );
+
+  const analyticsTabs = [
+    { key: "overview", label: "Overview", icon: "dashboard", description: "Main signals" },
+    { key: "delivery", label: "Delivery", icon: "timeline", description: "Flow and workload" },
+    { key: "quality", label: "Quality", icon: "fact_check", description: "Tests and defects" },
+    { key: "risk", label: "Risk", icon: "warning", description: "Attention areas" },
+  ] as const;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -275,294 +317,229 @@ export default function Analytics() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="min-h-full p-4 sm:p-6 lg:p-8 space-y-6">
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div className="grid gap-0 xl:grid-cols-[1.25fr_360px]">
-            <div className="border-b border-slate-200 p-6 sm:p-8 xl:border-b-0 xl:border-r">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="max-w-2xl">
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-400 font-semibold">
-                    Analytics Studio
-                  </p>
-                  <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                    Understand delivery fast
-                  </h1>
-                  <p className="mt-3 text-sm leading-6 text-slate-500">
-                    A more visual analytics workspace for projects, tasks, test cases,
-                    and defects. Some QA sections use polished dummy data for now and
-                    can be made dynamic later without changing the design.
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-start gap-3 sm:items-end">
-                  <StaticDataBanner />
-                  <div className="flex flex-wrap gap-2">
-                  {["7 Days", "30 Days", "Quarter", "All Time"].map((range, index) => (
-                    <button
-                      key={range}
-                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                        index === 1
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      }`}
-                      >
-                        {range}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                <InsightTile
-                  label="Completion"
-                  value={spotlight.completion}
-                  note="Workspace-wide task completion"
-                />
-                <InsightTile
-                  label="Quality"
-                  value={`${spotlight.testCases} / ${spotlight.openDefects}`}
-                  note="Test cases versus open defects"
-                />
-                <InsightTile
-                  label="Automation"
-                  value={spotlight.automation}
-                  note="Current automation coverage"
-                />
-              </div>
+      <div className="min-h-full space-y-5 p-4 sm:p-6 lg:p-8">
+        <WorkspacePageHeader
+          eyebrow="Analytics"
+          title="Workspace Analytics"
+          description="Smaller, cleaner analytics with focused tabs so you can scan one area at a time."
+          metaLabel="Reporting window"
+          metaValue="Last 30 days"
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {["7 Days", "30 Days", "Quarter", "All Time"].map((range, index) => (
+                <button
+                  key={range}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                    index === 1
+                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {range}
+                </button>
+              ))}
             </div>
+          }
+        />
 
-            <div className="bg-slate-50/80 p-6 sm:p-8">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-400 font-semibold">
-                Live Readout
+        <SprintStatStrip items={summaryItems} />
+        <SprintTabs items={analyticsTabs.map((item) => ({ ...item }))} value={activeTab} onChange={setActiveTab} />
+
+        {activeTab === "overview" && (
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.1fr)_340px]">
+            <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                  Momentum
+                </p>
+                <h2 className="mt-1 text-base font-semibold text-slate-900">
+                  Work created vs completed
+                </h2>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ModernTrendCard title="Created" accent="bg-slate-900" points={createdTrend} />
+                <ModernTrendCard title="Completed" accent="bg-blue-600" points={completedTrend} />
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                Snapshot
               </p>
-              <div className="mt-4 space-y-4">
+              <h2 className="mt-1 text-base font-semibold text-slate-900">
+                Live readout
+              </h2>
+              <div className="mt-4 space-y-3">
                 <SignalRow label="Open Tasks" value={String(spotlight.openTasks)} />
                 <SignalRow label="Due This Week" value={String(spotlight.dueThisWeek)} />
                 <SignalRow label="Projects Tracked" value={String(projects.length)} />
                 <SignalRow label="Team Members Active" value={String(workload.length)} />
               </div>
-            </div>
+            </section>
           </div>
-        </section>
+        )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                  Momentum
+        {activeTab === "delivery" && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                <div className="mb-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                    Delivery
+                  </p>
+                  <h2 className="mt-1 text-base font-semibold text-slate-900">
+                    Workload at a glance
+                  </h2>
+                </div>
+
+                <div className="space-y-4">
+                  {workload.map((person) => {
+                    const max = Math.max(...workload.map((item) => item.open), 1);
+                    return (
+                      <div key={person.name} className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{person.name}</p>
+                            <p className="text-[11px] text-slate-500">
+                              {person.high} high priority • {person.inProgress} in progress
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-slate-900">
+                            {person.open}
+                          </span>
+                        </div>
+                        <div className="h-2.5 rounded-full bg-slate-200">
+                          <div
+                            className="h-2.5 rounded-full bg-slate-900"
+                            style={{ width: `${Math.max(8, (person.open / max) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <MiniBarCard title="Task Flow" rows={taskFlow} />
+            </div>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                  Delivery
                 </p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                  Work created vs work completed
-                </h2>
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ModernTrendCard
-                title="Created"
-                accent="bg-slate-900"
-                points={createdTrend}
-              />
-              <ModernTrendCard
-                title="Completed"
-                accent="bg-blue-600"
-                points={completedTrend}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-              Focus
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-              What needs attention
-            </h2>
-            <div className="mt-5 space-y-3">
-              <FocusCard
-                title="Delivery pressure"
-                body={`${duePressure[0].value + duePressure[1].value} items are overdue or due today.`}
-              />
-              <FocusCard
-                title="Quality load"
-                body="Dummy QA data shows 18 open defects against 72 tracked test cases."
-              />
-              <FocusCard
-                title="Capacity balance"
-                body={`${workload[0]?.name || "Top contributor"} currently carries the highest open-task load.`}
-              />
-            </div>
-          </section>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          <MiniBarCard title="Task Flow" rows={taskFlow} />
-          <MiniBarCard
-            title="Due Pressure"
-            rows={duePressure}
-          />
-          <MiniBarCard
-            title="Test Case Status"
-            rows={[
-              { label: "Ready", value: 38 },
-              { label: "Draft", value: 14 },
-              { label: "Blocked", value: 4 },
-              { label: "Automated", value: 23 },
-            ]}
-          />
-          <MiniBarCard
-            title="Defect Lifecycle"
-            rows={[
-              { label: "Open", value: 9 },
-              { label: "In Progress", value: 6 },
-              { label: "Review", value: 3 },
-              { label: "Closed", value: 18 },
-            ]}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                  Project Readability
-                </p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                <h2 className="mt-1 text-base font-semibold text-slate-900">
                   Progress by project
                 </h2>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              {projectProgress.map((project) => (
-                <div
-                  key={project.name}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{project.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {project.total} tasks • {project.inProgress} in progress • {project.high} high priority
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                      {project.completion}% complete
-                    </span>
-                  </div>
-                  <div className="mt-4 h-3 rounded-full bg-slate-200">
-                    <div
-                      className="h-3 rounded-full bg-blue-600"
-                      style={{ width: `${Math.max(8, project.completion)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                  Team Map
-                </p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                  Workload at a glance
-                </h2>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {workload.map((person) => {
-                const max = Math.max(...workload.map((item) => item.open), 1);
-                return (
-                  <div key={person.name} className="space-y-2">
-                    <div className="flex items-center justify-between gap-3">
+              <div className="space-y-4">
+                {projectProgress.map((project) => (
+                  <div
+                    key={project.name}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{person.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {person.high} high priority • {person.inProgress} in progress
+                        <p className="text-sm font-semibold text-slate-900">{project.name}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          {project.total} tasks • {project.inProgress} in progress • {project.high} high priority
                         </p>
                       </div>
-                      <span className="text-sm font-semibold text-slate-900">
-                        {person.open}
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                        {project.completion}% complete
                       </span>
                     </div>
-                    <div className="h-3 rounded-full bg-slate-200">
+                    <div className="mt-3 h-2.5 rounded-full bg-slate-200">
                       <div
-                        className="h-3 rounded-full bg-slate-900"
-                        style={{ width: `${Math.max(8, (person.open / max) * 100)}%` }}
+                        className="h-2.5 rounded-full bg-blue-600"
+                        style={{ width: `${Math.max(8, project.completion)}%` }}
                       />
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_360px] gap-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                  Quality Analytics
+        {activeTab === "quality" && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+              <MiniBarCard
+                title="Test Case Status"
+                rows={[
+                  { label: "Ready", value: 38 },
+                  { label: "Draft", value: 14 },
+                  { label: "Blocked", value: 4 },
+                  { label: "Automated", value: 23 },
+                ]}
+              />
+              <MiniBarCard
+                title="Defect Lifecycle"
+                rows={[
+                  { label: "Open", value: 9 },
+                  { label: "In Progress", value: 6 },
+                  { label: "Review", value: 3 },
+                  { label: "Closed", value: 18 },
+                ]}
+              />
+            </div>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                  Quality
                 </p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                <h2 className="mt-1 text-base font-semibold text-slate-900">
                   Test execution and defect discovery
                 </h2>
               </div>
-            </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ModernTrendCard
-                title="Test Execution"
-                accent="bg-blue-600"
-                points={TEST_CASE_TREND}
-              />
-              <ModernTrendCard
-                title="Defects Raised"
-                accent="bg-slate-900"
-                points={DEFECT_TREND}
-              />
-            </div>
-
-            <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
-              <div className="grid grid-cols-[minmax(180px,1.2fr)_110px_110px_110px] gap-4 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                <span>Module</span>
-                <span>Test Cases</span>
-                <span>Defects</span>
-                <span>Pass Rate</span>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ModernTrendCard title="Test Execution" accent="bg-blue-600" points={TEST_CASE_TREND} />
+                <ModernTrendCard title="Defects Raised" accent="bg-slate-900" points={DEFECT_TREND} />
               </div>
-              <div className="divide-y divide-slate-100 bg-white">
-                {QUALITY_ROWS.map((row) => (
-                  <div
-                    key={row.label}
-                    className="grid grid-cols-[minmax(180px,1.2fr)_110px_110px_110px] gap-4 px-4 py-4"
-                  >
-                    <div className="text-sm font-semibold text-slate-900">{row.label}</div>
-                    <div className="text-sm text-slate-600">{row.testCases}</div>
-                    <div className="text-sm text-slate-600">{row.defects}</div>
-                    <div className="text-sm text-slate-600">{row.passRate}%</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
 
-          <section className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                Risk Matrix
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                Projects that need attention
-              </h2>
-              <div className="mt-4 space-y-3">
+              <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
+                <div className="grid grid-cols-[minmax(180px,1.2fr)_100px_100px_100px] gap-4 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <span>Module</span>
+                  <span>Cases</span>
+                  <span>Defects</span>
+                  <span>Pass Rate</span>
+                </div>
+                <div className="divide-y divide-slate-100 bg-white">
+                  {QUALITY_ROWS.map((row) => (
+                    <div
+                      key={row.label}
+                      className="grid grid-cols-[minmax(180px,1.2fr)_100px_100px_100px] gap-4 px-4 py-3"
+                    >
+                      <div className="text-sm font-semibold text-slate-900">{row.label}</div>
+                      <div className="text-sm text-slate-600">{row.testCases}</div>
+                      <div className="text-sm text-slate-600">{row.defects}</div>
+                      <div className="text-sm text-slate-600">{row.passRate}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === "risk" && (
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.1fr)_320px]">
+            <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                  Risk
+                </p>
+                <h2 className="mt-1 text-base font-semibold text-slate-900">
+                  Projects that need attention
+                </h2>
+              </div>
+
+              <div className="space-y-3">
                 {riskProjects.map((project) => (
                   <div
                     key={project.id}
@@ -571,12 +548,12 @@ export default function Analytics() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{project.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-[11px] text-slate-500">
                           {project.open_tasks} open • {formatPercent(project.completion_rate)} complete
                         </p>
                       </div>
                       <span
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${riskTone(project.risk)}`}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${riskTone(project.risk)}`}
                       >
                         {project.risk}
                       </span>
@@ -584,62 +561,36 @@ export default function Analytics() {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-                Data Mode
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                What is dynamic now
-              </h2>
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <p>Tasks and project analytics use current workspace data.</p>
-                <p>Test case and defect analytics use realistic dummy values for now.</p>
-                <p>Those QA blocks can be wired later without redesigning the page.</p>
-              </div>
-            </div>
-          </section>
-        </div>
+            <section className="space-y-5">
+              <MiniBarCard title="Due Pressure" rows={duePressure} />
+              <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+                  Data Mode
+                </p>
+                <h2 className="mt-1 text-base font-semibold text-slate-900">
+                  What is dynamic now
+                </h2>
+                <div className="mt-4 space-y-3 text-xs leading-5 text-slate-600 sm:text-sm">
+                  <p>Tasks and project analytics use current workspace data.</p>
+                  <p>Test case and defect analytics use realistic dummy values for now.</p>
+                  <p>Those QA blocks can be wired later without redesigning the page.</p>
+                </div>
+              </section>
+            </section>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
-
-function InsightTile({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold">
-        {label}
-      </p>
-      <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{note}</p>
     </div>
   );
 }
 
 function SignalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
       <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-lg font-semibold text-slate-900">{value}</span>
-    </div>
-  );
-}
-
-function FocusCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{body}</p>
+      <span className="text-base font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
@@ -654,18 +605,18 @@ function MiniBarCard({
   const max = Math.max(...rows.map((row) => row.value), 1);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
       <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      <div className="mt-4 space-y-4">
+      <div className="mt-4 space-y-3">
         {rows.map((row) => (
           <div key={row.label}>
-            <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
               <span>{row.label}</span>
               <span>{row.value}</span>
             </div>
-            <div className="h-3 rounded-full bg-slate-200">
+            <div className="h-2.5 rounded-full bg-slate-200">
               <div
-                className="h-3 rounded-full bg-blue-600"
+                className="h-2.5 rounded-full bg-blue-600"
                 style={{ width: `${Math.max(8, (row.value / max) * 100)}%` }}
               />
             </div>
@@ -688,22 +639,22 @@ function ModernTrendCard({
   const max = Math.max(...points.map((point) => point.value), 1);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <span className={`h-2.5 w-16 rounded-full ${accent}`} />
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <span className={`h-2 w-12 rounded-full ${accent}`} />
       </div>
-      <div className="mt-5 flex h-48 items-end gap-3">
+      <div className="mt-4 flex h-40 items-end gap-2">
         {points.map((point) => (
           <div key={point.label} className="flex flex-1 flex-col items-center gap-2">
-            <div className="text-xs font-semibold text-slate-500">{point.value}</div>
-            <div className="flex h-36 w-full items-end rounded-xl bg-white p-1.5">
+            <div className="text-[11px] font-semibold text-slate-500">{point.value}</div>
+            <div className="flex h-28 w-full items-end rounded-xl bg-white p-1.5">
               <div
                 className={`w-full rounded-lg ${accent}`}
                 style={{ height: `${Math.max(8, (point.value / max) * 100)}%` }}
               />
             </div>
-            <div className="text-xs text-slate-500">{point.label}</div>
+            <div className="text-[11px] text-slate-500">{point.label}</div>
           </div>
         ))}
       </div>

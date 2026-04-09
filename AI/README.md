@@ -52,6 +52,27 @@ Optional env vars:
   - `chat_provider` (current provider mode)
   - `gemini_configured` (`true/false` based on `GEMINI_API_KEY`)
 
+### Free model setup
+
+If you want stronger AI without paid APIs, the best path here is local/open models through Ollama on the backend side.
+
+Recommended free models:
+
+- `qwen2.5:7b`
+- `llama3.1:8b`
+- `mistral:7b`
+
+Recommended backend env for realistic chat:
+
+```bash
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5:7b
+AI_TIMEOUT_MS=25000
+```
+
+This repo now supports short conversation history end-to-end, so the chat assistant can answer follow-up questions more naturally instead of treating each message like a brand-new request.
+
 ## Endpoints
 
 ### 1) Health check
@@ -157,6 +178,10 @@ curl -X POST http://127.0.0.1:8787/chat-context \
     ],
     "projects": [
       {"name":"Task Tracker","status":"Active"}
+    ],
+    "history": [
+      {"role":"user","text":"What should I focus on first?"},
+      {"role":"assistant","text":"Start with the overdue API work because it is highest risk."}
     ]
   }'
 ```

@@ -4,25 +4,22 @@ import {
   UpdateProjectRequest,
   ProjectsResponse,
   ProjectResponse,
+  ProjectConfidentialAccessConfig,
+  ProjectConfidentialAccessProjectSummary,
 } from "../types/project";
 
 import { API_BASE_URL } from "../config/api";
+import { applyAuthInterceptors } from "./auth";
 
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const api = applyAuthInterceptors(
+  axios.create({
+    baseURL: `${API_BASE_URL}/api`,
+    withCredentials: true,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  }),
+);
 
 export const projectService = {
   // Get all projects
@@ -95,6 +92,7 @@ export const projectService = {
 
   getProjectUsers: async (
     search?: string,
+    signal?: AbortSignal,
   ): Promise<{
     success: boolean;
     data: Array<{
@@ -107,6 +105,7 @@ export const projectService = {
   }> => {
     const response = await api.get("/projects/users", {
       params: { search },
+      signal,
     });
     return response.data;
   },
@@ -170,6 +169,36 @@ export const projectService = {
         decision_note: decisionNote,
       },
     );
+    return response.data;
+  },
+
+  getConfidentialAccessConfig: async (
+    id: string,
+  ): Promise<{ success: boolean; data: ProjectConfidentialAccessConfig }> => {
+    const response = await api.get(`/projects/${id}/confidential-access/config`);
+    return response.data;
+  },
+
+  updateConfidentialAccessConfig: async (
+    id: string,
+    data: {
+      access_scope: "specific_users" | "organization";
+      allowed_user_ids: string[];
+    },
+  ): Promise<{
+    success: boolean;
+    data: ProjectConfidentialAccessConfig;
+    message?: string;
+  }> => {
+    const response = await api.patch(`/projects/${id}/confidential-access/config`, data);
+    return response.data;
+  },
+
+  getConfidentialAccessProjects: async (): Promise<{
+    success: boolean;
+    data: ProjectConfidentialAccessProjectSummary[];
+  }> => {
+    const response = await api.get("/projects/confidential-access/projects");
     return response.data;
   },
 };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { aiChatAPI } from "../../services/aiChat";
+import { aiChatAPI, type AiChatHistoryItem } from "../../services/aiChat";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -33,6 +33,10 @@ export default function AiAssistantWidget() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState("");
   const [contextSnapshot, setContextSnapshot] = useState("");
+  const [dynamicQuickPrompts, setDynamicQuickPrompts] = useState<string[]>([]);
+  const [sources, setSources] = useState<
+    Array<{ id?: string; type?: string; title: string; snippet?: string }>
+  >([]);
   const [position, setPosition] = useState<"right" | "left">(
     parsedPrefs?.position === "left" ? "left" : "right",
   );
@@ -57,7 +61,7 @@ export default function AiAssistantWidget() {
   ]);
   const location = useLocation();
 
-  const quickPrompts = [
+  const fallbackQuickPrompts = [
     "Plan my day from current tasks",
     "How should I prioritize this week?",
     "Give me project risk checks",
@@ -146,10 +150,18 @@ export default function AiAssistantWidget() {
       const lines = parseInsightLines(reply);
       setInsights(lines.length ? lines : ["No insights available right now."]);
       setContextSnapshot(response.data.contextSnapshot || "");
+      setDynamicQuickPrompts(
+        response.data.quickActions?.length
+          ? response.data.quickActions
+          : fallbackQuickPrompts,
+      );
+      setSources(response.data.sources || []);
     } catch (error) {
       setInsightsError("AI insights unavailable.");
       setInsights([]);
       setContextSnapshot("");
+      setDynamicQuickPrompts(fallbackQuickPrompts);
+      setSources([]);
     } finally {
       setInsightsLoading(false);
     }
@@ -164,7 +176,12 @@ export default function AiAssistantWidget() {
     const message = text.trim();
     if (!message || loading) return;
 
-    setMessages((prev) => [...prev, { role: "user", text: message }]);
+    const nextMessages = [...messages, { role: "user" as const, text: message }];
+    const history: AiChatHistoryItem[] = nextMessages
+      .slice(-8)
+      .map((item) => ({ role: item.role, text: item.text }));
+
+    setMessages(nextMessages);
     setInput("");
     setLoading(true);
     try {
@@ -172,7 +189,15 @@ export default function AiAssistantWidget() {
         message,
         location.pathname,
         responseMode,
+        history,
       );
+      if (response.data.quickActions?.length) {
+        setDynamicQuickPrompts(response.data.quickActions);
+      }
+      if (response.data.contextSnapshot) {
+        setContextSnapshot(response.data.contextSnapshot);
+      }
+      setSources(response.data.sources || []);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", text: response.data.reply || "No response." },
@@ -185,6 +210,8 @@ export default function AiAssistantWidget() {
           text: "AI assistant is temporarily unavailable. Please try again in a moment.",
         },
       ]);
+      setDynamicQuickPrompts(fallbackQuickPrompts);
+      setSources([]);
     } finally {
       setLoading(false);
     }
@@ -334,6 +361,26 @@ export default function AiAssistantWidget() {
                 {contextSnapshot && (
                   <p className="text-[11px] text-slate-500">{contextSnapshot}</p>
                 )}
+                {sources.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Grounded In
+                    </p>
+                    {sources.map((source) => (
+                      <div
+                        key={`${source.id || source.title}-${source.type || "source"}`}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                      >
+                        <p className="text-xs font-semibold text-slate-700">{source.title}</p>
+                        {source.snippet && (
+                          <p className="mt-1 text-[11px] text-slate-500 line-clamp-3">
+                            {source.snippet}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -372,7 +419,7 @@ export default function AiAssistantWidget() {
                   className={`h-9 px-3 rounded-lg text-white text-xs font-semibold disabled:opacity-50 ${accentClasses.send}`}
                   onClick={() => {
                     setActiveView("chat");
-                    sendMessage("Based on current page context, what should I focus on first?");
+                    sendMessage("Based on current page context and our current conversation, what should I focus on first?");
                   }}
                   disabled={loading}
                 >
@@ -382,7 +429,7 @@ export default function AiAssistantWidget() {
             ) : (
               <>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {quickPrompts.map((prompt) => (
+                  {(dynamicQuickPrompts.length ? dynamicQuickPrompts : fallbackQuickPrompts).map((prompt) => (
                     <button
                       key={prompt}
                       className="text-[11px] px-2 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50"

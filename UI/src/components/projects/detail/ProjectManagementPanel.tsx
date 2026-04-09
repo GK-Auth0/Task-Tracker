@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Project } from "../../../types/project";
 import aiChatAPI from "../../../services/aiChat";
 import { buildProjectTemplate } from "../../../utils/descriptionTemplates";
+import { ProjectPriority } from "../../../enums";
 
 interface ProjectUser {
   id: string;
@@ -26,7 +27,7 @@ interface ProjectManagementPanelProps {
   onUpdateProject: (payload: {
     name: string;
     description: string;
-    priority: "low" | "medium" | "high";
+    priority: ProjectPriority;
     startDate?: string;
     endDate?: string;
   }) => Promise<void>;
@@ -51,7 +52,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
 
   const [editName, setEditName] = useState(project.name || "");
   const [editDescription, setEditDescription] = useState(project.description || "");
-  const [editPriority, setEditPriority] = useState<"low" | "medium" | "high">(project.priority || "medium");
+  const [editPriority, setEditPriority] = useState<ProjectPriority>(project.priority || ProjectPriority.MEDIUM);
   const [editStartDate, setEditStartDate] = useState(project.startDate?.slice(0, 10) || "");
   const [editEndDate, setEditEndDate] = useState(project.endDate?.slice(0, 10) || "");
 
@@ -157,12 +158,12 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <select
               value={editPriority}
-              onChange={(event) => setEditPriority(event.target.value as "low" | "medium" | "high")}
+              onChange={(event) => setEditPriority(event.target.value as ProjectPriority)}
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value={ProjectPriority.LOW}>Low</option>
+              <option value={ProjectPriority.MEDIUM}>Medium</option>
+              <option value={ProjectPriority.HIGH}>High</option>
             </select>
             <input
               type="date"

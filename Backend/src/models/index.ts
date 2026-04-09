@@ -2,6 +2,7 @@ import User from "./user";
 import Project from "./project";
 import ProjectMember from "./ProjectMember";
 import ProjectFile from "./ProjectFile";
+import TaskFile from "./taskFile";
 import Task from "./task";
 import Subtask from "./subtask";
 import Comment from "./comment";
@@ -12,6 +13,7 @@ import { Commit } from "./commit";
 import UserMetadata from "./userMetadata";
 import AuthOtp from "./authOtp";
 import AuthPasswordReset from "./authPasswordReset";
+import AuthRefreshToken from "./authRefreshToken";
 import AuditLog from "./auditLog";
 import ChatGroup from "./chatGroup";
 import ChatMessage from "./chatMessage";
@@ -22,9 +24,18 @@ import UserSavedView from "./userSavedView";
 import UserInvitation from "./userInvitation";
 import ProjectConfidentialAccessRequest from "./projectConfidentialAccessRequest";
 import Invite from "./invite";
+import Organization from "./organization";
+import Config from "./config";
+import Defect from "./defect";
+import TestCase from "./testCase";
+import Sprint from "./sprint";
+import TestCaseModule from "./testCaseModule";
+import TestPlan from "./testPlan";
+import TestRun from "./testRun";
+import TestCaseSuite from "./testCaseSuite";
 
-const models = [User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite];
+const models = [User, Project, ProjectMember, ProjectFile, TaskFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuthRefreshToken, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule, TestPlan, TestRun, TestCaseSuite];
 
 export default models;
 
-export { User, Project, ProjectMember, ProjectFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite };
+export { User, Project, ProjectMember, ProjectFile, TaskFile, Task, Subtask, Comment, Label, TaskLabel, PullRequest, Commit, UserMetadata, AuthOtp, AuthPasswordReset, AuthRefreshToken, AuditLog, ChatGroup, ChatMessage, ChatGroupMember, ChatMessageRead, UserPinnedItem, UserSavedView, UserInvitation, ProjectConfidentialAccessRequest, Invite, Organization, Config, Defect, TestCase, Sprint, TestCaseModule, TestPlan, TestRun, TestCaseSuite };

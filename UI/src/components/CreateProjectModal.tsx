@@ -1,10 +1,13 @@
 import React, { useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { CreateProjectRequest } from "../types/project";
-import axios from "axios";
 import aiChatAPI from "../services/aiChat";
 import { buildProjectTemplate } from "../utils/descriptionTemplates";
-
-import { API_BASE_URL } from "../config/api";
+import { ProjectStatus, ProjectPriority } from "../enums";
+import { projectService } from "../services/projectService";
+import { sprintsAPI } from "../services/sprints";
+import { testCaseModulesAPI } from "../services/testCases";
+import type { Sprint } from "../types/sprint";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
 
 interface User {
@@ -16,19 +19,108 @@ interface User {
 
 interface CreateProjectModalProps {
   onClose: () => void;
-  onSubmit: (data: CreateProjectRequest) => void;
+  onSubmit: (
+    data: CreateProjectRequest,
+    options?: {
+      modules: string[];
+      sprintSetup?:
+        | { mode: "none" }
+        | { mode: "create_new" }
+        | {
+            mode: "existing";
+            sprintTemplate: {
+              name: string;
+              goal?: string | null;
+              release?: string | null;
+              squad?: string | null;
+              owner_id?: string;
+              capacity?: number | null;
+              start_date?: string | null;
+              end_date?: string | null;
+              status: "Planning" | "Active" | "Completed";
+            };
+          };
+    },
+  ) => Promise<{ id: string; name: string } | null>;
 }
+
+type SprintOption = {
+  id: string;
+  name: string;
+  goal?: string | null;
+  release?: string | null;
+  squad?: string | null;
+  owner_id?: string;
+  capacity?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status: "Planning" | "Active" | "Completed";
+};
+
+type ModuleOption = {
+  id: string;
+  name: string;
+};
+
+const sprintStatusPriority: Record<Sprint["status"], number> = {
+  Active: 0,
+  Planning: 1,
+  Completed: 2,
+};
+
+const toSprintFamilyOptions = (sprints: Sprint[]): SprintOption[] => {
+  const byName = new Map<string, Sprint>();
+
+  sprints.forEach((sprint) => {
+    const existing = byName.get(sprint.name);
+    if (!existing) {
+      byName.set(sprint.name, sprint);
+      return;
+    }
+
+    const existingPriority = sprintStatusPriority[existing.status] ?? 99;
+    const nextPriority = sprintStatusPriority[sprint.status] ?? 99;
+    if (nextPriority < existingPriority) {
+      byName.set(sprint.name, sprint);
+      return;
+    }
+
+    if (nextPriority === existingPriority) {
+      const existingUpdatedAt = new Date(existing.updated_at).getTime();
+      const nextUpdatedAt = new Date(sprint.updated_at).getTime();
+      if (nextUpdatedAt > existingUpdatedAt) {
+        byName.set(sprint.name, sprint);
+      }
+    }
+  });
+
+  return Array.from(byName.values())
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((sprint) => ({
+      id: sprint.name,
+      name: sprint.name,
+      goal: sprint.goal,
+      release: sprint.release,
+      squad: sprint.squad,
+      owner_id: sprint.owner_id,
+      capacity: sprint.capacity,
+      start_date: sprint.start_date,
+      end_date: sprint.end_date,
+      status: sprint.status,
+    }));
+};
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const navigate = useNavigate();
   const INVITE_SENDS_IMMEDIATELY = true;
   const [formData, setFormData] = useState<CreateProjectRequest>({
     name: "",
     description: "",
-    status: "planning",
-    priority: "medium",
+    status: ProjectStatus.PLANNING,
+    priority: ProjectPriority.MEDIUM,
     startDate: "",
     endDate: "",
   });
@@ -43,6 +135,17 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [availableSprints, setAvailableSprints] = useState<SprintOption[]>([]);
+  const [loadingSprints, setLoadingSprints] = useState(false);
+  const [sprintSetupMode, setSprintSetupMode] = useState<"none" | "existing" | "create_new">("none");
+  const [selectedSprintId, setSelectedSprintId] = useState("");
+  const [moduleNameInput, setModuleNameInput] = useState("");
+  const [moduleNames, setModuleNames] = useState<string[]>([]);
+  const [availableModules, setAvailableModules] = useState<ModuleOption[]>([]);
+  const [loadingModules, setLoadingModules] = useState(false);
+  const [selectedExistingModule, setSelectedExistingModule] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Fetch users when search term changes
@@ -55,14 +158,8 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
       try {
         setLoadingUsers(true);
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_BASE_URL}/api/projects/users`, {
-          params: { search: searchTerm },
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        setAvailableUsers(response.data.data || []);
+        const response = await projectService.getProjectUsers(searchTerm);
+        setAvailableUsers(response.data || []);
       } catch (error) {
         console.error("Error fetching users:", error);
         setAvailableUsers([]);
@@ -75,8 +172,60 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     return () => clearTimeout(debounceTimer);
   }, [searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchSprints = async () => {
+      try {
+        setLoadingSprints(true);
+        const response = await sprintsAPI.getSprints();
+        if (response.success) {
+          setAvailableSprints(toSprintFamilyOptions(response.data));
+        }
+      } catch (error) {
+        console.error("Failed to fetch sprints:", error);
+        setAvailableSprints([]);
+      } finally {
+        setLoadingSprints(false);
+      }
+    };
+
+    fetchSprints();
+  }, []);
+
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        setLoadingModules(true);
+        const response = await testCaseModulesAPI.getModules();
+        if (response.success) {
+          const unique = Array.from(
+            response.data.reduce((map, module) => {
+              const key = module.name.trim().toLowerCase();
+              if (!key || map.has(key)) return map;
+              map.set(key, {
+                id: module.name,
+                name: module.name.trim(),
+              });
+              return map;
+            }, new Map<string, ModuleOption>()),
+          )
+            .map(([, value]) => value)
+            .sort((left, right) => left.name.localeCompare(right.name));
+          setAvailableModules(unique);
+        }
+      } catch (error) {
+        console.error("Failed to fetch modules:", error);
+        setAvailableModules([]);
+      } finally {
+        setLoadingModules(false);
+      }
+    };
+
+    fetchModules();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError("");
 
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) {
@@ -86,6 +235,12 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       newErrors.description = "Description is required";
     } else if (formData.description.trim().length < 10) {
       newErrors.description = "Description should be at least 10 characters";
+    }
+    if (!moduleNames.length) {
+      newErrors.modules = "At least one module is required";
+    }
+    if (sprintSetupMode === "existing" && !selectedSprintId) {
+      newErrors.sprintSetup = "Select an existing sprint to mirror for this project";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -112,7 +267,42 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       projectData.endDate = formData.endDate;
     }
 
-    onSubmit(projectData);
+    try {
+      setSubmitting(true);
+      const selectedSprint = availableSprints.find((item) => item.id === selectedSprintId);
+      const sprintSetup =
+        sprintSetupMode === "create_new"
+          ? { mode: "create_new" as const }
+          : sprintSetupMode === "existing" && selectedSprint
+            ? {
+                mode: "existing" as const,
+                sprintTemplate: {
+                  name: selectedSprint.name,
+                  goal: selectedSprint.goal,
+                  release: selectedSprint.release,
+                  squad: selectedSprint.squad,
+                  owner_id: selectedSprint.owner_id,
+                  capacity: selectedSprint.capacity,
+                  start_date: selectedSprint.start_date,
+                  end_date: selectedSprint.end_date,
+                  status: selectedSprint.status,
+                },
+              }
+            : { mode: "none" as const };
+      const createdProject = await onSubmit(projectData, {
+        modules: moduleNames,
+        sprintSetup,
+      });
+      if (sprintSetup.mode === "create_new" && createdProject?.id) {
+        navigate(
+          `/sprint-board?tab=create&projectId=${encodeURIComponent(createdProject.id)}`,
+        );
+      }
+    } catch (error: any) {
+      setSubmitError(error?.message || "Failed to create project");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -148,6 +338,38 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setSelectedMembers((prev) => prev.filter((m) => m.id !== memberId));
   };
 
+  const addModule = () => {
+    const nextModule = moduleNameInput.trim();
+    if (!nextModule) return;
+    if (moduleNames.some((item) => item.toLowerCase() === nextModule.toLowerCase())) {
+      setModuleNameInput("");
+      return;
+    }
+    setModuleNames((prev) => [...prev, nextModule]);
+    setModuleNameInput("");
+    if (errors.modules) {
+      setErrors((prev) => ({ ...prev, modules: "" }));
+    }
+  };
+
+  const removeModule = (name: string) => {
+    setModuleNames((prev) => prev.filter((item) => item !== name));
+  };
+
+  const addExistingModule = () => {
+    const selected = selectedExistingModule.trim();
+    if (!selected) return;
+    if (moduleNames.some((item) => item.toLowerCase() === selected.toLowerCase())) {
+      setSelectedExistingModule("");
+      return;
+    }
+    setModuleNames((prev) => [...prev, selected]);
+    setSelectedExistingModule("");
+    if (errors.modules) {
+      setErrors((prev) => ({ ...prev, modules: "" }));
+    }
+  };
+
   const filteredMembers = availableUsers.filter(
     (member) => !selectedMembers.find((m) => m.id === member.id),
   );
@@ -164,6 +386,16 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
   const removeInvitee = (email: string) => {
     setInvitees((prev) => prev.filter((item) => item.email !== email));
+  };
+
+  const handleSprintModeChange = (value: "none" | "existing" | "create_new") => {
+    setSprintSetupMode(value);
+    if (value !== "existing") {
+      setSelectedSprintId("");
+    }
+    if (errors.sprintSetup) {
+      setErrors((prev) => ({ ...prev, sprintSetup: "" }));
+    }
   };
 
   const applyProjectTemplate = () => {
@@ -262,7 +494,12 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="create-project-form" onSubmit={handleSubmit} className="space-y-6">
+            {submitError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            ) : null}
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
                 Project Preview
@@ -425,6 +662,90 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               </div>
             </div>
 
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-[#0d151b] text-sm font-semibold leading-tight tracking-tight">
+                  Project Modules
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Pick existing workspace modules or create new ones. The selected module names will be added to this project.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedExistingModule}
+                  onChange={(e) => setSelectedExistingModule(e.target.value)}
+                  className="form-input flex w-full rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border border-[#cfdce7] bg-white focus:border-blue-600 h-12 px-4 text-base font-normal"
+                  disabled={loadingModules}
+                >
+                  <option value="">
+                    {loadingModules ? "Loading existing modules..." : "Choose existing module"}
+                  </option>
+                  {availableModules.map((module) => (
+                    <option key={module.id} value={module.name}>
+                      {module.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={addExistingModule}
+                  className="h-12 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  Use Existing
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={moduleNameInput}
+                  onChange={(e) => setModuleNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addModule();
+                    }
+                  }}
+                  className={`form-input flex w-full rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border h-12 placeholder:text-[#4c759a] px-4 text-base font-normal ${
+                    errors.modules
+                      ? "border-red-300 bg-red-50"
+                      : "border-[#cfdce7] bg-white focus:border-blue-600"
+                  }`}
+                  placeholder="Authentication"
+                />
+                <button
+                  type="button"
+                  onClick={addModule}
+                  className="h-12 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Add
+                </button>
+              </div>
+              {errors.modules ? (
+                <p className="text-red-500 text-xs">{errors.modules}</p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {moduleNames.length ? (
+                  moduleNames.map((moduleName) => (
+                    <span
+                      key={moduleName}
+                      className="inline-flex items-center gap-2 rounded-full bg-blue-600/10 px-3 py-1.5 text-xs font-semibold text-blue-600"
+                    >
+                      {moduleName}
+                      <button
+                        type="button"
+                        onClick={() => removeModule(moduleName)}
+                        className="material-symbols-outlined text-[14px] hover:text-blue-800"
+                      >
+                        close
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">No modules added yet.</p>
+                )}
+              </div>
+            </div>
+
             {/* Project Category Color */}
             <div className="space-y-3">
               <h3 className="text-[#0d151b] text-sm font-semibold leading-tight tracking-tight">
@@ -584,6 +905,86 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 </div>
               )}
             </div>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-900">Sprint Setup</p>
+                <p className="mt-1 text-xs text-blue-800">
+                  Choose an existing sprint to mirror for this new project, or send the user to sprint creation after save.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="sprint-setup-mode"
+                    checked={sprintSetupMode === "none"}
+                    onChange={() => handleSprintModeChange("none")}
+                    className="mt-1 h-4 w-4 border-blue-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">No sprint yet</p>
+                    <p className="text-xs text-slate-600">Create the project only.</p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="sprint-setup-mode"
+                    checked={sprintSetupMode === "existing"}
+                    onChange={() => handleSprintModeChange("existing")}
+                    className="mt-1 h-4 w-4 border-blue-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">Use existing sprint</p>
+                    <p className="text-xs text-slate-600">
+                      A matching sprint will be created for this project from the selected sprint.
+                    </p>
+                    <select
+                      value={selectedSprintId}
+                      onChange={(e) => {
+                        setSelectedSprintId(e.target.value);
+                        if (errors.sprintSetup) {
+                          setErrors((prev) => ({ ...prev, sprintSetup: "" }));
+                        }
+                      }}
+                      disabled={sprintSetupMode !== "existing" || loadingSprints}
+                      className="mt-2 h-11 w-full rounded-lg border border-blue-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    >
+                      <option value="">
+                        {loadingSprints ? "Loading sprints..." : "Select an existing sprint"}
+                      </option>
+                      {availableSprints.map((sprint) => (
+                        <option key={sprint.id} value={sprint.id}>
+                          {sprint.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.sprintSetup ? (
+                      <p className="mt-1 text-xs text-red-500">{errors.sprintSetup}</p>
+                    ) : null}
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="sprint-setup-mode"
+                    checked={sprintSetupMode === "create_new"}
+                    onChange={() => handleSprintModeChange("create_new")}
+                    className="mt-1 h-4 w-4 border-blue-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Create new sprint after save</p>
+                    <p className="text-xs text-slate-600">
+                      Redirect to the sprint create flow once the project is saved.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
           </form>
         </div>
 
@@ -592,15 +993,24 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             className="px-6 h-11 rounded-lg text-slate-600 font-semibold hover:bg-slate-100 transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
-            className="px-8 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
+            type="submit"
+            form="create-project-form"
+            disabled={submitting}
+            className="px-8 h-11 bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-semibold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
           >
-            Create Project
+            {submitting
+              ? "Saving..."
+              : sprintSetupMode === "create_new"
+                ? "Save and Create Sprint"
+                : sprintSetupMode === "existing"
+                  ? "Create Project and Link Sprint"
+                : "Create Project"}
             <span className="material-symbols-outlined text-lg">
               arrow_forward
             </span>

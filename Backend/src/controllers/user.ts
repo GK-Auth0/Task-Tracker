@@ -4,12 +4,21 @@ import { parseBoundedInt } from "../helpers/query";
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
+    const requesterId = (req as any).user?.id;
+
+    if (!requesterId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+      });
+    }
+
     const page = parseBoundedInt(req.query.page, 1, 1, 100000);
     const limit = parseBoundedInt(req.query.limit, 10, 1, 100);
     const search = req.query.search as string || "";
     const role = req.query.role as string || "";
     
-    const result = await getAllUsers({ page, limit, search, role });
+    const result = await getAllUsers({ requesterId, page, limit, search, role });
     return res.status(200).json({
       success: true,
       message: "Users retrieved successfully",
@@ -27,8 +36,17 @@ export const getUsers = async (req: Request, res: Response) => {
 
 export const getUser = async (req: Request, res: Response) => {
   try {
+    const requesterId = (req as any).user?.id;
+
+    if (!requesterId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+      });
+    }
+
     const userId = req.params.id as string;
-    const user = await getUserById(userId);
+    const user = await getUserById(userId, requesterId);
     return res.status(200).json({
       success: true,
       message: "User retrieved successfully",

@@ -10,6 +10,8 @@ import {
   forgotPassword,
   resetPassword,
   changePasswordInvited,
+  refreshSession,
+  logout,
 } from "../controllers/auth";
 import {
   registerSchema,
@@ -34,6 +36,8 @@ router.post("/resend-otp", authRateLimiter, checkSchema(resendOtpSchema), resend
 router.post("/forgot-password", authRateLimiter, checkSchema(forgotPasswordSchema), forgotPassword);
 router.post("/reset-password", authRateLimiter, checkSchema(resetPasswordSchema), resetPassword);
 router.post("/change-password-invited", authRateLimiter, checkSchema(changePasswordInvitedSchema), changePasswordInvited);
+router.post("/refresh", authRateLimiter, refreshSession);
+router.post("/logout", logout);
 router.get("/me", authenticateToken, me);
 
 export default router;

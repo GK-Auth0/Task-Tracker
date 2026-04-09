@@ -12,7 +12,9 @@ import {
   CreatedAt,
   UpdatedAt,
 } from "sequelize-typescript";
-import { User, Project, Subtask, Comment, Label, TaskLabel } from "./index";
+import { User, Project, Subtask, Comment, Label, TaskLabel, TaskFile } from "./index";
+import Sprint from "./sprint";
+import { TASK_STATUSES, type TaskStatusValue } from "../utils/taskStatus";
 
 @Table({
   tableName: "tasks",
@@ -44,11 +46,11 @@ export default class Task extends Model {
   description!: string;
 
   @Column({
-    type: DataType.ENUM("To Do", "In Progress", "Done"),
+    type: DataType.ENUM(...TASK_STATUSES),
     allowNull: false,
     defaultValue: "To Do",
   })
-  status!: "To Do" | "In Progress" | "Done";
+  status!: TaskStatusValue;
 
   @Column({
     type: DataType.ENUM("Low", "Medium", "High"),
@@ -56,6 +58,13 @@ export default class Task extends Model {
     defaultValue: "Medium",
   })
   priority!: "Low" | "Medium" | "High";
+
+  @Column({
+    type: DataType.ENUM("Story", "Task", "Bug"),
+    allowNull: false,
+    defaultValue: "Task",
+  })
+  issue_type!: "Story" | "Task" | "Bug";
 
   @Column({
     type: DataType.DATEONLY,
@@ -83,6 +92,19 @@ export default class Task extends Model {
   })
   assignee_id?: string;
 
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  defect_id?: string;
+
+  @ForeignKey(() => Sprint)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  sprint_id?: string;
+
   @CreatedAt
   created_at!: Date;
 
@@ -98,11 +120,17 @@ export default class Task extends Model {
   @BelongsTo(() => User, "assignee_id")
   assignee?: User;
 
+  @BelongsTo(() => Sprint, "sprint_id")
+  sprint?: Sprint;
+
   @HasMany(() => Subtask, "task_id")
   subtasks!: Subtask[];
 
   @HasMany(() => Comment, "task_id")
   comments!: Comment[];
+
+  @HasMany(() => TaskFile, "task_id")
+  attachments!: TaskFile[];
 
   @BelongsToMany(() => Label, () => TaskLabel)
   labels!: Label[];

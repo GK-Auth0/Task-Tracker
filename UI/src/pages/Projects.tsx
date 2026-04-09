@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "react-query";
 import { projectService } from "../services/projectService";
 import { tasksAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
@@ -7,40 +8,93 @@ import preferencesAPI, { PinnedItem, SavedView } from "../services/preferences";
 import { Project, CreateProjectRequest } from "../types/project";
 import CreateProjectModal from "../components/CreateProjectModal";
 import ProjectsHeader from "../components/projects/ProjectsHeader";
-import ProjectsFilters from "../components/projects/ProjectsFilters";
-import ProjectsGrid from "../components/projects/ProjectsGrid";
+import ProjectsFiltersBar, { ViewMode } from "../components/projects/ProjectsFiltersBar";
+import ProjectsList from "../components/projects/ProjectsList";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
-import SavedViewsBar from "../components/preferences/SavedViewsBar";
+import { testCaseModulesAPI } from "../services/testCases";
+import { sprintsAPI } from "../services/sprints";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWorkspaceContent } from "../types/roles";
+import { ProjectStatus } from "../enums";
 
-type ProjectStatusFilter = "all" | Project["status"];
+type ProjectStatusFilter = "all" | ProjectStatus;
 
 const Projects: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [insights, setInsights] = useState<AiProjectInsights | null>(null);
-  const [insightsLoading, setInsightsLoading] = useState(false);
-  const [insightsError, setInsightsError] = useState("");
-  const [pinnedProjectIds, setPinnedProjectIds] = useState<Set<string>>(new Set());
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState("");
   const [newViewName, setNewViewName] = useState("");
   const [savingView, setSavingView] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const canCreateProject = canManageWorkspaceContent(user?.role);
 
-  useEffect(() => {
-    fetchProjects();
-    fetchInsights();
-    fetchPinnedProjects();
-    fetchSavedViews();
-  }, []);
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>(
+    ["projects-list"],
+    async () => {
+      const response = await projectService.getProjects();
+      const payload = Array.isArray((response as any)?.data)
+        ? (response as any).data
+        : Array.isArray((response as any)?.data?.data)
+          ? (response as any).data.data
+          : [];
+      return payload;
+    },
+    {
+      staleTime: 30_000,
+    },
+  );
+
+  const {
+    data: insights = null,
+    isLoading: insightsLoading,
+    error: insightsQueryError,
+    refetch: refetchInsights,
+  } = useQuery<AiProjectInsights | null>(
+    ["project-insights"],
+    async () => {
+      const tasksRes = await tasksAPI.getTasks({ limit: 200 });
+      const payload = tasksRes.data.map((task) => ({
+        title: task.title,
+        priority: task.priority,
+        status: task.status,
+        due_date: task.due_date,
+      }));
+      if (payload.length === 0) {
+        return null;
+      }
+      return aiAssistantAPI.projectInsights(payload);
+    },
+    {
+      staleTime: 30_000,
+    }
+  );
+
+  const { data: pins = [] } = useQuery<PinnedItem[]>(
+    ["project-pins"],
+    () => preferencesAPI.getPins("project"),
+    {
+      staleTime: 30_000,
+    },
+  );
+
+  const { data: savedViews = [] } = useQuery<SavedView[]>(
+    ["saved-project-views"],
+    () => preferencesAPI.getSavedViews("projects"),
+    {
+      staleTime: 30_000,
+    },
+  );
+
+  const pinnedProjectIds = useMemo(
+    () => new Set(pins.map((pin) => pin.entity_id)),
+    [pins],
+  );
+  const insightsError = insightsQueryError ? "AI insights currently unavailable." : "";
 
   useEffect(() => {
     const query = searchParams.get("q");
@@ -49,81 +103,82 @@ const Projects: React.FC = () => {
     }
   }, [searchParams]);
 
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-      const response = await projectService.getProjects();
-      const payload = Array.isArray((response as any)?.data)
-        ? (response as any).data
-        : Array.isArray((response as any)?.data?.data)
-          ? (response as any).data.data
-          : [];
-      setProjects(payload);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchInsights = async () => {
-    try {
-      setInsightsLoading(true);
-      setInsightsError("");
-      const tasksRes = await tasksAPI.getTasks({ limit: 200 });
-      const payload = tasksRes.data.map((task) => ({
-        title: task.title,
-        priority: task.priority,
-        status: task.status,
-        due_date: task.due_date,
-      }));
-      const result = await aiAssistantAPI.projectInsights(payload);
-      setInsights(result);
-    } catch (error) {
-      setInsightsError("AI insights currently unavailable.");
-    } finally {
-      setInsightsLoading(false);
-    }
-  };
-
-  const fetchPinnedProjects = async () => {
-    try {
-      const pins = await preferencesAPI.getPins("project");
-      setPinnedProjectIds(new Set(pins.map((pin: PinnedItem) => pin.entity_id)));
-    } catch (error) {
-      console.error("Failed to load pinned projects:", error);
-    }
-  };
-
-  const fetchSavedViews = async () => {
-    try {
-      const views = await preferencesAPI.getSavedViews("projects");
-      setSavedViews(views);
-    } catch (error) {
-      console.error("Failed to load saved views:", error);
-    }
-  };
-
-  const handleCreateProject = async (projectData: CreateProjectRequest) => {
-    if (!canCreateProject) return;
+  const handleCreateProject = useCallback(async (
+    projectData: CreateProjectRequest,
+    options?: {
+      modules: string[];
+      sprintSetup?:
+        | { mode: "none" }
+        | { mode: "create_new" }
+        | {
+            mode: "existing";
+            sprintTemplate: {
+              name: string;
+              goal?: string | null;
+              release?: string | null;
+              squad?: string | null;
+              owner_id?: string;
+              capacity?: number | null;
+              start_date?: string | null;
+              end_date?: string | null;
+              status: "Planning" | "Active" | "Completed";
+            };
+          };
+    },
+  ) => {
+    if (!canCreateProject) return null;
     try {
       const response = await projectService.createProject(projectData);
       if (!response.success) {
         throw new Error("Project creation failed");
       }
+
+      const moduleNames = options?.modules || [];
+      if (moduleNames.length) {
+        await Promise.all(
+          moduleNames.map((name) =>
+            testCaseModulesAPI.createModule({
+              name,
+              project_id: response.data.id,
+            }),
+          ),
+        );
+      }
+
+      if (options?.sprintSetup?.mode === "existing") {
+        const template = options.sprintSetup.sprintTemplate;
+        await sprintsAPI.createSprint({
+          name: template.name,
+          goal: template.goal || undefined,
+          release: template.release || undefined,
+          squad: template.squad || undefined,
+          project_id: response.data.id,
+          owner_id: template.owner_id,
+          capacity: template.capacity ?? undefined,
+          start_date: template.start_date || undefined,
+          end_date: template.end_date || undefined,
+          status: template.status,
+        });
+      }
+
       setShowCreateModal(false);
-      fetchProjects();
+      await Promise.all([
+        queryClient.invalidateQueries(["projects-list"]),
+        queryClient.invalidateQueries(["project-insights"]),
+      ]);
+      return {
+        id: response.data.id,
+        name: response.data.name,
+      };
     } catch (error: any) {
       console.error("Error creating project:", error);
       console.error("Error response:", error.response?.data);
       console.error("Error status:", error.response?.status);
-      // Show error to user
       const errorMessage =
         error.response?.data?.message || error.message || "Unknown error";
-      alert(`Failed to create project: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
-  };
+  }, [canCreateProject, queryClient]);
 
   const filteredProjects = projects.filter((project) => {
     const projectName = String(project?.name ?? "");
@@ -139,29 +194,20 @@ const Projects: React.FC = () => {
     return matchesSearch && matchesStatus && matchesPinned;
   });
 
-  const handleToggleProjectPin = async (projectId: string, shouldPin: boolean) => {
+  const handleToggleProjectPin = useCallback(async (projectId: string, shouldPin: boolean) => {
     try {
       if (shouldPin) {
         await preferencesAPI.addPin("project", projectId);
       } else {
         await preferencesAPI.removePin("project", projectId);
       }
-
-      setPinnedProjectIds((prev) => {
-        const next = new Set(prev);
-        if (shouldPin) {
-          next.add(projectId);
-        } else {
-          next.delete(projectId);
-        }
-        return next;
-      });
+      await queryClient.invalidateQueries(["project-pins"]);
     } catch (error) {
       console.error("Failed to update project pin:", error);
     }
-  };
+  }, [queryClient]);
 
-  const applySavedView = () => {
+  const applySavedView = useCallback(() => {
     if (!selectedViewId) return;
     const view = savedViews.find((item) => item.id === selectedViewId);
     if (!view) return;
@@ -170,18 +216,18 @@ const Projects: React.FC = () => {
     const status = String(filters.statusFilter ?? "all");
     if (
       status === "all" ||
-      status === "planning" ||
-      status === "active" ||
-      status === "on_hold" ||
-      status === "completed" ||
-      status === "cancelled"
+      status === ProjectStatus.PLANNING ||
+      status === ProjectStatus.ACTIVE ||
+      status === ProjectStatus.ON_HOLD ||
+      status === ProjectStatus.COMPLETED ||
+      status === ProjectStatus.CANCELLED
     ) {
-      setStatusFilter(status);
+      setStatusFilter(status as ProjectStatusFilter);
     }
     setShowPinnedOnly(Boolean(filters.showPinnedOnly ?? false));
-  };
+  }, [savedViews, selectedViewId]);
 
-  const saveCurrentView = async () => {
+  const saveCurrentView = useCallback(async () => {
     if (!newViewName.trim()) return;
     try {
       setSavingView(true);
@@ -195,26 +241,38 @@ const Projects: React.FC = () => {
         },
       });
       setNewViewName("");
-      await fetchSavedViews();
+      await queryClient.invalidateQueries(["saved-project-views"]);
     } catch (error) {
       console.error("Failed to save current project view:", error);
     } finally {
       setSavingView(false);
     }
-  };
+  }, [newViewName, queryClient, searchTerm, showPinnedOnly, statusFilter]);
 
-  const deleteSelectedView = async () => {
+  const deleteSelectedView = useCallback(async () => {
     if (!selectedViewId) return;
     try {
       await preferencesAPI.deleteSavedView(selectedViewId);
       setSelectedViewId("");
-      await fetchSavedViews();
+      await queryClient.invalidateQueries(["saved-project-views"]);
     } catch (error) {
       console.error("Failed to delete saved project view:", error);
     }
-  };
+  }, [queryClient, selectedViewId]);
 
-  if (loading) {
+  const handleOpenCreateProject = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
+
+  const handleCloseCreateProject = useCallback(() => {
+    setShowCreateModal(false);
+  }, []);
+
+  const handleTogglePinnedOnly = useCallback(() => {
+    setShowPinnedOnly((previous) => !previous);
+  }, []);
+
+  if (projectsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         Loading...
@@ -226,30 +284,28 @@ const Projects: React.FC = () => {
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="min-h-full p-8">
         <ProjectsHeader
-          onCreate={() => setShowCreateModal(true)}
+          onCreate={handleOpenCreateProject}
           canCreate={canCreateProject}
         />
 
-        <SavedViewsBar
-          title="Project Saved Views"
-          views={savedViews.map((view) => ({ id: view.id, name: view.name }))}
-          selectedId={selectedViewId}
-          viewName={newViewName}
-          onSelectedIdChange={setSelectedViewId}
-          onViewNameChange={setNewViewName}
-          onApply={applySavedView}
-          onSave={saveCurrentView}
-          onDelete={deleteSelectedView}
-          saving={savingView}
-        />
-
-        <ProjectsFilters
+        <ProjectsFiltersBar
           searchTerm={searchTerm}
           statusFilter={statusFilter}
           showPinnedOnly={showPinnedOnly}
+          viewMode={viewMode}
+          savedViews={savedViews.map((view) => ({ id: view.id, name: view.name }))}
+          selectedViewId={selectedViewId}
+          newViewName={newViewName}
+          savingView={savingView}
           onSearchChange={setSearchTerm}
           onStatusChange={setStatusFilter}
-          onTogglePinnedOnly={() => setShowPinnedOnly((previous) => !previous)}
+          onTogglePinnedOnly={handleTogglePinnedOnly}
+          onViewModeChange={setViewMode}
+          onSelectedViewIdChange={setSelectedViewId}
+          onViewNameChange={setNewViewName}
+          onApplyView={applySavedView}
+          onSaveView={saveCurrentView}
+          onDeleteView={deleteSelectedView}
         />
 
         <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
@@ -267,7 +323,7 @@ const Projects: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={fetchInsights}
+              onClick={() => void refetchInsights()}
               disabled={insightsLoading}
               className="h-9 px-4 rounded-lg bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800 disabled:opacity-50"
             >
@@ -319,12 +375,13 @@ const Projects: React.FC = () => {
           )}
         </section>
 
-        <ProjectsGrid
+        <ProjectsList
           projects={filteredProjects}
-          onCreate={() => setShowCreateModal(true)}
+          onCreate={handleOpenCreateProject}
           pinnedProjectIds={pinnedProjectIds}
           onProjectPinToggle={handleToggleProjectPin}
           canCreate={canCreateProject}
+          viewMode={viewMode}
         />
 
         {filteredProjects.length === 0 && <ProjectsEmptyState />}
@@ -333,7 +390,7 @@ const Projects: React.FC = () => {
       {/* Create Project Modal */}
       {canCreateProject && showCreateModal && (
         <CreateProjectModal
-          onClose={() => setShowCreateModal(false)}
+          onClose={handleCloseCreateProject}
           onSubmit={handleCreateProject}
         />
       )}

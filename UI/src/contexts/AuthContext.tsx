@@ -3,20 +3,26 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
-import { authAPI } from "../services/auth";
-import type { OtpChallenge } from "../services/auth";
+import {
+  authAPI,
+  clearStoredAccessToken,
+  getStoredAccessToken,
+  setStoredAccessToken,
+} from "../services/auth";
+import type {
+  AuthenticatedUser,
+  OtpChallenge,
+  OrganizationSummary,
+} from "../services/auth";
 import {
   normalizeWorkspaceRole,
   type WorkspaceRole,
 } from "../types/roles";
-import RingLoader from "../components/RingLoader";
 
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
+interface User extends Omit<AuthenticatedUser, "role"> {
   role: WorkspaceRole;
 }
 
@@ -26,16 +32,17 @@ const normalizeUserRole = (role: unknown): WorkspaceRole =>
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithAuth0: (accessToken: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  loginWithAuth0: (accessToken: string) => Promise<User>;
   register: (
     email: string,
     password: string,
     firstName: string,
     lastName: string,
   ) => Promise<OtpChallenge>;
-  verifyOtp: (otpSessionId: string, otp: string) => Promise<void>;
+  verifyOtp: (otpSessionId: string, otp: string) => Promise<User>;
   resendOtp: (otpSessionId: string) => Promise<OtpChallenge>;
+  setOrganization: (organization: OrganizationSummary) => void;
   logout: () => void;
   loading: boolean;
 }
@@ -58,11 +65,17 @@ const defaultAuthContext: AuthContextType = {
   resendOtp: async () => {
     throw new Error("AuthProvider is not ready yet");
   },
+  setOrganization: () => {},
   logout: () => {},
   loading: true,
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext);
+
+const normalizeUser = (user: AuthenticatedUser): User => ({
+  ...user,
+  role: normalizeUserRole(user.role),
+});
 
 export const useAuth = () => {
   return useContext(AuthContext);
@@ -74,32 +87,115 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem("token"),
-  );
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      if (token) {
-        try {
-          const response = await authAPI.getCurrentUser();
-          setUser({
-            ...response.data,
-            role: normalizeUserRole(response.data.role),
-          });
-        } catch (error) {
-          localStorage.removeItem("token");
-          setToken(null);
-        }
-      }
-      setLoading(false);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const applyAuthenticatedUser = (nextUser: AuthenticatedUser) => {
+      if (!isMountedRef.current || !isActive) return;
+      setUser(normalizeUser(nextUser));
     };
 
-    initAuth();
-  }, [token]);
+    const clearAuthState = () => {
+      if (!isMountedRef.current || !isActive) return;
+      clearStoredAccessToken();
+      setUser(null);
+    };
 
-  const login = async (email: string, password: string): Promise<void> => {
+    const initAuth = async () => {
+      if (!isMountedRef.current || !isActive) return;
+      setLoading(true);
+      const bootstrapToken = getStoredAccessToken();
+      const currentPath =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      const isAuthPage =
+        currentPath.startsWith("/login") ||
+        currentPath.startsWith("/register") ||
+        currentPath.startsWith("/forgot-password") ||
+        currentPath.startsWith("/reset-password") ||
+        currentPath.startsWith("/auth/callback");
+
+      try {
+        const storedToken = bootstrapToken;
+
+        if (storedToken) {
+          try {
+            const response = await authAPI.getCurrentUser();
+            applyAuthenticatedUser(response.data);
+            return;
+          } catch (tokenError) {
+            if (isAuthPage) {
+              throw tokenError;
+            }
+
+            const response = await authAPI.refreshSession();
+            const authenticatedData = response.data as Extract<
+              typeof response.data,
+              { user: AuthenticatedUser; token?: string }
+            >;
+            const { user, token } = authenticatedData;
+            if (token) {
+              setStoredAccessToken(token);
+            }
+            if (user) {
+              applyAuthenticatedUser(user);
+              return;
+            }
+          }
+        }
+
+        if (!isAuthPage) {
+          const response = await authAPI.refreshSession();
+          const authenticatedData = response.data as Extract<
+            typeof response.data,
+            { user: AuthenticatedUser; token?: string }
+          >;
+          const { user, token } = authenticatedData;
+          if (token) {
+            setStoredAccessToken(token);
+          }
+          if (user) {
+            applyAuthenticatedUser(user);
+            return;
+          }
+        }
+
+        if (!isMountedRef.current || !isActive) return;
+        setUser(null);
+      } catch (error) {
+        if (!isMountedRef.current || !isActive) return;
+        if (getStoredAccessToken() === "") {
+          clearAuthState();
+          return;
+        }
+
+        const currentToken = getStoredAccessToken();
+        if (!currentToken || currentToken === bootstrapToken) {
+          clearAuthState();
+        }
+      } finally {
+        if (!isMountedRef.current || !isActive) return;
+        setLoading(false);
+      }
+    };
+
+    void initAuth();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const login = async (email: string, password: string): Promise<User> => {
     const response = await authAPI.login({ email, password });
     const data: any = response.data;
 
@@ -114,18 +210,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       throw err;
     }
 
-    const { user, token } = data;
-    localStorage.setItem("token", token);
-    setToken(token);
-    setUser({ ...user, role: normalizeUserRole(user.role) });
+    const authenticatedData = data as Extract<
+      typeof data,
+      { user: AuthenticatedUser; token?: string }
+    >;
+    const { user, token } = authenticatedData;
+    if (token) setStoredAccessToken(token);
+    const normalizedUser = normalizeUser(user);
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
-  const loginWithAuth0 = async (accessToken: string): Promise<void> => {
+  const loginWithAuth0 = async (accessToken: string): Promise<User> => {
     const response = await authAPI.loginWithAuth0(accessToken);
-    const { user, token } = response.data;
-    localStorage.setItem("token", token);
-    setToken(token);
-    setUser({ ...user, role: normalizeUserRole(user.role) });
+    const authenticatedData = response.data as Extract<
+      typeof response.data,
+      { user: AuthenticatedUser; token?: string }
+    >;
+    const { user, token } = authenticatedData;
+    if (token) setStoredAccessToken(token);
+    const normalizedUser = normalizeUser(user);
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
   const register = async (
@@ -143,13 +249,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return response.data;
   };
 
-  const verifyOtp = async (otpSessionId: string, otp: string) => {
+  const verifyOtp = async (otpSessionId: string, otp: string): Promise<User> => {
     const response = await authAPI.verifyOtp(otpSessionId, otp);
-    const { user, token } = response.data;
-
-    localStorage.setItem("token", token);
-    setToken(token);
-    setUser({ ...user, role: normalizeUserRole(user.role) });
+    const authenticatedData = response.data as Extract<
+      typeof response.data,
+      { user: AuthenticatedUser; token?: string }
+    >;
+    const { user, token } = authenticatedData;
+    if (token) setStoredAccessToken(token);
+    const normalizedUser = normalizeUser(user);
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
   const resendOtp = async (otpSessionId: string): Promise<OtpChallenge> => {
@@ -157,20 +267,34 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return response.data;
   };
 
+  const setOrganization = (organization: OrganizationSummary) => {
+    setUser((currentUser) =>
+      currentUser
+        ? {
+            ...currentUser,
+            organization_id: organization.id,
+            organization,
+            onboardingRequired: false,
+          }
+        : currentUser,
+    );
+  };
+
   const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
+    void authAPI.logout().catch(() => undefined);
+    clearStoredAccessToken();
     setUser(null);
   };
 
   const value = {
     user,
-    token,
+    token: null,
     login,
     loginWithAuth0,
     register,
     verifyOtp,
     resendOtp,
+    setOrganization,
     logout,
     loading,
   };

@@ -10,12 +10,23 @@ import aiRoutes from "./routes/ai";
 import preferencesRoutes from "./routes/preferences";
 import webhookRoutes from "./routes/webhook";
 import inviteRoutes from "./routes/invite";
+import organizationRoutes from "./routes/organization";
+import defectRoutes from "./routes/defect";
+import searchRoutes from "./routes/search";
+import testCaseRoutes from "./routes/testCase";
+import sprintRoutes from "./routes/sprint";
+import testCaseModuleRoutes from "./routes/testCaseModule";
+import testCaseSuiteRoutes from "./routes/testCaseSuite";
+import testPlanRoutes from "./routes/testPlan";
+import testRunRoutes from "./routes/testRun";
+import testInsightsRoutes from "./routes/testInsights";
 
 const router = express.Router();
 
 router.use("/api/auth", authRoutes);
 router.use("/api/projects", projectRoutes);
 router.use("/api/tasks", taskRoutes);
+router.use("/api/v1/tasks", taskRoutes);
 router.use("/api/users", userRoutes);
 router.use("/api/dashboard", dashboardRoutes);
 router.use("/api/audit-logs", auditLogRoutes);
@@ -24,6 +35,16 @@ router.use("/api/ai", aiRoutes);
 router.use("/api/preferences", preferencesRoutes);
 router.use("/api/webhook", webhookRoutes);
 router.use("/api/invites", inviteRoutes);
+router.use("/api/organizations", organizationRoutes);
+router.use("/api/defects", defectRoutes);
+router.use("/api/search", searchRoutes);
+router.use("/api/test-cases", testCaseRoutes);
+router.use("/api/test-case-modules", testCaseModuleRoutes);
+router.use("/api/test-case-suites", testCaseSuiteRoutes);
+router.use("/api/sprints", sprintRoutes);
+router.use("/api/test-plans", testPlanRoutes);
+router.use("/api/test-runs", testRunRoutes);
+router.use("/api/test-insights", testInsightsRoutes);
 
 // Health check route
 router.get("/api/health", (req: Request, res: Response) => {

@@ -1,6 +1,7 @@
 import { Table, Column, Model, DataType, PrimaryKey, Default, CreatedAt, UpdatedAt, ForeignKey, BelongsTo } from "sequelize-typescript";
 import User from "./user";
 import ChatGroup from "./chatGroup";
+import { decryptChatContent, encryptChatContent } from "../utils/chatEncryption";
 
 interface ChatMessageCreationAttributes {
   group_id: string;
@@ -37,6 +38,13 @@ export default class ChatMessage extends Model<ChatMessage, ChatMessageCreationA
   @Column({
     type: DataType.TEXT,
     allowNull: false,
+    get(this: ChatMessage) {
+      const storedValue = this.getDataValue("content");
+      return decryptChatContent(storedValue);
+    },
+    set(this: ChatMessage, value: string) {
+      this.setDataValue("content", encryptChatContent(value));
+    },
   })
   content!: string;
 

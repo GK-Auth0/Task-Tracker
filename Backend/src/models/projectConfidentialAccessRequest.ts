@@ -12,6 +12,7 @@ import {
 } from "sequelize-typescript";
 import Project from "./project";
 import User from "./user";
+import { ConfidentialAccessState } from "../enums";
 
 @Table({
   tableName: "project_confidential_access_requests",
@@ -38,11 +39,11 @@ export default class ProjectConfidentialAccessRequest extends Model {
   requester_id!: string;
 
   @Column({
-    type: DataType.ENUM("pending", "approved", "rejected"),
+    type: DataType.ENUM(ConfidentialAccessState.PENDING, ConfidentialAccessState.APPROVED, ConfidentialAccessState.REJECTED),
     allowNull: false,
-    defaultValue: "pending",
+    defaultValue: ConfidentialAccessState.PENDING,
   })
-  status!: "pending" | "approved" | "rejected";
+  status!: ConfidentialAccessState;
 
   @Column({
     type: DataType.TEXT,

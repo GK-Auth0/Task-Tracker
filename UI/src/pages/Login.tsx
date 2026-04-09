@@ -9,6 +9,9 @@ import AuthBackground from "../components/auth/AuthBackground";
 import RingLoader from "../components/RingLoader";
 import OtpVerification from "../components/OtpVerification";
 
+const getPostAuthPath = (onboardingRequired: boolean) =>
+  onboardingRequired ? "/organization/onboarding" : "/dashboard";
+
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -38,8 +41,8 @@ export default function Login() {
     setError("");
 
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const user = await login(email, password);
+      navigate(getPostAuthPath(user.onboardingRequired));
     } catch (error: any) {
       if (error?.code === "OTP_REQUIRED") {
         setOtpChallenge(error?.data || null);
@@ -73,8 +76,8 @@ export default function Login() {
     try {
       setLoading(true);
       setError("");
-      await verifyOtp(otpChallenge!.otpSessionId, otp);
-      navigate("/dashboard");
+      const user = await verifyOtp(otpChallenge!.otpSessionId, otp);
+      navigate(getPostAuthPath(user.onboardingRequired));
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || "OTP verification failed");
     } finally {

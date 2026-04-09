@@ -800,6 +800,244 @@ export const SPRINT_DEV_BOARD = {
   ],
 };
 
+export const SPRINT_WORKSPACE_OVERVIEW = [
+  {
+    label: "Active sprint",
+    value: "Sprint 24",
+    detail: "Authentication release hardening window",
+    icon: "rocket_launch",
+  },
+  {
+    label: "Team capacity",
+    value: "46 pts",
+    detail: "Across product, engineering, and QA",
+    icon: "groups",
+  },
+  {
+    label: "Planned scope",
+    value: "11 items",
+    detail: "Stories, bugs, and handoff tasks",
+    icon: "assignment",
+  },
+  {
+    label: "Readiness",
+    value: "68%",
+    detail: "Blend of delivery progress and QA confidence",
+    icon: "monitoring",
+  },
+];
+
+export const SPRINT_PLANNING_BOARD = {
+  focusAreas: [
+    {
+      title: "Release goal",
+      detail: "Stabilize authentication and complete end-to-end QA handoff for Web App 2.4.",
+      icon: "flag",
+    },
+    {
+      title: "Primary risk",
+      detail: "Password-reset hardening and reviewer-list regression can delay release confidence.",
+      icon: "warning",
+    },
+    {
+      title: "Sprint cadence",
+      detail: "Development lock on Apr 2, QA sweep on Apr 4, release review on Apr 5.",
+      icon: "event_upcoming",
+    },
+  ],
+  swimlanes: [
+    {
+      title: "Committed Scope",
+      tone: "bg-blue-50 text-blue-700 border-blue-200",
+      items: [
+        {
+          id: "AUTH-72",
+          title: "Email login for workspace members",
+          owner: "Arjun",
+          points: "5 pts",
+          target: "Ready for QA",
+        },
+        {
+          id: "AUTH-96",
+          title: "Lock expired password reset token on submit",
+          owner: "Rahul",
+          points: "5 pts",
+          target: "In progress",
+        },
+        {
+          id: "TASK-188",
+          title: "Rich task creation experience",
+          owner: "Priya",
+          points: "8 pts",
+          target: "Code review",
+        },
+      ],
+    },
+    {
+      title: "Stretch Scope",
+      tone: "bg-amber-50 text-amber-700 border-amber-200",
+      items: [
+        {
+          id: "AUTH-102",
+          title: "Add reset token audit analytics",
+          owner: "Keerthi",
+          points: "3 pts",
+          target: "Backlog",
+        },
+        {
+          id: "CAL-31",
+          title: "Polish calendar due-date grouping",
+          owner: "Riya",
+          points: "3 pts",
+          target: "Design QA",
+        },
+      ],
+    },
+    {
+      title: "Dependencies",
+      tone: "bg-rose-50 text-rose-700 border-rose-200",
+      items: [
+        {
+          id: "BUG-342",
+          title: "Reviewer list not loading in staging",
+          owner: "Backend Team",
+          points: "Blocker",
+          target: "Needs fix before retest",
+        },
+        {
+          id: "ENV-18",
+          title: "Mail sandbox stability for reset-link checks",
+          owner: "Platform Ops",
+          points: "Support",
+          target: "Needed for security sweep",
+        },
+      ],
+    },
+  ],
+  ceremonies: [
+    {
+      name: "Sprint Planning",
+      when: "Mar 30 • 10:00 AM",
+      owner: "Product + Engineering",
+      agenda: "Lock scope, confirm owners, and assign QA mapping for committed stories.",
+    },
+    {
+      name: "Backlog Refinement",
+      when: "Apr 1 • 3:00 PM",
+      owner: "Product",
+      agenda: "Review stretch items and adjust if blockers spill into committed work.",
+    },
+    {
+      name: "Release Readiness",
+      when: "Apr 5 • 11:30 AM",
+      owner: "QA + Engineering",
+      agenda: "Walk pass/fail trends, open defects, and deployment recommendation.",
+    },
+  ],
+};
+
+export const SPRINT_MONITORING_BOARD = {
+  stats: [
+    {
+      label: "Velocity",
+      value: "29 / 46 pts",
+      detail: "Completed and accepted so far this sprint",
+      icon: "speed",
+    },
+    {
+      label: "Burndown trend",
+      value: "On track",
+      detail: "2 points ahead of projected line",
+      icon: "trending_down",
+    },
+    {
+      label: "Blocked items",
+      value: "2",
+      detail: "Need dependency or defect resolution",
+      icon: "block",
+    },
+    {
+      label: "QA confidence",
+      value: "7 / 10",
+      detail: "Weighted from pass rate and blocker severity",
+      icon: "verified",
+    },
+  ],
+  checkpoints: [
+    {
+      title: "Scope health",
+      status: "Healthy",
+      note: "Committed stories are still inside planned capacity with one stretch item paused.",
+    },
+    {
+      title: "Engineering flow",
+      status: "Watch",
+      note: "Two items are sitting in review longer than 24 hours and may affect QA start time.",
+    },
+    {
+      title: "QA execution",
+      status: "At risk",
+      note: "Security sweep depends on staging mail sandbox reliability and BUG-342 resolution.",
+    },
+  ],
+  incidents: [
+    {
+      id: "INC-18",
+      title: "Reviewer endpoint returning 500 in staging",
+      severity: "High",
+      owner: "Backend Team",
+      eta: "Today • 5:00 PM",
+    },
+    {
+      id: "INC-21",
+      title: "Reset-link email delayed in sandbox environment",
+      severity: "Medium",
+      owner: "Platform Ops",
+      eta: "Tomorrow • 11:00 AM",
+    },
+  ],
+  teamPulse: [
+    {
+      name: "Frontend",
+      summary: "1 item in review, 1 ready for QA",
+      tone: "bg-blue-50 text-blue-700 border-blue-200",
+    },
+    {
+      name: "Backend",
+      summary: "1 blocker fix in progress, audit analytics queued",
+      tone: "bg-amber-50 text-amber-700 border-amber-200",
+    },
+    {
+      name: "QA",
+      summary: "47 of 62 cases executed, defect retests pending",
+      tone: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    },
+  ],
+};
+
+export const SPRINT_CREATE_CONTEXT = {
+  templates: [
+    {
+      name: "Release Hardening Sprint",
+      focus: "Bug fixes, regression, stabilization",
+      capacity: "40-48 pts",
+    },
+    {
+      name: "Feature Delivery Sprint",
+      focus: "Story completion with QA handoff",
+      capacity: "48-55 pts",
+    },
+    {
+      name: "Design QA Sprint",
+      focus: "UX polish, validation, and defect closure",
+      capacity: "28-36 pts",
+    },
+  ],
+  owners: ["Harini", "Arjun", "Priya", "Rahul", "Keerthi", "Maya"],
+  squadOptions: ["Platform", "Frontend", "Backend", "QA", "Cross-functional"],
+  releaseOptions: ["Web App 2.4", "Security Patch", "UX Refresh"],
+};
+
 export const statusClasses: Record<TestCaseStatus, string> = {
   Draft: "bg-slate-100 text-slate-700 border-slate-200",
   Ready: "bg-blue-100 text-blue-700 border-blue-200",
@@ -830,4 +1068,19 @@ export const qaSectionLinks = [
   { to: "/test-defects", label: "Defects", icon: "bug_report" },
   { to: "/test-defects/raise", label: "Raise Defect", icon: "add_circle" },
   { to: "/test-reports", label: "Reports", icon: "analytics" },
+];
+
+export const testCaseSectionLinks = [
+  { to: "/test-cases", label: "Test Cases", icon: "fact_check" },
+  { to: "/test-cases/create", label: "Create Test Case", icon: "add_task" },
+  { to: "/test-plans", label: "Test Plans", icon: "assignment" },
+  { to: "/test-runs", label: "Test Runs", icon: "playlist_play" },
+  { to: "/test-traceability", label: "Traceability", icon: "account_tree" },
+  { to: "/test-reports", label: "Reports", icon: "analytics" },
+];
+
+export const defectSectionLinks = [
+  { to: "/test-defects", label: "Defects", icon: "bug_report" },
+  { to: "/test-defects/raise", label: "Raise Defect", icon: "add_circle" },
+  { to: "/test-defects/reports", label: "Reports", icon: "analytics" },
 ];

@@ -4,16 +4,25 @@ import { createHash, createPublicKey, randomBytes, randomInt, randomUUID } from 
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import { appConfig } from "../config/app";
-import { AuthOtp, AuthPasswordReset, User, UserMetadata } from "../models";
+import {
+  AuthOtp,
+  AuthPasswordReset,
+  AuthRefreshToken,
+  Organization,
+  User,
+  UserMetadata,
+} from "../models";
 import type { LoginDto, RegisterDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
 import { sendOtpEmail, sendPasswordResetEmail, sendSignupWelcomeEmail } from "./email";
 
-const JWT_SECRET = appConfig.jwt.secret;
-const JWT_EXPIRES_IN = appConfig.jwt.expiresIn || "7d";
+const ACCESS_TOKEN_SECRET = appConfig.jwt.accessSecret;
+const REFRESH_TOKEN_SECRET = appConfig.jwt.refreshSecret;
+const ACCESS_TOKEN_EXPIRES_IN = appConfig.jwt.accessExpiresIn || "15m";
+const REFRESH_TOKEN_EXPIRES_IN = appConfig.jwt.refreshExpiresIn || "30d";
 const OTP_EXPIRES_MINUTES = parseInt(process.env.OTP_EXPIRES_MINUTES || "10", 10);
 const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || "5", 10);
-const OTP_HASH_SECRET = process.env.OTP_HASH_SECRET || JWT_SECRET;
+const OTP_HASH_SECRET = process.env.OTP_HASH_SECRET || ACCESS_TOKEN_SECRET;
 const OTP_SEND_ASYNC_ON_REGISTER =
   (process.env.OTP_SEND_ASYNC_ON_REGISTER || "true").trim().toLowerCase() === "true";
 const OTP_FAIL_OPEN_ON_REGISTER =
@@ -58,6 +67,11 @@ export interface AuthSuccessResult {
   token: string;
 }
 
+export interface SessionMetadata {
+  ip?: string;
+  userAgent?: string;
+}
+
 type Auth0Jwk = {
   kid: string;
   kty: string;
@@ -88,7 +102,38 @@ const getAuth0Config = () => {
 
 const getUserWithoutPassword = (user: User) => {
   const { password_hash, ...userWithoutPassword } = user.get({ plain: true });
-  return userWithoutPassword;
+  return {
+    ...userWithoutPassword,
+    organization: user.organization
+      ? {
+          id: user.organization.id,
+          name: user.organization.name,
+          org_code: user.organization.org_code,
+          slug: user.organization.slug,
+          status: user.organization.status,
+          logo_url: user.organization.logo_url,
+        }
+      : null,
+    onboardingRequired: !user.organization_id,
+  };
+};
+
+const parseDurationToMs = (value: string, fallbackMs: number) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  const match = normalized.match(/^(\d+)\s*(s|m|h|d)$/);
+
+  if (!match) {
+    const asNumber = Number.parseInt(normalized, 10);
+    return Number.isFinite(asNumber) ? asNumber * 1000 : fallbackMs;
+  }
+
+  const amount = Number.parseInt(match[1], 10);
+  const unit = match[2];
+
+  if (unit === "s") return amount * 1000;
+  if (unit === "m") return amount * 60 * 1000;
+  if (unit === "h") return amount * 60 * 60 * 1000;
+  return amount * 24 * 60 * 60 * 1000;
 };
 
 const issueJwtForUser = (user: User) => {
@@ -97,12 +142,27 @@ const issueJwtForUser = (user: User) => {
     email: user.email,
     full_name: user.full_name,
     role: user.role,
+    organization_id: user.organization_id ?? null,
+    token_type: "access",
   };
 
-  return jwt.sign(tokenPayload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
+  return jwt.sign(tokenPayload, ACCESS_TOKEN_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   } as SignOptions);
 };
+
+const issueRefreshJwtForSession = (userId: string, sessionId: string) =>
+  jwt.sign(
+    {
+      sub: userId,
+      session_id: sessionId,
+      token_type: "refresh",
+    },
+    REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    } as SignOptions,
+  );
 
 const fetchAuth0Jwks = async (): Promise<Auth0Jwk[]> => {
   const now = Date.now();
@@ -189,8 +249,19 @@ const generateOtpCode = () => randomInt(100000, 1000000).toString();
 const hashOtp = (otp: string) =>
   createHash("sha256").update(`${otp}:${OTP_HASH_SECRET}`).digest("hex");
 
+const hashRefreshToken = (token: string) =>
+  createHash("sha256").update(`${token}:${OTP_HASH_SECRET}`).digest("hex");
+
 const hashResetToken = (token: string) =>
   createHash("sha256").update(`${token}:${OTP_HASH_SECRET}`).digest("hex");
+
+const decodeJwtExpiry = (token: string, fallbackMs: number) => {
+  const decoded = jwt.decode(token) as JwtPayload | null;
+  if (typeof decoded?.exp === "number") {
+    return new Date(decoded.exp * 1000);
+  }
+  return new Date(Date.now() + fallbackMs);
+};
 
 const shouldExposeOtp = () =>
   (process.env.OTP_EXPOSE_IN_RESPONSE || "").trim().toLowerCase() === "true";
@@ -393,6 +464,157 @@ const buildAuthSuccessResult = (user: User): AuthSuccessResult => {
   };
 };
 
+const validateRefreshTokenSession = async (refreshToken: string) => {
+  const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as JwtPayload & {
+    session_id?: string;
+    token_type?: string;
+    sub?: string;
+  };
+
+  if (decoded.token_type !== "refresh" || !decoded.session_id || !decoded.sub) {
+    throw new Error("Invalid refresh token");
+  }
+
+  const session = await AuthRefreshToken.findByPk(decoded.session_id);
+  if (!session || session.user_id !== decoded.sub) {
+    throw new Error("Refresh session not found");
+  }
+
+  if (session.revoked_at) {
+    await AuthRefreshToken.update(
+      { revoked_at: new Date() },
+      {
+        where: {
+          user_id: session.user_id,
+          revoked_at: null,
+        },
+      },
+    );
+    throw new Error("Refresh token revoked");
+  }
+
+  if (new Date(session.expires_at).getTime() <= Date.now()) {
+    session.revoked_at = new Date();
+    await session.save();
+    throw new Error("Refresh token expired");
+  }
+
+  if (session.token_hash !== hashRefreshToken(refreshToken)) {
+    await AuthRefreshToken.update(
+      { revoked_at: new Date() },
+      {
+        where: {
+          user_id: session.user_id,
+          revoked_at: null,
+        },
+      },
+    );
+    throw new Error("Refresh token reuse detected");
+  }
+
+  return session;
+};
+
+export const createRefreshSession = async (
+  userId: string,
+  metadata: SessionMetadata = {},
+) => {
+  const sessionId = randomUUID();
+  const refreshToken = issueRefreshJwtForSession(userId, sessionId);
+  const expiresAt = decodeJwtExpiry(
+    refreshToken,
+    parseDurationToMs(REFRESH_TOKEN_EXPIRES_IN, 30 * 24 * 60 * 60 * 1000),
+  );
+
+  await AuthRefreshToken.create({
+    id: sessionId,
+    user_id: userId,
+    token_hash: hashRefreshToken(refreshToken),
+    expires_at: expiresAt,
+    created_by_ip: metadata.ip || null,
+    last_used_ip: metadata.ip || null,
+    last_used_at: new Date(),
+    user_agent: metadata.userAgent || null,
+  });
+
+  return {
+    token: refreshToken,
+    sessionId,
+    expiresAt,
+  };
+};
+
+export const refreshAuthSession = async (
+  refreshToken: string,
+  metadata: SessionMetadata = {},
+): Promise<AuthSuccessResult & { refreshToken: string }> => {
+  const session = await validateRefreshTokenSession(refreshToken);
+  const hydratedUser = await getAuthUserById(session.user_id);
+  const nextRefreshSession = await createRefreshSession(session.user_id, metadata);
+
+  session.revoked_at = new Date();
+  session.replaced_by_token_id = nextRefreshSession.sessionId;
+  session.last_used_at = new Date();
+  session.last_used_ip = metadata.ip || session.last_used_ip || null;
+  session.user_agent = metadata.userAgent || session.user_agent || null;
+  await session.save();
+
+  return {
+    ...buildAuthSuccessResult(hydratedUser),
+    refreshToken: nextRefreshSession.token,
+  };
+};
+
+export const revokeRefreshSession = async (refreshToken: string) => {
+  try {
+    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as JwtPayload & {
+      session_id?: string;
+    };
+
+    if (!decoded.session_id) return;
+
+    const session = await AuthRefreshToken.findByPk(decoded.session_id);
+    if (!session || session.revoked_at) return;
+
+    session.revoked_at = new Date();
+    session.last_used_at = new Date();
+    await session.save();
+  } catch {
+    // Best effort logout.
+  }
+};
+
+export const revokeAllRefreshSessionsForUser = async (userId: string) => {
+  await AuthRefreshToken.update(
+    { revoked_at: new Date() },
+    {
+      where: {
+        user_id: userId,
+        revoked_at: null,
+      },
+    },
+  );
+};
+
+const getAuthUserById = async (userId: string) => {
+  const user = await User.findByPk(userId, {
+    include: [
+      {
+        model: Organization,
+        as: "organization",
+        attributes: ["id", "name", "org_code", "slug", "status", "logo_url"],
+        required: false,
+      },
+    ],
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user;
+};
+
 const createOtpChallengeForUser = async (
   user: User,
   purpose: OtpPurpose,
@@ -562,7 +784,8 @@ export async function loginUser(
     return createOtpChallengeForUser(user, "register");
   }
 
-  return buildAuthSuccessResult(user);
+  const hydratedUser = await getAuthUserById(user.id);
+  return buildAuthSuccessResult(hydratedUser);
 }
 
 export async function loginWithAuth0AccessToken(
@@ -592,7 +815,8 @@ export async function loginWithAuth0AccessToken(
     });
   }
 
-  return buildAuthSuccessResult(user);
+  const hydratedUser = await getAuthUserById(user.id);
+  return buildAuthSuccessResult(hydratedUser);
 }
 
 export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
@@ -608,7 +832,8 @@ export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
     );
   }
 
-  return buildAuthSuccessResult(user);
+  const hydratedUser = await getAuthUserById(user.id);
+  return buildAuthSuccessResult(hydratedUser);
 }
 
 export async function resendOtp(sessionId: string): Promise<OtpChallengeResult> {
@@ -698,6 +923,7 @@ export async function resetPasswordWithOtp(
   const user = await verifyOtpSession(otpSessionId, otp, "passwordReset");
   user.password_hash = await bcrypt.hash(newPassword, 10);
   await user.save();
+  await revokeAllRefreshSessionsForUser(user.id);
 }
 
 export async function resetPasswordWithToken(token: string, newPassword: string) {
@@ -726,6 +952,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 
   user.password_hash = await bcrypt.hash(newPassword, 10);
   await user.save();
+  await revokeAllRefreshSessionsForUser(user.id);
 
   resetSession.is_used = true;
   resetSession.used_at = new Date();
@@ -733,12 +960,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 }
 
 export async function getCurrentUser(userId: string) {
-  const user = await User.findByPk(userId);
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
+  const user = await getAuthUserById(userId);
   return getUserWithoutPassword(user);
 }
 
@@ -762,4 +984,5 @@ export async function changePasswordForInvitedUser(
     password_hash: hashedPassword,
     password_reset_required: false,
   });
+  await revokeAllRefreshSessionsForUser(user.id);
 }

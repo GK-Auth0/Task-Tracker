@@ -3,18 +3,31 @@ import { IncomingMessage } from "http";
 import net from "net";
 import jwt from "jsonwebtoken";
 import { Duplex } from "stream";
-import { URL } from "url";
-import ChatGroupMember from "../models/chatGroupMember";
 import { appConfig } from "../config";
+import { isUserInChatGroup } from "../services/chat";
 
 type WebSocketClient = {
   socket: net.Socket;
   userId: string;
   subscribedGroups: Set<string>;
+  authorizedGroups: Set<string>;
 };
 
 const clients = new Set<WebSocketClient>();
-const JWT_SECRET = appConfig.jwt.secret;
+const JWT_SECRET = appConfig.jwt.accessSecret;
+const SUPPORTED_WS_PROTOCOL = "chat.v1";
+
+const readCookie = (request: IncomingMessage, name: string) => {
+  const cookieHeader = request.headers.cookie;
+  if (!cookieHeader) return "";
+
+  const cookieValue = cookieHeader
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+
+  return cookieValue ? decodeURIComponent(cookieValue.slice(name.length + 1)) : "";
+};
 
 const parseFrame = (buffer: Buffer): { payload: string; bytesUsed: number } | null => {
   if (buffer.length < 2) return null;
@@ -109,10 +122,16 @@ const handleMessage = async (client: WebSocketClient, rawMessage: string) => {
   try {
     const parsed = JSON.parse(rawMessage) as { type?: string; groupId?: string };
     if (parsed.type === "subscribe" && parsed.groupId) {
-      const membershipCount = await ChatGroupMember.count({
-        where: { group_id: parsed.groupId, user_id: client.userId },
-      });
-      if (membershipCount === 0) {
+      if (!client.authorizedGroups.has(parsed.groupId)) {
+        const isMember = await isUserInChatGroup(parsed.groupId, client.userId);
+        if (!isMember) {
+          sendSystem(client, "Access denied for this chat group");
+          return;
+        }
+        client.authorizedGroups.add(parsed.groupId);
+      }
+
+      if (!client.authorizedGroups.has(parsed.groupId)) {
         sendSystem(client, "Access denied for this chat group");
         return;
       }
@@ -154,10 +173,18 @@ export const broadcastChatMessage = (
 };
 
 const authenticateRequest = (request: IncomingMessage): string | null => {
-  if (!request.url) return null;
-  const host = request.headers.host || "localhost";
-  const parsed = new URL(request.url, `http://${host}`);
-  const token = parsed.searchParams.get("token");
+  const cookieToken = readCookie(request, appConfig.jwt.accessCookieName);
+  const protocolHeader = request.headers["sec-websocket-protocol"];
+  const rawProtocols = Array.isArray(protocolHeader)
+    ? protocolHeader.join(",")
+    : String(protocolHeader || "");
+  const protocols = rawProtocols
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const tokenProtocol = protocols.find((entry) => entry.startsWith("access-token."));
+  const protocolToken = tokenProtocol?.slice("access-token.".length);
+  const token = cookieToken || protocolToken;
   if (!token) return null;
 
   try {
@@ -170,6 +197,13 @@ const authenticateRequest = (request: IncomingMessage): string | null => {
 
 export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
   if (!request.url?.startsWith("/ws/chat")) {
+    socket.destroy();
+    return;
+  }
+
+  const requestedProtocols = String(request.headers["sec-websocket-protocol"] || "");
+  if (!requestedProtocols.includes(SUPPORTED_WS_PROTOCOL)) {
+    socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
     socket.destroy();
     return;
   }
@@ -193,6 +227,7 @@ export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
       "Upgrade: websocket",
       "Connection: Upgrade",
       `Sec-WebSocket-Accept: ${acceptKey}`,
+      `Sec-WebSocket-Protocol: ${SUPPORTED_WS_PROTOCOL}`,
       "\r\n",
     ].join("\r\n"),
   );
@@ -201,6 +236,7 @@ export const handleChatUpgrade = (request: IncomingMessage, socket: Duplex) => {
     socket: socket as net.Socket,
     userId,
     subscribedGroups: new Set<string>(),
+    authorizedGroups: new Set<string>(),
   };
 
   clients.add(client);

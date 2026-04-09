@@ -5,11 +5,12 @@ import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 export const getEntityAuditLogs = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const organizationId = (req as any).user?.organization_id;
 
-    if (!userId) {
+    if (!userId || !organizationId) {
       return res.status(401).json({
         success: false,
-        message: "User ID required",
+        message: "User context required",
         error: "UNAUTHORIZED",
       });
     }
@@ -20,7 +21,7 @@ export const getEntityAuditLogs = async (req: Request, res: Response) => {
     const from = parseIsoDate(req.query.from);
     const to = parseIsoDate(req.query.to);
 
-    const logs = await getAuditLogs(entity_type, entity_id, limit, from, to);
+    const logs = await getAuditLogs(organizationId, entity_type, entity_id, limit, from, to);
 
     return res.status(200).json({
       success: true,

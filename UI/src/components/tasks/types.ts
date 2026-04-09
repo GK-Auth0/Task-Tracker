@@ -1,3 +1,5 @@
+import type { TaskStatusValue } from "../../utils/taskStatus";
+
 export interface DashboardSummary {
   total_tasks: number;
   completed_tasks: number;
@@ -9,7 +11,7 @@ export interface TaskItem {
   id: string;
   title: string;
   description?: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
   due_date?: string;
   assignee?: {

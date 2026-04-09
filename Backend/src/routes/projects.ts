@@ -4,6 +4,8 @@ import { authenticateToken } from '../middleware/auth';
 import { validateProject, validateProjectUpdate } from '../middleware/projectValidation';
 import { upload } from '../middleware/upload';
 import { requireWorkspaceRole } from '../middleware/rbac';
+import { cacheGetResponse } from '../middleware/responseCache';
+import { projectReadRateLimiter, searchRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -154,7 +156,8 @@ router.use(authenticateToken);
  *                     totalPages:
  *                       type: integer
  */
-router.get('/', projectController.getProjects);
+router.get('/', projectReadRateLimiter, cacheGetResponse(10000), projectController.getProjects);
+router.get('/confidential-access/projects', projectReadRateLimiter, cacheGetResponse(10000), projectController.getConfidentialAccessProjects);
 
 /**
  * @swagger
@@ -174,7 +177,7 @@ router.get('/', projectController.getProjects);
  *       200:
  *         description: Users retrieved successfully
  */
-router.get('/users', projectController.getUsers);
+router.get('/users', searchRateLimiter, cacheGetResponse(5000), projectController.getUsers);
 
 /**
  * @swagger
@@ -206,13 +209,15 @@ router.get('/users', projectController.getUsers);
  *       404:
  *         description: Project not found
  */
-router.get('/:id', projectController.getProject);
+router.get('/:id', projectReadRateLimiter, cacheGetResponse(8000), projectController.getProject);
 router.post('/:id/members', requireWorkspaceRole("Member"), projectController.addProjectMember);
 router.put('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.updateProjectMemberRole);
 router.delete('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.removeProjectMember);
 router.post('/:id/confidential-access/request', projectController.requestConfidentialAccess);
 router.get('/:id/confidential-access/requests', projectController.getConfidentialAccessRequests);
 router.patch('/:id/confidential-access/requests/:requestId', projectController.reviewConfidentialAccessRequest);
+router.get('/:id/confidential-access/config', projectController.getConfidentialAccessConfig);
+router.patch('/:id/confidential-access/config', projectController.updateConfidentialAccessConfig);
 router.get('/:id/activity', projectController.getProjectActivity);
 
 /**

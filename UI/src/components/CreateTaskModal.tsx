@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { tasksAPI, usersAPI, projectsAPI } from "../services/dashboard";
 import { getTaskAiSuggestion } from "../utils/taskAiAssistant";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
 import { appendTaskAiDraft, buildTaskTemplate } from "../utils/descriptionTemplates";
+import { TaskPriority } from "../enums";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
+import { defectsAPI } from "../services/defects";
+import { sprintsAPI } from "../services/sprints";
 
 interface User {
   id: string;
@@ -16,56 +20,93 @@ interface Project {
   name: string;
 }
 
+interface DefectOption {
+  id: string;
+  reference_code: string;
+  title: string;
+  project_id: string;
+  created_task_id?: string | null;
+}
+
+interface SprintOption {
+  id: string;
+  name: string;
+  project_id: string;
+}
+
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTaskCreated: () => void;
 }
 
-const normalizePriority = (
-  value: string | undefined,
-): "Low" | "Medium" | "High" => {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "low") return "Low";
-  if (normalized === "medium") return "Medium";
-  if (normalized === "high") return "High";
-  return "Medium";
+const buildLocalAiSuggestion = (title: string, description: string): AiTaskSuggestion => {
+  const local = getTaskAiSuggestion(title, description);
+  return {
+    priority: local.priority,
+    due_date: local.dueDate || "",
+    estimated_hours: 1.5,
+    checklist: local.checklist,
+    reason: local.reason,
+  };
 };
+
+type IssueType = "Story" | "Task" | "Bug";
 
 export default function CreateTaskModal({
   isOpen,
   onClose,
   onTaskCreated,
 }: CreateTaskModalProps) {
+  const navigate = useNavigate();
   const INVITE_SENDS_IMMEDIATELY = true;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium");
+  const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
+  const [issueType, setIssueType] = useState<IssueType>("Task");
   const [projectId, setProjectId] = useState("");
+  const [defectId, setDefectId] = useState("");
+  const [sprintId, setSprintId] = useState("");
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [defects, setDefects] = useState<DefectOption[]>([]);
+  const [sprints, setSprints] = useState<SprintOption[]>([]);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
   const [invitees, setInvitees] = useState<Array<{ full_name: string; email: string }>>([]);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() => {
-    const local = getTaskAiSuggestion("", "");
-    return {
-      priority: local.priority,
-      due_date: local.dueDate || "",
-      estimated_hours: 1.5,
-      checklist: local.checklist,
-      reason: local.reason,
-    };
-  });
+  const [aiSuggestion, setAiSuggestion] = useState<AiTaskSuggestion>(() =>
+    buildLocalAiSuggestion("", ""),
+  );
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setAssigneeId("");
+    setDueDate("");
+    setPriority(TaskPriority.MEDIUM);
+    setIssueType("Task");
+    setProjectId("");
+    setDefectId("");
+    setSprintId("");
+    setInvitees([]);
+    setDescriptionError("");
+    setSubmitError("");
+    setAttachments([]);
+    setAiError("");
+    setAiLoading(false);
+    setAiSuggestion(buildLocalAiSuggestion("", ""));
+  };
 
   const applyTaskTemplate = () => {
     setDescription(buildTaskTemplate(title).slice(0, 1000));
@@ -74,21 +115,30 @@ export default function CreateTaskModal({
 
   useEffect(() => {
     if (isOpen) {
+      resetForm();
       // Fetch users and projects when modal opens
       fetchUsersAndProjects();
     }
   }, [isOpen]);
 
   useEffect(() => {
+    if (!projectId) {
+      setDefectId("");
+      setSprintId("");
+      return;
+    }
+
+    if (defectId && !defects.some((defect) => defect.id === defectId && defect.project_id === projectId)) {
+      setDefectId("");
+    }
+    if (sprintId && !sprints.some((sprint) => sprint.id === sprintId && sprint.project_id === projectId)) {
+      setSprintId("");
+    }
+  }, [defectId, defects, projectId, sprintId, sprints]);
+
+  useEffect(() => {
     if (!isOpen || !title.trim()) {
-      const local = getTaskAiSuggestion(title, description);
-      setAiSuggestion({
-        priority: local.priority,
-        due_date: local.dueDate || "",
-        estimated_hours: 1.5,
-        checklist: local.checklist,
-        reason: local.reason,
-      });
+      setAiSuggestion(buildLocalAiSuggestion(title, description));
       setAiError("");
       return;
     }
@@ -103,15 +153,8 @@ export default function CreateTaskModal({
           setAiSuggestion(remote);
         }
       } catch (error) {
-        const local = getTaskAiSuggestion(title, description);
         if (!cancelled) {
-          setAiSuggestion({
-            priority: local.priority,
-            due_date: local.dueDate || "",
-            estimated_hours: 1.5,
-            checklist: local.checklist,
-            reason: local.reason,
-          });
+          setAiSuggestion(buildLocalAiSuggestion(title, description));
           setAiError("AI service unavailable. Using local smart suggestions.");
         }
       } finally {
@@ -129,9 +172,11 @@ export default function CreateTaskModal({
 
   const fetchUsersAndProjects = async () => {
     try {
-      const [usersResponse, projectsResponse] = await Promise.all([
+      const [usersResponse, projectsResponse, defectsResponse, sprintsResponse] = await Promise.all([
         usersAPI.getUsers(),
         projectsAPI.getProjects(),
+        defectsAPI.getDefects(),
+        sprintsAPI.getSprints(),
       ]);
 
       if (usersResponse.success) {
@@ -141,6 +186,30 @@ export default function CreateTaskModal({
       if (projectsResponse.success && projectsResponse.data.length > 0) {
         setProjects(projectsResponse.data);
         // Don't auto-select first project, let user choose
+      }
+
+      if (defectsResponse.success) {
+        setDefects(
+          defectsResponse.data
+            .filter((defect) => !defect.created_task_id)
+            .map((defect) => ({
+              id: defect.id,
+              reference_code: defect.reference_code,
+              title: defect.title,
+              project_id: defect.project_id,
+              created_task_id: defect.created_task_id,
+            })),
+        );
+      }
+
+      if (sprintsResponse.success) {
+        setSprints(
+          sprintsResponse.data.map((sprint) => ({
+            id: sprint.id,
+            name: sprint.name,
+            project_id: sprint.project_id,
+          })),
+        );
       }
     } catch (error) {
       console.error("Failed to fetch users and projects:", error);
@@ -173,6 +242,7 @@ export default function CreateTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError("");
     if (!title.trim() || (projects.length > 0 && !projectId)) return;
     if (!description.trim()) {
       setDescriptionError("Description is required");
@@ -185,29 +255,46 @@ export default function CreateTaskModal({
 
     setLoading(true);
     try {
-      await tasksAPI.createTask({
+      const createResponse = await tasksAPI.createTask({
         title: title.trim(),
         description: description.trim(),
         project_id: projectId,
         assignee_id: assigneeId || undefined,
+        defect_id: defectId || undefined,
+        sprint_id: sprintId || undefined,
         due_date: dueDate || undefined,
-        priority: normalizePriority(priority), // Ensure priority is valid
+        priority: priority,
+        issue_type: issueType,
         invitees: INVITE_SENDS_IMMEDIATELY ? [] : invitees,
       });
 
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setAssigneeId("");
-      setDueDate("");
-      setPriority("Medium");
-      setProjectId("");
-      setInvitees([]);
+      const createdTaskId = createResponse.data?.id;
+      if (createdTaskId && attachments.length > 0) {
+        await Promise.all(
+          attachments.map((file) => tasksAPI.uploadAttachment(createdTaskId, file)),
+        );
+      }
 
+      resetForm();
       onTaskCreated();
       onClose();
     } catch (error) {
       console.error("Failed to create task:", error);
+      const responseData = (error as any)?.response?.data;
+      const validationMessage = Array.isArray(responseData?.errors)
+        ? responseData.errors
+            .map((item: { field?: string; message?: string }) =>
+              item?.field ? `${item.field}: ${item.message}` : item?.message,
+            )
+            .filter(Boolean)
+            .join(", ")
+        : "";
+      setSubmitError(
+        validationMessage ||
+          responseData?.error ||
+          responseData?.message ||
+          "Failed to create task",
+      );
     } finally {
       setLoading(false);
     }
@@ -224,6 +311,26 @@ export default function CreateTaskModal({
 
   const removeInvitee = (email: string) => {
     setInvitees((prev) => prev.filter((item) => item.email !== email));
+  };
+
+  const removeAttachment = (targetName: string) => {
+    setAttachments((prev) => prev.filter((file) => file.name !== targetName));
+  };
+
+  const availableDefects = defects.filter(
+    (defect) => !projectId || defect.project_id === projectId,
+  );
+  const availableSprints = sprints.filter(
+    (sprint) => !projectId || sprint.project_id === projectId,
+  );
+  const selectedProjectName =
+    projects.find((project) => project.id === projectId)?.name || "this project";
+
+  const handleRedirectToSprintCreate = () => {
+    if (!projectId) return;
+    resetForm();
+    onClose();
+    navigate(`/sprint-board?tab=create&projectId=${encodeURIComponent(projectId)}`);
   };
 
   const formatDescription = (
@@ -255,63 +362,91 @@ export default function CreateTaskModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-[760px] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
+    <div className="fixed inset-0 z-50 bg-slate-900/45 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-[760px] max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
         <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex flex-col">
             <h2 className="text-gray-900 text-xl font-bold leading-tight">
-              Create New Task
+              Raise Ticket
             </h2>
             <p className="text-gray-600 text-xs font-normal">
-              Add details to organize and assign work to your team.
+              Capture a story, task, or bug and assign it to your team.
             </p>
           </div>
           <button
             className="text-slate-400 hover:text-slate-600 transition-colors"
-            onClick={onClose}
+            onClick={() => {
+              resetForm();
+              onClose();
+            }}
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
         {/* Modal Body (Form) */}
-        <div className="px-6 py-4 overflow-y-auto max-h-[80vh]">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 [scrollbar-gutter:stable] [will-change:scroll-position]">
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
-                Task Preview
+                Ticket Preview
               </p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">
-                    {title.trim() || "Untitled Task"}
+                    {title.trim() || "Untitled Ticket"}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {priority} Priority {projectId ? "• Project Selected" : ""}
+                    {issueType} • {priority} Priority {projectId ? "• Project Selected" : ""}
                   </p>
                 </div>
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    priority === "High"
-                      ? "bg-rose-100 text-rose-700"
-                      : priority === "Medium"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-sky-100 text-sky-700"
-                  }`}
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      priority === TaskPriority.HIGH
+                        ? "bg-rose-100 text-rose-700"
+                        : priority === TaskPriority.MEDIUM
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-sky-100 text-sky-700"
+                    }`}
+                  >
+                    {priority}
+                  </span>
+              </div>
+            </div>
+
+            {submitError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-gray-900 text-sm font-semibold">
+                  Issue Type
+                </label>
+                <select
+                  className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                  value={issueType}
+                  onChange={(e) => setIssueType(e.target.value as IssueType)}
+                  aria-label="Issue type"
                 >
-                  {priority}
-                </span>
+                  <option value="Story">Story</option>
+                  <option value="Task">Task</option>
+                  <option value="Bug">Bug</option>
+                </select>
               </div>
             </div>
 
             {/* Task Name */}
             <div className="flex flex-col gap-2">
-              <label className="text-gray-900 text-sm font-semibold">
-                Task Name
+              <label htmlFor="create-task-title" className="text-gray-900 text-sm font-semibold">
+                Ticket Title
               </label>
               <input
+                id="create-task-title"
                 className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4 placeholder:text-slate-400"
                 placeholder="e.g. Design system update"
                 type="text"
@@ -332,6 +467,8 @@ export default function CreateTaskModal({
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
                   required
+                  title="Select a project for this task"
+                  aria-label="Project selection"
                 >
                   <option value="">Select a project</option>
                   {projects.map((project) => (
@@ -384,8 +521,10 @@ export default function CreateTaskModal({
                       </div>
                       <div className="flex gap-2">
                         <input
+                          id="create-task-project-name"
                           className="flex-1 rounded-lg text-gray-900 border-blue-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-10 px-3 text-sm placeholder:text-slate-400"
                           placeholder="Project name"
+                          aria-label="New project name"
                           value={newProjectName}
                           onChange={(e) => setNewProjectName(e.target.value)}
                           onKeyPress={(e) =>
@@ -419,6 +558,8 @@ export default function CreateTaskModal({
                     className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 pl-10 pr-4 appearance-none"
                     value={assigneeId}
                     onChange={(e) => setAssigneeId(e.target.value)}
+                    title="Select a team member to assign this task"
+                    aria-label="Assignee selection"
                   >
                     <option value="">Select a team member</option>
                     {users.map((user) => (
@@ -439,15 +580,17 @@ export default function CreateTaskModal({
 
               {/* Due Date */}
               <div className="flex flex-col gap-2">
-                <label className="text-gray-900 text-sm font-semibold">
+                <label htmlFor="create-task-due-date" className="text-gray-900 text-sm font-semibold">
                   Due Date
                 </label>
                 <div className="relative">
                   <input
+                    id="create-task-due-date"
                     className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 pl-10 px-4"
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
+                    aria-label="Due date"
                   />
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center pointer-events-none">
                     <span className="material-symbols-outlined text-lg">
@@ -456,6 +599,76 @@ export default function CreateTaskModal({
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-semibold">
+                Sprint
+              </label>
+              <select
+                className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                value={sprintId}
+                onChange={(e) => setSprintId(e.target.value)}
+                disabled={!projectId && projects.length > 0}
+                title="Link this task to a sprint"
+                aria-label="Sprint selection"
+              >
+                <option value="">
+                  {!projectId ? "Select a project first" : "No sprint"}
+                </option>
+                {availableSprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>
+                    {sprint.name}
+                  </option>
+                ))}
+              </select>
+              {projectId && availableSprints.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">
+                        No sprint available for {selectedProjectName}.
+                      </p>
+                      <p className="text-xs text-amber-800">
+                        Create one first, then come back and link this task.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRedirectToSprintCreate}
+                      className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+                    >
+                      Create Sprint
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-900 text-sm font-semibold">
+                Link Defect
+              </label>
+              <select
+                className="w-full rounded-lg text-gray-900 border-gray-300 bg-white focus:ring-blue-600 focus:border-blue-600 h-12 px-4"
+                value={defectId}
+                onChange={(e) => setDefectId(e.target.value)}
+                disabled={!projectId && projects.length > 0}
+                title="Link this task to an approved or open defect"
+                aria-label="Defect selection"
+              >
+                <option value="">
+                  {!projectId ? "Select a project first" : "No linked defect"}
+                </option>
+                {availableDefects.map((defect) => (
+                  <option key={defect.id} value={defect.id}>
+                    {defect.reference_code} - {defect.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500">
+                Linking keeps the defect and task connected for tracking.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -501,39 +714,39 @@ export default function CreateTaskModal({
               <div className="flex gap-2">
                 <button
                   className={`flex-1 py-2 px-3 rounded-lg border transition-all flex items-center justify-center gap-2 text-sm font-medium ${
-                    priority === "Low"
+                    priority === TaskPriority.LOW
                       ? "border-2 border-blue-600/40 bg-blue-600/5 text-blue-600 font-bold shadow-sm"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                   type="button"
-                  onClick={() => setPriority("Low")}
+                  onClick={() => setPriority(TaskPriority.LOW)}
                 >
                   <span className="size-2 rounded-full bg-emerald-500"></span>
-                  Low
+                  {TaskPriority.LOW}
                 </button>
                 <button
                   className={`flex-1 py-2 px-3 rounded-lg border transition-all flex items-center justify-center gap-2 text-sm font-medium ${
-                    priority === "Medium"
+                    priority === TaskPriority.MEDIUM
                       ? "border-2 border-blue-600/40 bg-blue-600/5 text-blue-600 font-bold shadow-sm"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                   type="button"
-                  onClick={() => setPriority("Medium")}
+                  onClick={() => setPriority(TaskPriority.MEDIUM)}
                 >
                   <span className="size-2 rounded-full bg-amber-500"></span>
-                  Medium
+                  {TaskPriority.MEDIUM}
                 </button>
                 <button
                   className={`flex-1 py-2 px-3 rounded-lg border transition-all flex items-center justify-center gap-2 text-sm font-medium ${
-                    priority === "High"
+                    priority === TaskPriority.HIGH
                       ? "border-2 border-blue-600/40 bg-blue-600/5 text-blue-600 font-bold shadow-sm"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                   type="button"
-                  onClick={() => setPriority("High")}
+                  onClick={() => setPriority(TaskPriority.HIGH)}
                 >
                   <span className="size-2 rounded-full bg-rose-500"></span>
-                  High
+                  {TaskPriority.HIGH}
                 </button>
               </div>
             </div>
@@ -565,7 +778,7 @@ export default function CreateTaskModal({
                 <button
                   type="button"
                   className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50 transition-colors"
-                  onClick={() => setPriority(normalizePriority(aiSuggestion.priority))}
+                  onClick={() => setPriority(aiSuggestion.priority as TaskPriority)}
                 >
                   Apply Priority: {aiSuggestion.priority}
                 </button>
@@ -584,6 +797,10 @@ export default function CreateTaskModal({
                   onClick={() => {
                     const next = appendTaskAiDraft(description, title, aiSuggestion).slice(0, 1000);
                     setDescription(next);
+                    setPriority(aiSuggestion.priority as TaskPriority);
+                    if (aiSuggestion.due_date) {
+                      setDueDate(aiSuggestion.due_date);
+                    }
                   }}
                 >
                   Insert Checklist
@@ -663,6 +880,7 @@ export default function CreateTaskModal({
                 onChange={(e) => {
                   setDescription(e.target.value);
                   if (descriptionError) setDescriptionError("");
+                  if (submitError) setSubmitError("");
                 }}
               ></textarea>
               <div className="flex items-center justify-between">
@@ -678,12 +896,60 @@ export default function CreateTaskModal({
             </div>
 
             {/* Attachments Placeholder */}
-            <div className="p-4 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center gap-2 text-slate-400 hover:border-blue-600/50 hover:text-blue-600 transition-all cursor-pointer">
-              <span className="material-symbols-outlined">attach_file</span>
-              <span className="text-sm font-medium">
-                Drop files to attach or click to browse
-              </span>
-            </div>
+            <label className="block rounded-lg border-2 border-dashed border-slate-200 p-4 text-slate-400 hover:border-blue-600/50 hover:text-blue-600 transition-all cursor-pointer">
+              <div className="flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined">attach_file</span>
+                <span className="text-sm font-medium">
+                  Drop files to attach or click to browse
+                </span>
+              </div>
+              <input
+                type="file"
+                className="sr-only"
+                multiple
+                title="Attach files to this task"
+                aria-label="File attachment"
+                onChange={(e) => {
+                  const selected = Array.from(e.target.files || []);
+                  if (selected.length) {
+                    setAttachments((prev) => {
+                      const seen = new Set(prev.map((file) => `${file.name}-${file.size}`));
+                      const next = [...prev];
+                      selected.forEach((file) => {
+                        const key = `${file.name}-${file.size}`;
+                        if (!seen.has(key)) {
+                          next.push(file);
+                        }
+                      });
+                      return next;
+                    });
+                  }
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+            {attachments.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((file) => (
+                  <div
+                    key={`${file.name}-${file.size}`}
+                    className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                  >
+                    <span className="truncate max-w-[220px]">{file.name}</span>
+                    <span className="text-slate-400">
+                      {(file.size / (1024 * 1024)).toFixed(1)} MB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(file.name)}
+                      className="material-symbols-outlined text-[14px]"
+                    >
+                      close
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </form>
         </div>
 
@@ -710,7 +976,7 @@ export default function CreateTaskModal({
             }
           >
             <span className="material-symbols-outlined text-lg">add_task</span>
-            {loading ? "Creating..." : "Create Task"}
+            {loading ? "Creating..." : "Raise Ticket"}
           </button>
         </div>
       </div>

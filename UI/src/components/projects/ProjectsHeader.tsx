@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 
 interface ProjectsHeaderProps {
   onCreate: () => void;
@@ -32,4 +32,4 @@ const ProjectsHeader: React.FC<ProjectsHeaderProps> = ({
   );
 };
 
-export default ProjectsHeader;
+export default memo(ProjectsHeader);

@@ -1,5 +1,6 @@
 import React from "react";
 import { TaskItem } from "./types";
+import { TASK_STATUSES, getTaskStatusTone } from "../../utils/taskStatus";
 
 interface TasksBoardTabProps {
   tasks: TaskItem[];
@@ -7,24 +8,16 @@ interface TasksBoardTabProps {
 }
 
 const TasksBoardTab: React.FC<TasksBoardTabProps> = ({ tasks, onTaskClick }) => {
-  const columns = {
-    todo: tasks.filter((task) => task.status === "To Do"),
-    inProgress: tasks.filter((task) => task.status === "In Progress"),
-    done: tasks.filter((task) => task.status === "Done"),
-  };
+  const columns = TASK_STATUSES.map((status) => ({
+    key: status,
+    title: status,
+    items: tasks.filter((task) => task.status === status),
+    tone: getTaskStatusTone(status).card,
+  }));
 
   return (
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      {[
-        { key: "todo", title: "To Do", items: columns.todo, tone: "bg-slate-100 text-slate-700" },
-        {
-          key: "inProgress",
-          title: "In Progress",
-          items: columns.inProgress,
-          tone: "bg-blue-100 text-blue-700",
-        },
-        { key: "done", title: "Done", items: columns.done, tone: "bg-emerald-100 text-emerald-700" },
-      ].map((column) => (
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      {columns.map((column) => (
         <div key={column.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-black text-slate-800">{column.title}</h3>

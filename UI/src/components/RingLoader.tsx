@@ -1,9 +1,11 @@
+import { memo } from "react";
+
 interface RingLoaderProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
 
-export default function RingLoader({ size = 'md', className = '' }: RingLoaderProps) {
+function RingLoader({ size = 'md', className = '' }: RingLoaderProps) {
   const sizeClasses = {
     sm: 'w-8 h-8 text-xs',
     md: 'w-12 h-12 text-sm',
@@ -17,3 +19,5 @@ export default function RingLoader({ size = 'md', className = '' }: RingLoaderPr
     </div>
   );
 }
+
+export default memo(RingLoader);

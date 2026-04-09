@@ -126,7 +126,10 @@ export default function TeamManagement() {
     try {
       const response = await inviteAPI.sendInvite(inviteData);
       if (response.success) {
-        setInviteSuccess(`Invite sent successfully to ${inviteData.email}`);
+        const orgCodeText = response.data?.orgCode
+          ? ` Personal org code: ${response.data.orgCode}`
+          : "";
+        setInviteSuccess(`Invite sent successfully to ${inviteData.email}.${orgCodeText}`);
         setInviteData({ email: '', role: 'Member' });
         fetchInvites(); // Refresh invites list
         setTimeout(() => {
@@ -797,8 +800,8 @@ export default function TeamManagement() {
             
             <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                <strong>Note:</strong> The invited user will receive an email with a temporary password. 
-                They will be required to change it on their first login.
+                <strong>Note:</strong> Each invited user gets their own unique organization access code.
+                That code is safer than sharing one common code across the whole organization.
               </Typography>
             </Box>
           </Box>

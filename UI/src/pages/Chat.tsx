@@ -112,18 +112,27 @@ const Chat: React.FC = () => {
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const response = await chatAPI.searchUsers(searchQuery.trim(), 20);
+        const response = await chatAPI.searchUsers(
+          searchQuery.trim(),
+          20,
+          controller.signal,
+        );
         if (response.success) {
           setUserSearchResults(response.data);
         }
       } catch (error) {
+        if (controller.signal.aborted) return;
         setUserSearchResults([]);
       }
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [activeTab, searchQuery]);
 
   useEffect(() => {
@@ -137,9 +146,14 @@ const Chat: React.FC = () => {
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const response = await chatAPI.searchUsers(groupMemberQuery.trim(), 20);
+        const response = await chatAPI.searchUsers(
+          groupMemberQuery.trim(),
+          20,
+          controller.signal,
+        );
         if (response.success) {
           setGroupMemberResults(
             response.data.filter(
@@ -148,18 +162,19 @@ const Chat: React.FC = () => {
           );
         }
       } catch (error) {
+        if (controller.signal.aborted) return;
         setGroupMemberResults([]);
       }
     }, 220);
 
-    return () => clearTimeout(timer);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [showCreateGroup, groupMemberQuery, selectedGroupMembers]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat?token=${encodeURIComponent(token)}`);
+    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat`, ["chat.v1"]);
 
     socket.onopen = () => {
       setSocketConnected(true);

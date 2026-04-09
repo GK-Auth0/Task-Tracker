@@ -1,12 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Project } from "../../../types/project";
+import { ProjectStatus } from "../../../enums";
 
 interface ProjectHeaderProps {
   project: Project;
   isOwnerOrAdmin: boolean;
-  onStatusChange: (status: string) => void;
+  onStatusChange: (status: ProjectStatus) => void;
   onCreateTask: () => void;
+  sprintLabel?: string;
 }
 
 const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -14,6 +16,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   isOwnerOrAdmin,
   onStatusChange,
   onCreateTask,
+  sprintLabel,
 }) => {
   const members = project.members || [];
   const visibleMembers = members.slice(0, 5);
@@ -37,16 +40,16 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             </h1>
             <select
               value={project.status}
-              onChange={(event) => onStatusChange(event.target.value)}
+              onChange={(event) => onStatusChange(event.target.value as ProjectStatus)}
               disabled={!isOwnerOrAdmin}
               className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700 disabled:opacity-60"
               aria-label="Project status"
             >
-              <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="on_hold">On Hold</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value={ProjectStatus.PLANNING}>Planning</option>
+              <option value={ProjectStatus.ACTIVE}>Active</option>
+              <option value={ProjectStatus.ON_HOLD}>On Hold</option>
+              <option value={ProjectStatus.COMPLETED}>Completed</option>
+              <option value={ProjectStatus.CANCELLED}>Cancelled</option>
             </select>
           </div>
 
@@ -55,6 +58,11 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-4">
+            {sprintLabel ? (
+              <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                Sprint: {sprintLabel}
+              </span>
+            ) : null}
             <div className="flex -space-x-2">
               {visibleMembers.map((member) => (
                 <div
@@ -106,7 +114,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-lg">add</span>
-            New Task
+            Raise Ticket
           </button>
         </div>
       </div>

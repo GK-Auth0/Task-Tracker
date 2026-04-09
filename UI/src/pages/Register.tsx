@@ -8,6 +8,9 @@ import AuthShowcase from "../components/auth/AuthShowcase";
 import AuthBackground from "../components/auth/AuthBackground";
 import RingLoader from "../components/RingLoader";
 
+const getPostAuthPath = (onboardingRequired: boolean) =>
+  onboardingRequired ? "/organization/onboarding" : "/dashboard";
+
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -111,8 +114,8 @@ export default function Register() {
     try {
       setLoading(true);
       setError("");
-      await verifyOtp(otpChallenge!.otpSessionId, otp);
-      navigate("/dashboard");
+      const user = await verifyOtp(otpChallenge!.otpSessionId, otp);
+      navigate(getPostAuthPath(user.onboardingRequired));
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || "OTP verification failed");
     } finally {

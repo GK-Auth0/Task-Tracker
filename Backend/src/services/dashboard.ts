@@ -1,31 +1,105 @@
 import { AuditLog, Project, Task, User } from "../models";
-import { Op } from "sequelize";
+import { fn, literal, Op } from "sequelize";
+import {
+  ACTIVE_TASK_STATUSES,
+  DONE_TASK_STATUSES,
+  TODO_TASK_STATUSES,
+} from "../utils/taskStatus";
 
-export async function getDashboardSummary(userId: string) {
-  const now = new Date();
-
-  // Get all tasks for the user (created or assigned)
-  const allTasks = await Task.findAll({
-    where: {
-      [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
-    },
-    attributes: ["status", "due_date"],
+const getUserOrganizationId = async (userId: string) => {
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "organization_id"],
   });
 
-  const totalTasks = allTasks.length;
-  const completedTasks = allTasks.filter(
-    (task) => task.status === "Done",
-  ).length;
-  const inProgressTasks = allTasks.filter(
-    (task) => task.status === "In Progress",
-  ).length;
-  const todoTasks = allTasks.filter((task) => task.status === "To Do").length;
+  if (!user) {
+    throw new Error("User not found");
+  }
 
-  // Calculate overdue tasks (due date passed and not completed)
-  const overdueTasks = allTasks.filter(
-    (task) =>
-      task.due_date && new Date(task.due_date) < now && task.status !== "Done",
-  ).length;
+  return user.organization_id || null;
+};
+
+const getTaskScope = (userId: string) => ({
+  [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
+});
+
+const getScopedProjectInclude = (organizationId: string) => [
+  {
+    model: Project,
+    as: "project",
+    attributes: ["id", "name", "status"],
+    include: [
+      {
+        model: User,
+        as: "owner",
+        attributes: ["id", "organization_id"],
+        where: { organization_id: organizationId },
+      },
+    ],
+  },
+] as const;
+
+export async function getDashboardSummary(userId: string) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return {
+      total_tasks: 0,
+      completed_tasks: 0,
+      in_progress_tasks: 0,
+      todo_tasks: 0,
+      overdue_tasks: 0,
+      completion_rate: 0,
+    };
+  }
+
+  const taskScope = getTaskScope(userId);
+  const scopedProjectInclude = getScopedProjectInclude(organizationId);
+  const today = startOfDay(new Date());
+
+  const [
+    totalTasks,
+    completedTasks,
+    inProgressTasks,
+    todoTasks,
+    overdueTasks,
+  ] = await Promise.all([
+    Task.count({
+      where: taskScope,
+      include: scopedProjectInclude as any,
+      distinct: true,
+      col: "id",
+    }),
+    Task.count({
+      where: { ...taskScope, status: { [Op.in]: DONE_TASK_STATUSES } },
+      include: scopedProjectInclude as any,
+      distinct: true,
+      col: "id",
+    }),
+    Task.count({
+      where: { ...taskScope, status: { [Op.in]: ACTIVE_TASK_STATUSES } },
+      include: scopedProjectInclude as any,
+      distinct: true,
+      col: "id",
+    }),
+    Task.count({
+      where: { ...taskScope, status: { [Op.in]: TODO_TASK_STATUSES } },
+      include: scopedProjectInclude as any,
+      distinct: true,
+      col: "id",
+    }),
+    Task.count({
+      where: {
+        ...taskScope,
+        status: { [Op.notIn]: DONE_TASK_STATUSES },
+        due_date: {
+          [Op.not]: null,
+          [Op.lt]: today,
+        },
+      },
+      include: scopedProjectInclude as any,
+      distinct: true,
+      col: "id",
+    }),
+  ]);
 
   return {
     total_tasks: totalTasks,
@@ -66,31 +140,41 @@ export async function getDashboardOverview(
   userId: string,
   options: DashboardOverviewOptions = {},
 ) {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return {
+      summary: await getDashboardSummary(userId),
+      metrics: {
+        open_tasks: 0,
+        high_priority_upcoming: 0,
+        due_today: 0,
+        due_this_week: 0,
+      },
+      upcoming_tasks: [],
+      recent_activity: [],
+    };
+  }
+
   const upcomingLimit = Math.min(Math.max(options.upcomingLimit || 12, 1), 50);
   const activityLimit = Math.min(Math.max(options.activityLimit || 10, 1), 50);
 
   const summary = await getDashboardSummary(userId);
 
-  const taskScope = {
-    [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
-  };
+  const taskScope = getTaskScope(userId);
+  const scopedProjectInclude = getScopedProjectInclude(organizationId);
 
   const upcomingTasksRaw = await Task.findAll({
     where: {
       ...taskScope,
       status: {
-        [Op.ne]: "Done",
+        [Op.notIn]: DONE_TASK_STATUSES,
       },
       due_date: {
         [Op.not]: null,
       },
     },
     include: [
-      {
-        model: Project,
-        as: "project",
-        attributes: ["id", "name"],
-      },
+      ...(scopedProjectInclude as any),
       {
         model: User,
         as: "assignee",
@@ -102,19 +186,26 @@ export async function getDashboardOverview(
     limit: upcomingLimit,
   });
 
-  const relevantTasks = await Task.findAll({
-    where: taskScope,
-    attributes: ["id", "project_id"],
-  });
+  const [relevantTaskIdsRaw, relevantProjectIdsRaw] = await Promise.all([
+    Task.findAll({
+      where: taskScope,
+      include: [...(scopedProjectInclude as any)],
+      attributes: ["id"],
+      raw: true,
+    }),
+    Task.findAll({
+      where: taskScope,
+      include: [...(scopedProjectInclude as any)],
+      attributes: ["project_id"],
+      group: ["Task.project_id", "project.id", "project->owner.id"],
+      raw: true,
+    }),
+  ]);
 
-  const taskIds = relevantTasks.map((task) => task.id);
-  const projectIds = Array.from(
-    new Set(
-      relevantTasks
-        .map((task) => task.project_id)
-        .filter((projectId): projectId is string => Boolean(projectId)),
-    ),
-  );
+  const taskIds = relevantTaskIdsRaw.map((task: any) => String(task.id));
+  const projectIds = relevantProjectIdsRaw
+    .map((task: any) => task.project_id)
+    .filter((projectId: string | null | undefined): projectId is string => Boolean(projectId));
 
   const activityWhere: any = {};
   if (taskIds.length > 0 || projectIds.length > 0) {
@@ -227,74 +318,182 @@ const normalizeProjectStatus = (status: string | null | undefined) => {
 };
 
 export async function getDashboardInsights(userId: string) {
-  const taskScope = {
-    [Op.or]: [{ creator_id: userId }, { assignee_id: userId }],
-  };
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    return {
+      task_status_breakdown: { todo: 0, in_progress: 0, done: 0 },
+      task_priority_breakdown: { high: 0, medium: 0, low: 0 },
+      due_date_breakdown: {
+        overdue: 0,
+        today: 0,
+        this_week: 0,
+        later: 0,
+        no_due_date: 0,
+      },
+      project_status_breakdown: {
+        planning: 0,
+        active: 0,
+        on_hold: 0,
+        completed: 0,
+        cancelled: 0,
+      },
+      project_health: [],
+    };
+  }
 
-  const tasks = await Task.findAll({
-    where: taskScope,
-    attributes: ["id", "status", "priority", "due_date", "project_id"],
-  });
-
-  const statusBreakdown = {
-    todo: tasks.filter((task) => task.status === "To Do").length,
-    in_progress: tasks.filter((task) => task.status === "In Progress").length,
-    done: tasks.filter((task) => task.status === "Done").length,
-  };
-
-  const priorityBreakdown = {
-    high: tasks.filter((task) => task.priority === "High").length,
-    medium: tasks.filter((task) => task.priority === "Medium").length,
-    low: tasks.filter((task) => task.priority === "Low").length,
-  };
-
+  const taskScope = getTaskScope(userId);
+  const scopedProjectInclude = getScopedProjectInclude(organizationId);
   const today = startOfDay(new Date());
   const inAWeek = new Date(today);
   inAWeek.setDate(today.getDate() + 7);
 
-  const dueDateBreakdown = {
-    overdue: 0,
-    today: 0,
-    this_week: 0,
-    later: 0,
-    no_due_date: 0,
+  const [
+    statusRows,
+    priorityRows,
+    dueDateCounts,
+    taskProjectRows,
+    ownedProjects,
+  ] = await Promise.all([
+    Task.findAll({
+      where: taskScope,
+      include: scopedProjectInclude as any,
+      attributes: ["status", [fn("COUNT", literal("*")), "count"]],
+      group: ["Task.status", "project.id", "project->owner.id"],
+      raw: true,
+    }),
+    Task.findAll({
+      where: taskScope,
+      include: scopedProjectInclude as any,
+      attributes: ["priority", [fn("COUNT", literal("*")), "count"]],
+      group: ["Task.priority", "project.id", "project->owner.id"],
+      raw: true,
+    }),
+    Promise.all([
+      Task.count({
+        where: {
+          ...taskScope,
+          due_date: null,
+        },
+        include: scopedProjectInclude as any,
+        distinct: true,
+        col: "id",
+      }),
+      Task.count({
+        where: {
+          ...taskScope,
+          due_date: { [Op.lt]: today },
+        },
+        include: scopedProjectInclude as any,
+        distinct: true,
+        col: "id",
+      }),
+      Task.count({
+        where: {
+          ...taskScope,
+          due_date: today,
+        },
+        include: scopedProjectInclude as any,
+        distinct: true,
+        col: "id",
+      }),
+      Task.count({
+        where: {
+          ...taskScope,
+          due_date: {
+            [Op.gt]: today,
+            [Op.lte]: inAWeek,
+          },
+        },
+        include: scopedProjectInclude as any,
+        distinct: true,
+        col: "id",
+      }),
+      Task.count({
+        where: {
+          ...taskScope,
+          due_date: {
+            [Op.gt]: inAWeek,
+          },
+        },
+        include: scopedProjectInclude as any,
+        distinct: true,
+        col: "id",
+      }),
+    ]),
+    Task.findAll({
+      where: taskScope,
+      include: scopedProjectInclude as any,
+      attributes: [
+        "project_id",
+        [fn("COUNT", literal("*")), "total"],
+        [
+          fn(
+            "SUM",
+            literal(`CASE WHEN "Task"."status" IN ('Done') THEN 1 ELSE 0 END`),
+          ),
+          "completed",
+        ],
+      ],
+      group: ["Task.project_id", "project.id", "project->owner.id"],
+      raw: true,
+    }),
+    Project.findAll({
+      where: {
+        owner_id: userId,
+      },
+      include: [
+        {
+          model: User,
+          as: "owner",
+          attributes: ["id", "organization_id"],
+          where: { organization_id: organizationId },
+        },
+      ],
+      attributes: ["id", "name", "status"],
+    }),
+  ]);
+
+  const statusBreakdown = {
+    todo: 0,
+    in_progress: 0,
+    done: 0,
   };
 
-  tasks.forEach((task) => {
-    if (!task.due_date) {
-      dueDateBreakdown.no_due_date += 1;
-      return;
-    }
-
-    const dueDate = startOfDay(new Date(task.due_date));
-    if (dueDate.getTime() < today.getTime()) {
-      dueDateBreakdown.overdue += 1;
-      return;
-    }
-
-    if (dueDate.getTime() === today.getTime()) {
-      dueDateBreakdown.today += 1;
-      return;
-    }
-
-    if (dueDate.getTime() <= inAWeek.getTime()) {
-      dueDateBreakdown.this_week += 1;
-      return;
-    }
-
-    dueDateBreakdown.later += 1;
+  statusRows.forEach((row: any) => {
+    const count = Number(row.count || 0);
+    if (TODO_TASK_STATUSES.includes(row.status)) statusBreakdown.todo += count;
+    if (ACTIVE_TASK_STATUSES.includes(row.status)) statusBreakdown.in_progress += count;
+    if (DONE_TASK_STATUSES.includes(row.status)) statusBreakdown.done += count;
   });
+
+  const priorityBreakdown = {
+    high: 0,
+    medium: 0,
+    low: 0,
+  };
+
+  priorityRows.forEach((row: any) => {
+    const count = Number(row.count || 0);
+    if (row.priority === "High") priorityBreakdown.high += count;
+    if (row.priority === "Medium") priorityBreakdown.medium += count;
+    if (row.priority === "Low") priorityBreakdown.low += count;
+  });
+
+  const dueDateBreakdown = {
+    overdue: dueDateCounts[1],
+    today: dueDateCounts[2],
+    this_week: dueDateCounts[3],
+    later: dueDateCounts[4],
+    no_due_date: dueDateCounts[0],
+  };
 
   const taskProjectIds = Array.from(
-    new Set(tasks.map((task) => task.project_id).filter(Boolean)),
-  ) as string[];
-
-  const ownedProjects = await Project.findAll({
-    where: {
-      owner_id: userId,
-    },
-    attributes: ["id", "name", "status"],
-  });
+    new Set(
+      taskProjectRows
+        .map((row: any) => row.project_id)
+        .filter((projectId: string | null | undefined): projectId is string => Boolean(projectId)),
+    ),
+  );
 
   const ownedProjectIds = ownedProjects.map((project) => project.id);
   const relevantProjectIds = Array.from(new Set([...taskProjectIds, ...ownedProjectIds]));
@@ -307,23 +506,25 @@ export async function getDashboardInsights(userId: string) {
               [Op.in]: relevantProjectIds,
             },
           },
+          include: [
+            {
+              model: User,
+              as: "owner",
+              attributes: ["id", "organization_id"],
+              where: { organization_id: organizationId },
+            },
+          ],
           attributes: ["id", "name", "status"],
         })
       : [];
 
-  const tasksByProject = tasks.reduce(
-    (acc, task) => {
-      if (!task.project_id) return acc;
-      if (!acc[task.project_id]) {
-        acc[task.project_id] = {
-          total: 0,
-          completed: 0,
-        };
-      }
-      acc[task.project_id].total += 1;
-      if (task.status === "Done") {
-        acc[task.project_id].completed += 1;
-      }
+  const tasksByProject = taskProjectRows.reduce(
+    (acc, row: any) => {
+      if (!row.project_id) return acc;
+      acc[String(row.project_id)] = {
+        total: Number(row.total || 0),
+        completed: Number(row.completed || 0),
+      };
       return acc;
     },
     {} as Record<string, { total: number; completed: number }>,

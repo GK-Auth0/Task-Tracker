@@ -1,0 +1,510 @@
+Table users {
+  id uuid [pk]
+  full_name varchar(255) [not null]
+  email varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  avatar_url varchar(500)
+  role varchar(20) [not null, note: 'Admin, Member, Viewer']
+  organization_id uuid
+  password_reset_required boolean
+  is_invited_user boolean
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table organization {
+  id uuid [pk]
+  name varchar(255) [not null]
+  org_code char(6) [not null, unique, note: 'Auto-generated code in TT0001 format']
+  slug varchar(255) [not null, unique]
+  description text
+  logo_url varchar(500)
+  admin uuid [not null]
+  capacity integer [not null, default: 1, note: 'Maximum active users allowed for the organization']
+  status varchar(20) [not null, default: 'active', note: 'active, inactive']
+  industry varchar(100)
+  website_url varchar(500)
+  contact_email varchar(255)
+  phone_number varchar(30)
+  address_line_1 varchar(255)
+  address_line_2 varchar(255)
+  city varchar(100)
+  state varchar(100)
+  country varchar(100)
+  postal_code varchar(20)
+  created_by uuid [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table projects {
+  id uuid [pk]
+  name varchar(255) [not null]
+  description text [not null]
+  owner_id uuid [not null]
+  status varchar(20) [not null, note: 'planning, active, on_hold, completed, cancelled, Active, Archived']
+  priority varchar(10) [not null, note: 'low, medium, high']
+  start_date date
+  end_date date
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table tasks {
+  id uuid [pk]
+  project_id uuid [not null]
+  title varchar(255) [not null]
+  description text [not null]
+  status varchar(20) [not null, note: 'To Do, In Progress, Done']
+  priority varchar(10) [not null, note: 'Low, Medium, High']
+  issue_type varchar(20) [not null, note: 'Story, Task, Bug']
+  due_date date
+  start_date date
+  creator_id uuid [not null]
+  assignee_id uuid
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table subtasks {
+  id uuid [pk]
+  task_id uuid [not null]
+  title varchar(255) [not null]
+  is_completed boolean
+  position integer [not null]
+  assignee_id uuid
+  linked_task_id uuid
+}
+
+Table task_files {
+  id uuid [pk]
+  task_id uuid [not null]
+  filename varchar(255) [not null]
+  original_name varchar(255) [not null]
+  file_url text [not null]
+  file_size bigint [not null]
+  mime_type varchar(100) [not null]
+  uploaded_by uuid [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table comments {
+  id uuid [pk]
+  task_id uuid [not null]
+  user_id uuid [not null]
+  content text [not null]
+  created_at timestamp
+}
+
+Table labels {
+  id uuid [pk]
+  name varchar(100) [not null, unique]
+  color_hex varchar(7) [not null]
+}
+
+Table task_labels {
+  task_id uuid [not null, pk]
+  label_id uuid [not null, pk]
+}
+
+Table project_members {
+  id uuid [pk]
+  project_id uuid [not null]
+  user_id uuid [not null]
+  role varchar(10) [not null, note: 'owner, admin, member, viewer']
+  joined_at timestamp
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (project_id, user_id) [unique]
+  }
+}
+
+Table project_files {
+  id uuid [pk]
+  project_id uuid [not null]
+  filename varchar(255) [not null]
+  original_name varchar(255) [not null]
+  file_url text [not null]
+  file_size bigint [not null]
+  mime_type varchar(100) [not null]
+  uploaded_by uuid [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table pull_requests {
+  id uuid [pk]
+  title varchar(255) [not null]
+  status varchar(20) [not null, note: 'open, merged, closed']
+  repository varchar(255) [not null]
+  branch varchar(255) [not null]
+  number integer [not null]
+  author varchar(255) [not null]
+  github_url varchar(500) [not null]
+  task_id uuid [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table commits {
+  id uuid [pk]
+  hash varchar(40) [not null]
+  message text [not null]
+  author_name varchar(255) [not null]
+  author_avatar varchar(500)
+  task_id uuid [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table user_metadata {
+  user_id uuid [pk]
+  ip_address varchar [not null]
+  country varchar(100)
+  region varchar(100)
+  city varchar(100)
+  timezone varchar(50)
+  lat decimal
+  lng decimal
+  browser varchar(255)
+  os varchar(255)
+  device varchar(255)
+  created_at timestamp
+}
+
+Table audit_logs {
+  id uuid [pk]
+  entity_type varchar(20) [not null, note: 'task, project']
+  entity_id uuid [not null]
+  action varchar(20) [not null, note: 'created, updated, deleted, status_changed, assigned, unassigned']
+  user_id uuid [not null]
+  old_values text
+  new_values text
+  changes text
+  created_at timestamp
+}
+
+Table chat_groups {
+  id uuid [pk]
+  name varchar(255) [not null]
+  description text
+  project_id uuid
+  created_by uuid [not null]
+  is_project_group boolean
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table chat_messages {
+  id uuid [pk]
+  group_id uuid [not null]
+  user_id uuid [not null]
+  content text [not null]
+  attachment_url varchar(500)
+  attachment_name varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table chat_group_members {
+  id uuid [pk]
+  group_id uuid [not null]
+  user_id uuid [not null]
+  joined_at timestamp
+
+  indexes {
+    (group_id, user_id) [unique]
+  }
+}
+
+Table chat_message_reads {
+  id uuid [pk]
+  message_id uuid [not null]
+  user_id uuid [not null]
+  read_at timestamp
+
+  indexes {
+    (message_id, user_id) [unique]
+  }
+}
+
+Table auth_otps {
+  id uuid [pk]
+  user_id uuid [not null]
+  purpose varchar(20) [not null, note: 'login, register, auth0, passwordReset']
+  otp_hash varchar(255) [not null]
+  expires_at timestamp [not null]
+  attempts integer [not null]
+  is_verified boolean [not null]
+  verified_at timestamp
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table auth_password_resets {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash varchar(255) [not null]
+  expires_at timestamp [not null]
+  is_used boolean [not null]
+  used_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table user_pinned_items {
+  id uuid [pk]
+  user_id uuid [not null]
+  entity_type varchar(20) [not null, note: 'task, project']
+  entity_id uuid [not null]
+  note varchar(255)
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, entity_type, entity_id) [unique]
+  }
+}
+
+Table user_saved_views {
+  id uuid [pk]
+  user_id uuid [not null]
+  page varchar(20) [not null, note: 'tasks, projects']
+  name varchar(100) [not null]
+  filters text [not null]
+  is_default boolean [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table user_invitations {
+  id uuid [pk]
+  context_type varchar(20) [not null, note: 'project, task']
+  project_id uuid
+  task_id uuid
+  invited_by uuid [not null]
+  full_name varchar(255) [not null]
+  email varchar(255) [not null]
+  status varchar(20) [not null, note: 'pending, accepted, expired, cancelled']
+  invite_token uuid [not null]
+  expires_at timestamp [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table project_confidential_access_requests {
+  id uuid [pk]
+  project_id uuid [not null]
+  requester_id uuid [not null]
+  status varchar(20) [not null, note: 'pending, approved, rejected']
+  reason text
+  decision_note text
+  requested_at timestamp
+  decided_at timestamp
+  decided_by uuid
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table defects {
+  id uuid [pk]
+  reference_code varchar(20) [not null, unique]
+  title varchar(255) [not null]
+  description text [not null]
+  reproduction_steps jsonb [not null]
+  severity varchar(20) [not null, note: 'Critical, High, Medium, Low']
+  priority varchar(20) [not null, note: 'Critical, High, Medium, Low']
+  status varchar(20) [not null, note: 'Open, Approved, Rejected, In Progress, Resolved']
+  project_id uuid [not null]
+  linked_task_id uuid
+  created_task_id uuid
+  creator_id uuid [not null]
+  assignee_id uuid
+  sprint_name varchar(120)
+  linked_run varchar(120)
+  linked_case varchar(120)
+  environment varchar(120)
+  rejection_reason text
+  approved_at timestamp
+  approved_by uuid
+  rejected_at timestamp
+  rejected_by uuid
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table test_cases {
+  id uuid [pk]
+  reference_code varchar(20) [not null, unique]
+  title varchar(255) [not null]
+  project_id uuid [not null]
+  linked_task_id uuid
+  owner_id uuid [not null]
+  suite varchar(120) [not null]
+  module varchar(120) [not null]
+  sprint_name varchar(120)
+  priority varchar(20) [not null, note: 'Critical, High, Medium, Low']
+  status varchar(20) [not null, note: 'Draft, Ready, Blocked, Passed, Failed']
+  automation varchar(20) [not null, note: 'Manual, Automated, Candidate']
+  tags jsonb [not null]
+  preconditions jsonb [not null]
+  steps jsonb [not null]
+  linked_items jsonb [not null]
+  execution_history jsonb [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table sprints {
+  id uuid [pk]
+  name varchar(120) [not null]
+  goal text
+  release varchar(120)
+  squad varchar(120)
+  project_id uuid [not null]
+  owner_id uuid [not null]
+  capacity integer
+  start_date date
+  end_date date
+  status varchar(20) [not null, note: 'Planning, Active, Completed']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table config {
+  id uuid [pk]
+  project_id uuid [not null, unique]
+  organization_id uuid [not null]
+  access_scope varchar(30) [not null, note: 'specific_users, organization']
+  allowed_user_ids jsonb [not null]
+  created_by uuid
+  updated_by uuid
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table invites {
+  id uuid [pk]
+  inviter_id uuid [not null]
+  invitee_email varchar(255) [not null]
+  invitee_id uuid
+  invite_code varchar(100) [not null, unique]
+  temporary_password varchar(255)
+  status varchar(50) [note: 'pending, accepted, expired']
+  sent_at timestamp
+  accepted_at timestamp
+  expires_at timestamp
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table cron_types {
+  type_id uuid [pk]
+  type_name varchar(255) [not null, unique]
+  description varchar(500)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table crons {
+  cron_id uuid [pk]
+  cron_name varchar(255) [not null, unique]
+  type_id uuid [not null]
+  is_active boolean [not null]
+  schedule_expression varchar(255) [not null]
+  next_run_at timestamp
+  last_run_at timestamp
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table cron_executions {
+  execution_id uuid [pk]
+  cron_id uuid [not null]
+  status varchar(20) [not null, note: 'pending, running, success, failed, retrying']
+  retry_count integer
+  started_at timestamp
+  ended_at timestamp
+  error_message text
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table cron_retries {
+  retry_id uuid [pk]
+  execution_id uuid [not null]
+  retry_count integer [not null]
+  status boolean [not null]
+  retry_time timestamp
+  created_at timestamp
+  updated_at timestamp
+}
+
+Ref: users.organization_id > organization.id
+Ref: organization.created_by > users.id
+Ref: organization.admin > users.id
+Ref: projects.owner_id > users.id
+Ref: tasks.project_id > projects.id
+Ref: tasks.creator_id > users.id
+Ref: tasks.assignee_id > users.id
+Ref: tasks.defect_id > defects.id
+Ref: tasks.sprint_id > sprints.id
+Ref: subtasks.task_id > tasks.id
+Ref: subtasks.assignee_id > users.id
+Ref: subtasks.linked_task_id > tasks.id
+Ref: task_files.task_id > tasks.id
+Ref: task_files.uploaded_by > users.id
+Ref: comments.task_id > tasks.id
+Ref: comments.user_id > users.id
+Ref: task_labels.task_id > tasks.id
+Ref: task_labels.label_id > labels.id
+Ref: project_members.project_id > projects.id
+Ref: project_members.user_id > users.id
+Ref: project_files.project_id > projects.id
+Ref: project_files.uploaded_by > users.id
+Ref: pull_requests.task_id > tasks.id
+Ref: commits.task_id > tasks.id
+Ref: user_metadata.user_id > users.id
+Ref: audit_logs.user_id > users.id
+Ref: chat_groups.project_id > projects.id
+Ref: chat_groups.created_by > users.id
+Ref: chat_messages.group_id > chat_groups.id
+Ref: chat_messages.user_id > users.id
+Ref: chat_group_members.group_id > chat_groups.id
+Ref: chat_group_members.user_id > users.id
+Ref: chat_message_reads.message_id > chat_messages.id
+Ref: chat_message_reads.user_id > users.id
+Ref: auth_otps.user_id > users.id
+Ref: auth_password_resets.user_id > users.id
+Ref: user_pinned_items.user_id > users.id
+Ref: user_saved_views.user_id > users.id
+Ref: user_invitations.project_id > projects.id
+Ref: user_invitations.task_id > tasks.id
+Ref: user_invitations.invited_by > users.id
+Ref: project_confidential_access_requests.project_id > projects.id
+Ref: project_confidential_access_requests.requester_id > users.id
+Ref: project_confidential_access_requests.decided_by > users.id
+Ref: defects.project_id > projects.id
+Ref: defects.linked_task_id > tasks.id
+Ref: defects.created_task_id > tasks.id
+Ref: defects.creator_id > users.id
+Ref: defects.assignee_id > users.id
+Ref: defects.approved_by > users.id
+Ref: defects.rejected_by > users.id
+Ref: test_cases.project_id > projects.id
+Ref: test_cases.linked_task_id > tasks.id
+Ref: test_cases.owner_id > users.id
+Ref: sprints.project_id > projects.id
+Ref: sprints.owner_id > users.id
+Ref: config.project_id > projects.id
+Ref: config.organization_id > organization.id
+Ref: config.created_by > users.id
+Ref: config.updated_by > users.id
+Ref: invites.inviter_id > users.id
+Ref: invites.invitee_id > users.id
+Ref: crons.type_id > cron_types.type_id
+Ref: cron_executions.cron_id > crons.cron_id
+Ref: cron_retries.execution_id > cron_executions.execution_id

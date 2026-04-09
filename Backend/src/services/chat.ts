@@ -5,6 +5,18 @@ import User from "../models/user";
 import Project from "../models/project";
 import { Op } from "sequelize";
 
+const getUserOrganizationId = async (userId: string) => {
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "organization_id"],
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user.organization_id || null;
+};
+
 export const createChatGroup = async (data: {
   name: string;
   description?: string;
@@ -47,6 +59,15 @@ export const addUsersToChatGroup = async (groupId: string, userIds: string[]) =>
   );
 };
 
+export const isUserInChatGroup = async (groupId: string, userId: string) => {
+  const member = await ChatGroupMember.findOne({
+    where: { group_id: groupId, user_id: userId },
+    attributes: ["group_id"],
+  });
+
+  return Boolean(member);
+};
+
 export const getChatGroups = async (userId: string) => {
   const memberGroups = await ChatGroupMember.findAll({
     where: { user_id: userId },
@@ -77,41 +98,35 @@ export const getChatGroups = async (userId: string) => {
     ],
   });
   
-  // Get member counts and format response
-  const groupsWithCounts = await Promise.all(
-    memberGroups.map(async (memberGroup) => {
-      const group = memberGroup.group;
-      if (!group) return null;
-      const memberCount = await ChatGroupMember.count({
-        where: { group_id: group.id },
-      });
+  const groupsWithCounts = memberGroups.map((memberGroup) => {
+    const group = memberGroup.group;
+    if (!group) return null;
 
-      const groupJson: any = group.toJSON();
-      const members = Array.isArray(groupJson.members) ? groupJson.members : [];
-      let displayName = groupJson.name;
-      const directKey = String(groupJson.description || "");
-      const isDirect = directKey.startsWith("direct:");
+    const groupJson: any = group.toJSON();
+    const members = Array.isArray(groupJson.members) ? groupJson.members : [];
+    let displayName = groupJson.name;
+    const directKey = String(groupJson.description || "");
+    const isDirect = directKey.startsWith("direct:");
 
-      if (isDirect) {
-        const otherMember = members.find((m: any) => m?.user?.id !== userId);
-        if (otherMember?.user?.full_name) {
-          displayName = otherMember.user.full_name;
-        }
+    if (isDirect) {
+      const otherMember = members.find((m: any) => m?.user?.id !== userId);
+      if (otherMember?.user?.full_name) {
+        displayName = otherMember.user.full_name;
       }
-      
-      return {
-        ...groupJson,
-        name: displayName,
-        is_direct: isDirect,
-        members: members.map((m: any) => ({
-          id: m?.user?.id,
-          full_name: m?.user?.full_name,
-          email: m?.user?.email,
-        })),
-        memberCount,
-      };
-    }),
-  );
+    }
+    
+    return {
+      ...groupJson,
+      name: displayName,
+      is_direct: isDirect,
+      members: members.map((m: any) => ({
+        id: m?.user?.id,
+        full_name: m?.user?.full_name,
+        email: m?.user?.email,
+      })),
+      memberCount: members.length,
+    };
+  });
   
   return (groupsWithCounts.filter(Boolean) as NonNullable<typeof groupsWithCounts[number]>[])
     .sort(
@@ -183,9 +198,12 @@ export const searchChatUsers = async (
   limit = 20,
 ) => {
   if (!query.trim()) return [];
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) return [];
   const rows = await User.findAll({
     where: {
       id: { [Op.ne]: userId },
+      organization_id: organizationId,
       [Op.or]: [
         { full_name: { [Op.iLike]: `%${query}%` } },
         { email: { [Op.iLike]: `%${query}%` } },
@@ -199,6 +217,11 @@ export const searchChatUsers = async (
 };
 
 export const getOrCreateDirectGroup = async (userId: string, targetUserId: string) => {
+  const organizationId = await getUserOrganizationId(userId);
+  if (!organizationId) {
+    throw new Error("User must belong to an organization");
+  }
+
   const ids = [userId, targetUserId].sort();
   const directKey = `direct:${ids[0]}:${ids[1]}`;
 
@@ -211,10 +234,13 @@ export const getOrCreateDirectGroup = async (userId: string, targetUserId: strin
 
   if (!group) {
     const target = await User.findByPk(targetUserId, {
-      attributes: ["id", "full_name"],
+      attributes: ["id", "full_name", "organization_id"],
     });
     if (!target) {
       throw new Error("Target user not found");
+    }
+    if (target.organization_id !== organizationId) {
+      throw new Error("Target user must belong to the same organization");
     }
 
     group = await ChatGroup.create({

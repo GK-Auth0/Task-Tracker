@@ -1,4 +1,6 @@
 import api from "./auth";
+import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
+import type { TaskStatusValue } from "../utils/taskStatus";
 
 export interface DashboardSummary {
   total_tasks: number;
@@ -12,7 +14,7 @@ export interface DashboardSummary {
 export interface DashboardOverviewUpcomingTask {
   id: string;
   title: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
   due_date?: string;
   days_to_due: number | null;
@@ -100,9 +102,36 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
+  issue_type?: "Story" | "Task" | "Bug";
   due_date?: string;
+  attachments?: Array<{
+    id: string;
+    original_name: string;
+    file_url: string;
+    file_size: number;
+    mime_type: string;
+    created_at: string;
+    uploader?: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
+  }>;
+  subtasks?: Array<{
+    id: string;
+    title: string;
+    is_completed: boolean;
+    position?: number;
+    assignee_id?: string;
+    linked_task_id?: string;
+    assignee?: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
+  }>;
   project: {
     id: string;
     name: string;
@@ -117,6 +146,12 @@ export interface Task {
     full_name: string;
     email: string;
   };
+  defect_id?: string | null;
+  sprint_id?: string | null;
+  sprint?: {
+    id: string;
+    name: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -263,11 +298,20 @@ export const usersAPI = {
 };
 
 export const projectsAPI = {
-  getProjects: async (): Promise<{
+  getProjects: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{
     success: boolean;
     data: { id: string; name: string }[];
   }> => {
-    const response = await api.get("/api/projects");
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+
+    const response = await api.get(
+      `/api/projects${queryParams.toString() ? `?${queryParams.toString()}` : ""}`,
+    );
     return response.data;
   },
 
@@ -316,7 +360,7 @@ export const tasksAPI = {
     if (filters?.page) params.append("page", filters.page.toString());
     if (filters?.limit) params.append("limit", filters.limit.toString());
 
-    const response = await api.get(`/api/tasks?${params.toString()}`);
+    const response = await api.get(`/api/v1/tasks?${params.toString()}`);
     return response.data;
   },
 
@@ -325,19 +369,25 @@ export const tasksAPI = {
     description: string;
     project_id: string;
     assignee_id?: string;
+    defect_id?: string;
+    sprint_id?: string;
     due_date?: string;
     priority: "Low" | "Medium" | "High";
+    issue_type?: "Story" | "Task" | "Bug";
     invitees?: Array<{
       full_name: string;
       email: string;
     }>;
   }): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.post("/api/tasks", data);
+    const response = await api.post("/api/v1/tasks", {
+      ...data,
+      priority: normalizeTaskPriority(data.priority) || "Medium",
+    });
     return response.data;
   },
 
   getTask: async (id: string): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.get(`/api/tasks/${id}`);
+    const response = await api.get(`/api/v1/tasks/${id}`);
     return response.data;
   },
 
@@ -345,7 +395,22 @@ export const tasksAPI = {
     id: string,
     data: Partial<Task>,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.patch(`/api/tasks/${id}`, data);
+    const response = await api.patch(`/api/v1/tasks/${id}`, {
+      ...data,
+      ...(data.priority
+        ? { priority: normalizeTaskPriority(data.priority) || data.priority }
+        : {}),
+    });
+    return response.data;
+  },
+
+  deleteTask: async (
+    id: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> => {
+    const response = await api.delete(`/api/v1/tasks/${id}`);
     return response.data;
   },
 
@@ -355,7 +420,7 @@ export const tasksAPI = {
     success: boolean;
     data: PullRequest[];
   }> => {
-    const response = await api.get(`/api/tasks/${taskId}/pull-requests`);
+    const response = await api.get(`/api/v1/tasks/${taskId}/pull-requests`);
     return response.data;
   },
 
@@ -365,7 +430,7 @@ export const tasksAPI = {
     success: boolean;
     data: Commit[];
   }> => {
-    const response = await api.get(`/api/tasks/${taskId}/commits`);
+    const response = await api.get(`/api/v1/tasks/${taskId}/commits`);
     return response.data;
   },
 
@@ -375,7 +440,99 @@ export const tasksAPI = {
     success: boolean;
     data: ActivityLog[];
   }> => {
-    const response = await api.get(`/api/tasks/${taskId}/activity`);
+    const response = await api.get(`/api/v1/tasks/${taskId}/activity`);
+    return response.data;
+  },
+
+  uploadAttachment: async (
+    taskId: string,
+    file: File,
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      original_name: string;
+      file_url: string;
+      file_size: number;
+      mime_type: string;
+      created_at: string;
+      uploader?: {
+        id: string;
+        full_name: string;
+        email: string;
+      };
+    };
+  }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`/api/v1/tasks/${taskId}/attachments`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  createSubtask: async (
+    taskId: string,
+    data: { title: string; assignee_id?: string },
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      title: string;
+      is_completed: boolean;
+      position?: number;
+      assignee_id?: string;
+      linked_task_id?: string;
+      assignee?: {
+        id: string;
+        full_name: string;
+        email: string;
+      };
+    };
+  }> => {
+    const response = await api.post(`/api/v1/tasks/${taskId}/subtasks`, data);
+    return response.data;
+  },
+
+  updateSubtask: async (
+    taskId: string,
+    subtaskId: string,
+    data: { title?: string; is_completed?: boolean; assignee_id?: string },
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      title: string;
+      is_completed: boolean;
+      position?: number;
+      assignee_id?: string;
+      linked_task_id?: string;
+      assignee?: {
+        id: string;
+        full_name: string;
+        email: string;
+      };
+    };
+  }> => {
+    const response = await api.patch(
+      `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  deleteSubtask: async (
+    taskId: string,
+    subtaskId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> => {
+    const response = await api.delete(
+      `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
+    );
     return response.data;
   },
 };

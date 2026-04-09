@@ -28,6 +28,7 @@ export const sendInvite = async (req: Request, res: Response) => {
       message: 'Invite sent successfully',
       data: {
         inviteCode: result.invite.invite_code,
+        orgCode: result.orgCode,
         email: result.user.email,
         role: result.user.role,
       },
@@ -65,6 +66,7 @@ export const getInviteDetails = async (req: Request, res: Response) => {
       success: true,
       data: {
         inviteCode: invite.invite_code,
+        orgCode: invite.org_code,
         inviterName: invite.inviter?.full_name,
         inviteeEmail: invite.invitee_email,
         status: invite.status,

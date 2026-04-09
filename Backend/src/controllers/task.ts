@@ -8,10 +8,45 @@ import {
   deleteTask,
   getTaskPullRequests,
   getTaskCommits,
+  createSubtask,
+  updateSubtask,
+  deleteSubtask,
+  getTaskForUpload,
 } from "../services/task";
 import { createAuditLog, getAuditLogs } from "../services/auditService";
 import { processInvites } from "../services/invitation";
 import { parseBoundedInt, parseIsoDate } from "../helpers/query";
+import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
+import cloudinary from "../config/cloudinary";
+import { TaskFile, User } from "../models";
+
+const normalizeTaskPriority = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return String(value);
+
+  const normalized = value.trim().toLowerCase();
+  const priorityMap: Record<string, TaskPriority> = {
+    low: TaskPriority.LOW,
+    medium: TaskPriority.MEDIUM,
+    high: TaskPriority.HIGH,
+  };
+
+  return priorityMap[normalized] ?? value;
+};
+
+const normalizeTaskIssueType = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return String(value);
+
+  const normalized = value.trim().toLowerCase();
+  const typeMap: Record<string, TaskIssueType> = {
+    story: TaskIssueType.STORY,
+    task: TaskIssueType.TASK,
+    bug: TaskIssueType.BUG,
+  };
+
+  return typeMap[normalized] ?? value;
+};
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
@@ -29,6 +64,7 @@ export const getTasks = async (req: Request, res: Response) => {
       status: req.query.status as string,
       priority: req.query.priority as string,
       project_id: req.query.project_id as string,
+      sprint_id: req.query.sprint_id as string,
       due_from: parseIsoDate(req.query.due_from),
       due_to: parseIsoDate(req.query.due_to),
       created_from: parseIsoDate(req.query.created_from),
@@ -78,10 +114,14 @@ export const createNewTask = async (req: Request, res: Response) => {
     const taskData = {
       title: req.body.title,
       description: String(req.body.description || "").trim(),
-      status: req.body.status || "To Do",
-      priority: req.body.priority || "Medium",
+      status: req.body.status || TaskStatus.TODO,
+      priority: normalizeTaskPriority(req.body.priority) || TaskPriority.MEDIUM,
+      issue_type:
+        normalizeTaskIssueType(req.body.issue_type) || TaskIssueType.TASK,
       project_id: req.body.project_id,
       assignee_id: req.body.assignee_id,
+      defect_id: req.body.defect_id,
+      sprint_id: req.body.sprint_id,
       creator_id: userId,
       due_date: req.body.due_date,
     };
@@ -128,12 +168,13 @@ export const createNewTask = async (req: Request, res: Response) => {
 export const getTask = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const organizationId = (req as any).user?.organization_id;
     const taskId = req.params.id as string;
 
-    if (!userId) {
+    if (!userId || !organizationId) {
       return res.status(401).json({
         success: false,
-        message: "User ID required",
+        message: "User context required",
         error: "UNAUTHORIZED",
       });
     }
@@ -181,8 +222,17 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
           ? undefined
           : String(req.body.description).trim(),
       status: req.body.status,
-      priority: req.body.priority,
+      priority:
+        req.body.priority === undefined
+          ? undefined
+          : normalizeTaskPriority(req.body.priority),
+      issue_type:
+        req.body.issue_type === undefined
+          ? undefined
+          : normalizeTaskIssueType(req.body.issue_type),
       assignee_id: req.body.assignee_id,
+      defect_id: req.body.defect_id,
+      sprint_id: req.body.sprint_id,
       due_date: req.body.due_date,
     };
 
@@ -241,6 +291,177 @@ export const updateTaskDetails = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: "Failed to update task",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const createTaskSubtask = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const subtask = await createSubtask(
+      taskId,
+      {
+        title: String(req.body.title).trim(),
+        assignee_id: req.body.assignee_id,
+      },
+      userId,
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Subtask created successfully",
+      data: subtask,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to create subtask",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const updateTaskSubtask = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+    const subtaskId = req.params.subtaskId as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const subtask = await updateSubtask(
+      taskId,
+      subtaskId,
+      {
+        title:
+          req.body.title === undefined ? undefined : String(req.body.title).trim(),
+        is_completed: req.body.is_completed,
+        assignee_id: req.body.assignee_id,
+      },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Subtask updated successfully",
+      data: subtask,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to update subtask",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const removeTaskSubtask = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+    const subtaskId = req.params.subtaskId as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    await deleteSubtask(taskId, subtaskId, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Subtask deleted successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to delete subtask",
+      error: (error as any).message,
+    });
+  }
+};
+
+export const uploadTaskAttachment = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const taskId = req.params.id as string;
+    const file = (req as any).file;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID required",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file provided",
+      });
+    }
+
+    await getTaskForUpload(taskId, userId);
+
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: `task-tracker/tasks/${taskId}`,
+      resource_type: "auto",
+    });
+
+    const attachment = await TaskFile.create({
+      task_id: taskId,
+      filename: result.public_id,
+      original_name: file.originalname,
+      file_url: result.secure_url,
+      file_size: file.size,
+      mime_type: file.mimetype,
+      uploaded_by: userId,
+    });
+
+    const attachmentWithUploader = await TaskFile.findByPk(attachment.id, {
+      include: [
+        {
+          model: User,
+          as: "uploader",
+          attributes: ["id", "full_name", "email"],
+        },
+      ],
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Attachment uploaded successfully",
+      data: attachmentWithUploader,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to upload attachment",
       error: (error as any).message,
     });
   }
@@ -349,12 +570,13 @@ export const getTaskCommitHistory = async (req: Request, res: Response) => {
 export const getTaskActivityLogs = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const organizationId = (req as any).user?.organization_id;
     const taskId = req.params.id as string;
 
-    if (!userId) {
+    if (!userId || !organizationId) {
       return res.status(401).json({
         success: false,
-        message: "User ID required",
+        message: "User context required",
         error: "UNAUTHORIZED",
       });
     }
@@ -363,7 +585,7 @@ export const getTaskActivityLogs = async (req: Request, res: Response) => {
     await getTaskById(taskId, userId);
 
     const limit = parseBoundedInt(req.query.limit, 50, 1, 200);
-    const logs = await getAuditLogs("task", taskId, limit);
+    const logs = await getAuditLogs(organizationId, "task", taskId, limit);
 
     return res.status(200).json({
       success: true,

@@ -1,36 +1,27 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { tasksAPI, usersAPI } from "../services/dashboard";
 import { aiAssistantAPI, AiProjectInsights } from "../services/aiAssistant";
 import CalendarHeader from "../components/calendar/CalendarHeader";
 import CalendarMonthGrid from "../components/calendar/CalendarMonthGrid";
 import CalendarTeamLegend from "../components/calendar/CalendarTeamLegend";
 import CalendarSidebar from "../components/calendar/CalendarSidebar";
-import { CalendarTask, TeamMember } from "../components/calendar/types";
+import { CalendarTask } from "../components/calendar/types";
+import { useCalendarData } from "../components/calendar/useCalendarData";
 
 const Calendar: React.FC = () => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [tasks, setTasks] = useState<CalendarTask[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
   const [calendarType, setCalendarType] = useState<"personal" | "team">(
     "personal",
   );
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [aiInsights, setAiInsights] = useState<AiProjectInsights | null>(null);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
   const [aiInsightsError, setAiInsightsError] = useState("");
   const [contentTab, setContentTab] = useState<
     "calendar" | "insights" | "agenda" | "workload" | "deadlines"
   >("calendar");
-
-  useEffect(() => {
-    fetchTasks();
-    if (calendarType === "team") {
-      fetchTeamMembers();
-    }
-  }, [user, calendarType]);
+  const { tasks, teamMembers, loading } = useCalendarData(user?.id, calendarType);
 
   useEffect(() => {
     if (tasks.length > 0) {
@@ -40,47 +31,6 @@ const Calendar: React.FC = () => {
       setAiInsightsError("");
     }
   }, [tasks]);
-
-  const fetchTeamMembers = async () => {
-    try {
-      const response = await usersAPI.getUsers({ limit: 100 });
-      if (response.success) {
-        const colors = [
-          "emerald",
-          "indigo",
-          "rose",
-          "amber",
-          "purple",
-          "green",
-          "blue",
-          "orange",
-        ];
-        const membersWithColors = response.data.map((member, index) => ({
-          ...member,
-          color: colors[index % colors.length],
-        }));
-        setTeamMembers(membersWithColors);
-      }
-    } catch (error) {
-      console.error("Error fetching team members:", error);
-    }
-  };
-
-  const fetchTasks = async () => {
-    if (!user?.id) return;
-
-    try {
-      setLoading(true);
-      const response = await tasksAPI.getTasks({ limit: 100 });
-      if (response.success) {
-        setTasks(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchCalendarInsights = async () => {
     try {
@@ -193,10 +143,12 @@ const Calendar: React.FC = () => {
       (assignee, index, arr) => arr.findIndex((a) => a.id === assignee.id) === index,
     );
 
-  const membersWithTasks = visibleAssignees.map((assignee) => {
+  const membersWithTasks = visibleAssignees
+    .filter((assignee) => teamMembers.some((member) => member.id === assignee.id))
+    .map((assignee) => {
     const member = teamMembers.find((m) => m.id === assignee.id);
     return member ? { ...assignee, color: member.color } : { ...assignee, color: "blue" };
-  });
+    });
 
   const sortedTasks = [...tasks]
     .filter((task) => task.due_date)

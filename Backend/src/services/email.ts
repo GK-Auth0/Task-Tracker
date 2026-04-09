@@ -12,7 +12,6 @@ import {
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "resend").toLowerCase();
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "no-reply@tasktracker.local";
-const UI_APP_URL = process.env.UI_APP_URL || process.env.FRONTEND_URL || "http://localhost:3001";
 const OTP_EMAIL_WEBHOOK_URL = process.env.OTP_EMAIL_WEBHOOK_URL;
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
@@ -33,6 +32,30 @@ const EMAIL_RETRY_BASE_DELAY_MS = parseInt(
   process.env.EMAIL_RETRY_BASE_DELAY_MS || "500",
   10,
 );
+
+const getPrimaryUrl = (...values: Array<string | undefined>) => {
+  for (const value of values) {
+    if (!value) continue;
+
+    const candidates = value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    for (const candidate of candidates) {
+      try {
+        const parsed = new URL(candidate);
+        return parsed.toString().replace(/\/+$/, "");
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return "http://localhost:3001";
+};
+
+const UI_APP_URL = getPrimaryUrl(process.env.UI_APP_URL, process.env.FRONTEND_URL);
 
 let smtpTransporter: any = null;
 let smtpTransporterKey: string | null = null;
@@ -248,7 +271,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       from: OTP_FROM_EMAIL,
       to,
       subject: "Reset your TaskTracker password",
-      html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+      html: buildResetPasswordHtml(resetLink),
     });
     return;
   }
@@ -258,7 +281,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
       await sendResendEmail({
         to,
         subject: "Reset your TaskTracker password",
-        html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+        html: buildResetPasswordHtml(resetLink),
       });
     } catch (error: any) {
       if (EMAIL_USER && EMAIL_PASS) {
@@ -273,7 +296,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+          html: buildResetPasswordHtml(resetLink),
         });
         return;
       }
@@ -294,7 +317,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           {
             to,
             subject: "Reset your TaskTracker password",
-            html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+            html: buildResetPasswordHtml(resetLink),
             resetLink,
           },
           {
@@ -318,7 +341,7 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
           from: OTP_FROM_EMAIL,
           to,
           subject: "Reset your TaskTracker password",
-          html: buildResetPasswordHtml(resetLink, UI_APP_URL),
+          html: buildResetPasswordHtml(resetLink),
         });
         return;
       }
@@ -354,7 +377,6 @@ export const sendWorkspaceInviteEmail = async (options: {
     fullName: options.fullName,
     contextType: options.contextType,
     inviteUrl,
-    appUrl: UI_APP_URL,
   });
 
   if (EMAIL_PROVIDER === "smtp") {
@@ -474,9 +496,14 @@ const getSmtpTransporter = (options: {
   return smtpTransporter;
 };
 
-export const sendWelcomeEmail = async (to: string, temporaryPassword: string, fullName: string) => {
+export const sendWelcomeEmail = async (
+  to: string,
+  temporaryPassword: string,
+  fullName: string,
+  orgCode?: string,
+) => {
   const subject = "Welcome to TaskTracker - Your Account Details";
-  const html = buildWelcomeHtml(fullName, temporaryPassword, UI_APP_URL);
+  const html = buildWelcomeHtml(fullName, temporaryPassword, UI_APP_URL, orgCode);
 
   if (EMAIL_PROVIDER === "smtp") {
     if (!EMAIL_USER || !EMAIL_PASS) {

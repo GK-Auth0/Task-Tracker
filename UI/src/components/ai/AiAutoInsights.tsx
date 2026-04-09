@@ -40,6 +40,7 @@ export default function AiAutoInsights() {
   const { pathname } = useLocation();
   const [insights, setInsights] = useState<string[]>([]);
   const [contextSnapshot, setContextSnapshot] = useState("");
+  const [quickActions, setQuickActions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hidden, setHidden] = useState(
@@ -57,10 +58,12 @@ export default function AiAutoInsights() {
       const lines = parseInsightLines(reply);
       setInsights(lines.length > 0 ? lines : ["No insights available right now."]);
       setContextSnapshot(response.data.contextSnapshot || "");
+      setQuickActions(response.data.quickActions || []);
     } catch (err) {
       setError("AI insights unavailable.");
       setInsights([]);
       setContextSnapshot("");
+      setQuickActions([]);
     } finally {
       setLoading(false);
     }
@@ -147,6 +150,19 @@ export default function AiAutoInsights() {
 
         {contextSnapshot && (
           <p className="mt-3 text-[11px] text-slate-500">{contextSnapshot}</p>
+        )}
+
+        {quickActions.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {quickActions.map((action) => (
+              <span
+                key={action}
+                className="rounded-full border border-cyan-200 bg-white px-3 py-1 text-[11px] font-medium text-cyan-900"
+              >
+                {action}
+              </span>
+            ))}
+          </div>
         )}
       </section>
     </div>

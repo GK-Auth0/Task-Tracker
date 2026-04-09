@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "react-query";
 import RingLoader from "../components/RingLoader";
 import {
   dashboardAPI,
   tasksAPI,
-  type DashboardInsights,
-  type DashboardOverview,
   type DashboardOverviewActivity,
   type DashboardOverviewUpcomingTask,
 } from "../services/dashboard";
@@ -14,9 +13,7 @@ import {
   aiAssistantAPI,
   type AiAutoInsightProject,
   type AiAutoInsightTask,
-  type AiAutoInsights,
   type AiChatContextResult,
-  type AiWorkloadForecast,
 } from "../services/aiAssistant";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardStatsGrid from "../components/dashboard/DashboardStatsGrid";
@@ -126,22 +123,11 @@ const mapProjectForAi = (project: DashboardProjectDetail): AiAutoInsightProject 
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState<DashboardOverview | null>(null);
-  const [insights, setInsights] = useState<DashboardInsights | null>(null);
-  const [projects, setProjects] = useState<DashboardProjectDetail[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState("");
-  const [aiAutoInsights, setAiAutoInsights] = useState<AiAutoInsights | null>(null);
-  const [aiForecast, setAiForecast] = useState<AiWorkloadForecast | null>(null);
   const [aiActionReply, setAiActionReply] = useState<AiChatContextResult | null>(null);
   const [aiActionLoading, setAiActionLoading] = useState(false);
-  const [aiTasksContext, setAiTasksContext] = useState<AiAutoInsightTask[]>([]);
-  const [aiProjectsContext, setAiProjectsContext] = useState<AiAutoInsightProject[]>([]);
-
-  const fetchOverview = async () => {
-    setLoading(true);
-    try {
+  const { data: dashboardData, isLoading: dashboardLoading, refetch: refetchDashboard } = useQuery(
+    ["dashboard-page-data"],
+    async () => {
       const [overviewRes, insightsRes, projectRes, tasksRes] = await Promise.all([
         dashboardAPI.getOverview({
           upcomingLimit: 12,
@@ -151,54 +137,82 @@ export default function Dashboard() {
         projectService.getProjects(),
         tasksAPI.getTasks({ page: 1, limit: 80 }),
       ]);
-      setOverview(overviewRes.data);
-      setInsights(insightsRes.data);
+
       const parsedProjects = parseProjects(projectRes);
-      setProjects(parsedProjects);
+      const aiTasksContext = (tasksRes.data || []).map(mapTaskForAi);
+      const aiProjectsContext = parsedProjects.map(mapProjectForAi);
 
-      const aiTasks = (tasksRes.data || []).map(mapTaskForAi);
-      const aiProjects = parsedProjects.map(mapProjectForAi);
-      setAiTasksContext(aiTasks);
-      setAiProjectsContext(aiProjects);
-      setAiActionReply(null);
+      return {
+        overview: overviewRes.data,
+        insights: insightsRes.data,
+        projects: parsedProjects,
+        aiTasksContext,
+        aiProjectsContext,
+      };
+    },
+    {
+      staleTime: 30_000,
+      onSuccess: () => {
+        setAiActionReply(null);
+      },
+    },
+  );
 
-      if (aiTasks.length > 0) {
-        setAiLoading(true);
-        setAiError("");
-        try {
-          const [autoRes, forecastRes, defaultReply] = await Promise.all([
-            aiAssistantAPI.autoInsights(aiTasks, aiProjects, "/dashboard"),
-            aiAssistantAPI.workloadForecast(aiTasks, 7),
-            aiAssistantAPI.chatContext(
-              "Show top risks in my current page",
-              aiTasks,
-              aiProjects,
-              "/dashboard",
-              "balanced",
-            ),
-          ]);
-          setAiAutoInsights(autoRes);
-          setAiForecast(forecastRes);
-          setAiActionReply(defaultReply);
-        } catch (error) {
-          setAiAutoInsights(null);
-          setAiForecast(null);
-          setAiActionReply(null);
-          setAiError("AI insights unavailable right now.");
-        } finally {
-          setAiLoading(false);
-        }
-      } else {
-        setAiAutoInsights(null);
-        setAiForecast(null);
-        setAiError("No tasks available for AI dashboard analysis.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch dashboard overview:", error);
-    } finally {
-      setLoading(false);
+  const overview = dashboardData?.overview || null;
+  const insights = dashboardData?.insights || null;
+  const projects = dashboardData?.projects || [];
+  const aiTasksContext = dashboardData?.aiTasksContext || [];
+  const aiProjectsContext = dashboardData?.aiProjectsContext || [];
+
+  const {
+    data: aiDashboardData,
+    isLoading: aiLoading,
+    refetch: refetchAiDashboard,
+    error: aiDashboardError,
+  } = useQuery(
+    ["dashboard-ai-data", aiTasksContext, aiProjectsContext],
+    async () => {
+      const [autoInsights, forecast, defaultReply] = await Promise.all([
+        aiAssistantAPI.autoInsights(aiTasksContext, aiProjectsContext, "/dashboard"),
+        aiAssistantAPI.workloadForecast(aiTasksContext, 7),
+        aiAssistantAPI.chatContext(
+          "Show top risks in my current page",
+          aiTasksContext,
+          aiProjectsContext,
+          "/dashboard",
+          "balanced",
+        ),
+      ]);
+
+      return {
+        autoInsights,
+        forecast,
+        defaultReply,
+      };
+    },
+    {
+      enabled: aiTasksContext.length > 0,
+      staleTime: 30_000,
+      onSuccess: (result) => {
+        setAiActionReply(result.defaultReply);
+      },
+      onError: () => {
+        setAiActionReply(null);
+      },
+    },
+  );
+
+  const aiAutoInsights = aiDashboardData?.autoInsights || null;
+  const aiForecast = aiDashboardData?.forecast || null;
+  const aiError = useMemo(() => {
+    if (aiTasksContext.length === 0) {
+      return "No tasks available for AI dashboard analysis.";
     }
-  };
+    if (aiDashboardError) {
+      return "AI insights unavailable right now.";
+    }
+    return "";
+  }, [aiDashboardError, aiTasksContext.length]);
 
   const runAiAction = async (prompt: string) => {
     if (!aiTasksContext.length) return;
@@ -223,11 +237,7 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchOverview();
-  }, []);
-
-  if (loading) {
+  if (dashboardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <RingLoader size="lg" />
@@ -241,7 +251,12 @@ export default function Dashboard() {
         <DashboardHeader
           overview={overview}
           onOpenTasks={() => navigate("/tasks")}
-          onRefresh={fetchOverview}
+          onRefresh={async () => {
+            const refreshed = await refetchDashboard();
+            if ((refreshed.data?.aiTasksContext || []).length > 0) {
+              await refetchAiDashboard();
+            }
+          }}
         />
 
         <DashboardStatsGrid overview={overview} />

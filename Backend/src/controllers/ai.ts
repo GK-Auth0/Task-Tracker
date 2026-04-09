@@ -19,6 +19,15 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
       | "concise"
       | "balanced"
       | "detailed";
+    const history = Array.isArray(req.body?.history)
+      ? req.body.history
+          .map((item: any) => ({
+            role: item?.role === "assistant" ? "assistant" : "user",
+            text: String(item?.text || "").trim(),
+          }))
+          .filter((item: { role: "user" | "assistant"; text: string }) => item.text)
+          .slice(-8)
+      : [];
 
     if (!message) {
       return res.status(400).json({
@@ -34,6 +43,9 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
       });
     }
 
+    const routeProjectMatch = routeContext.match(/^\/projects\/([^/?#]+)/);
+    const routeProjectId = routeProjectMatch?.[1] || "";
+
     const [taskRows, membershipRows, ownedRows] = await Promise.all([
       Task.findAll({
         where: {
@@ -42,6 +54,7 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
         attributes: [
           "id",
           "title",
+          "description",
           "status",
           "priority",
           "due_date",
@@ -66,22 +79,54 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
     ownedRows.forEach((row) => projectIdSet.add(row.id));
 
     const projectIds = Array.from(projectIdSet);
+    const hasRouteProjectAccess = routeProjectId && projectIdSet.has(routeProjectId);
     const projectRows =
       projectIds.length > 0
         ? await Project.findAll({
             where: { id: { [Op.in]: projectIds } },
-            attributes: ["id", "name", "status", "priority", "updated_at"],
+            attributes: ["id", "name", "description", "status", "priority", "updated_at"],
             order: [["updated_at", "DESC"]],
             limit: 30,
           })
         : [];
 
+    const routeTaskRows =
+      hasRouteProjectAccess
+        ? await Task.findAll({
+            where: { project_id: routeProjectId },
+            attributes: [
+              "id",
+              "title",
+              "description",
+              "status",
+              "priority",
+              "due_date",
+              "project_id",
+              "updated_at",
+            ],
+            order: [["updated_at", "DESC"]],
+            limit: 25,
+          })
+        : [];
+
+    const routeProject = hasRouteProjectAccess
+      ? projectRows.find((project) => project.id === routeProjectId) || null
+      : null;
+
+    const mergedTaskMap = new Map<string, any>();
+    [...routeTaskRows, ...taskRows].forEach((task) => {
+      if (!mergedTaskMap.has(task.id)) {
+        mergedTaskMap.set(task.id, task);
+      }
+    });
+    const mergedTasks = Array.from(mergedTaskMap.values());
+
     const taskSummary = {
-      total: taskRows.length,
-      done: taskRows.filter((t) => t.status === "Done").length,
-      inProgress: taskRows.filter((t) => t.status === "In Progress").length,
-      todo: taskRows.filter((t) => t.status === "To Do").length,
-      highPriorityOpen: taskRows.filter(
+      total: mergedTasks.length,
+      done: mergedTasks.filter((t) => t.status === "Done").length,
+      inProgress: mergedTasks.filter((t) => t.status === "In Progress").length,
+      todo: mergedTasks.filter((t) => t.status === "To Do").length,
+      highPriorityOpen: mergedTasks.filter(
         (t) => t.priority === "High" && t.status !== "Done",
       ).length,
     };
@@ -94,17 +139,57 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
       projects: projectRows.slice(0, 12).map((p) => ({
         id: p.id,
         name: p.name,
+        description: p.description,
         status: p.status,
         priority: p.priority,
       })),
-      recentTasks: taskRows.slice(0, 20).map((t) => ({
+      recentTasks: mergedTasks.slice(0, 24).map((t) => ({
         id: t.id,
         title: t.title,
+        description: t.description,
         status: t.status,
         priority: t.priority,
         due_date: t.due_date,
         project_id: t.project_id,
+        project_name:
+          projectRows.find((project) => project.id === t.project_id)?.name || undefined,
       })),
+      knowledge: [
+        ...projectRows.slice(0, 12).map((project) => ({
+          id: `project:${project.id}`,
+          type: "project",
+          title: project.name,
+          content: String(project.description || "").trim(),
+          metadata: {
+            status: project.status,
+            priority: project.priority,
+          },
+        })),
+        ...mergedTasks
+          .slice(0, 24)
+          .map((task) => ({
+            id: `task:${task.id}`,
+            type: "task",
+            title: task.title,
+            content: String(task.description || "").trim(),
+            metadata: {
+              status: task.status,
+              priority: task.priority,
+              due_date: task.due_date,
+              project_name:
+                projectRows.find((project) => project.id === task.project_id)?.name || undefined,
+            },
+          })),
+      ].filter((item) => item.content),
+      routeProject: routeProject
+        ? {
+            id: routeProject.id,
+            name: routeProject.name,
+            description: routeProject.description,
+            status: routeProject.status,
+            priority: routeProject.priority,
+          }
+        : null,
     };
 
     const replyBody = await getAiAssistantReply(
@@ -112,14 +197,16 @@ export const chatWithAssistant = async (req: Request, res: Response) => {
       routeContext,
       userContext,
       responseMode,
+      history,
     );
-    const contextSnapshot = `Context Snapshot: ${taskSummary.total} tasks (${taskSummary.done} done, ${taskSummary.inProgress} in progress, ${taskSummary.todo} to do), ${taskSummary.highPriorityOpen} high-priority open, ${projectRows.length} projects.`;
-    const reply = `${contextSnapshot}\n\n${replyBody}`;
+    const defaultContextSnapshot = `Context Snapshot: ${taskSummary.total} tasks (${taskSummary.done} done, ${taskSummary.inProgress} in progress, ${taskSummary.todo} to do), ${taskSummary.highPriorityOpen} high-priority open, ${projectRows.length} projects.`;
     return res.status(200).json({
       success: true,
       data: {
-        reply,
-        contextSnapshot,
+        reply: replyBody.reply,
+        contextSnapshot: replyBody.contextSnapshot || defaultContextSnapshot,
+        quickActions: replyBody.quickActions || [],
+        provider: replyBody.provider || "unknown",
       },
     });
   } catch (error) {

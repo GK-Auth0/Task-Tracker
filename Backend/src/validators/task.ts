@@ -1,3 +1,18 @@
+import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
+
+const normalizeTaskPriority = (value: unknown) => {
+  if (typeof value !== "string") return value;
+
+  const normalized = value.trim().toLowerCase();
+  const priorityMap: Record<string, TaskPriority> = {
+    low: TaskPriority.LOW,
+    medium: TaskPriority.MEDIUM,
+    high: TaskPriority.HIGH,
+  };
+
+  return priorityMap[normalized] ?? value;
+};
+
 export const createTaskSchema = {
   title: {
     notEmpty: {
@@ -21,38 +36,27 @@ export const createTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [["To Do", "In Progress", "Done"]],
-      errorMessage: "Status must be one of: To Do, In Progress, Done",
+      options: [Object.values(TaskStatus)],
+      errorMessage: `Status must be one of: ${Object.values(TaskStatus).join(', ')}`,
     },
   },
   priority: {
-    optional: true,
-
-    // 1. Validate first (strict check)
-    custom: {
-      options: (value: unknown) => {
-        if (value == null) return true;
-
-        return ["Low", "Medium", "High"].includes(String(value));
-      },
-      errorMessage: "Priority must be one of: Low, Medium, High",
-    },
-
-    // 2. Sanitize (normalize input)
     customSanitizer: {
-      options: (value: unknown) => {
-        if (value == null) return value;
-
-        const normalized = String(value).trim().toLowerCase();
-
-        const map: Record<string, string> = {
-          low: "Low",
-          medium: "Medium",
-          high: "High",
-        };
-
-        return map[normalized] ?? value;
-      },
+      options: normalizeTaskPriority,
+    },
+    notEmpty: {
+      errorMessage: "Priority is required",
+    },
+    isIn: {
+      options: [Object.values(TaskPriority)],
+      errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
+    },
+  },
+  issue_type: {
+    optional: true,
+    isIn: {
+      options: [Object.values(TaskIssueType)],
+      errorMessage: `Issue type must be one of: ${Object.values(TaskIssueType).join(", ")}`,
     },
   },
   project_id: {
@@ -67,6 +71,18 @@ export const createTaskSchema = {
     optional: true,
     isUUID: {
       errorMessage: "Assignee ID must be a valid UUID",
+    },
+  },
+  defect_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Defect ID must be a valid UUID",
+    },
+  },
+  sprint_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Sprint ID must be a valid UUID",
     },
   },
   due_date: {
@@ -119,44 +135,43 @@ export const updateTaskSchema = {
   status: {
     optional: true,
     isIn: {
-      options: [["To Do", "In Progress", "Done"]],
-      errorMessage: "Status must be one of: To Do, In Progress, Done",
+      options: [Object.values(TaskStatus)],
+      errorMessage: `Status must be one of: ${Object.values(TaskStatus).join(', ')}`,
     },
   },
   priority: {
     optional: true,
-
-    // 1. Validate first (strict check)
-    custom: {
-      options: (value: unknown) => {
-        if (value == null) return true;
-
-        return ["Low", "Medium", "High"].includes(String(value));
-      },
-      errorMessage: "Priority must be one of: Low, Medium, High",
-    },
-
-    // 2. Sanitize (normalize input)
     customSanitizer: {
-      options: (value: unknown) => {
-        if (value == null) return value;
-
-        const normalized = String(value).trim().toLowerCase();
-
-        const map: Record<string, string> = {
-          low: "Low",
-          medium: "Medium",
-          high: "High",
-        };
-
-        return map[normalized] ?? value;
-      },
+      options: normalizeTaskPriority,
+    },
+    isIn: {
+      options: [Object.values(TaskPriority)],
+      errorMessage: `Priority must be one of: ${Object.values(TaskPriority).join(', ')}`,
+    },
+  },
+  issue_type: {
+    optional: true,
+    isIn: {
+      options: [Object.values(TaskIssueType)],
+      errorMessage: `Issue type must be one of: ${Object.values(TaskIssueType).join(", ")}`,
     },
   },
   assignee_id: {
     optional: true,
     isUUID: {
       errorMessage: "Assignee ID must be a valid UUID",
+    },
+  },
+  defect_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Defect ID must be a valid UUID",
+    },
+  },
+  sprint_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Sprint ID must be a valid UUID",
     },
   },
   due_date: {
@@ -169,6 +184,48 @@ export const updateTaskSchema = {
         return Number.isFinite(time);
       },
       errorMessage: "Due date must be a valid ISO 8601 date",
+    },
+  },
+};
+
+export const createSubtaskSchema = {
+  title: {
+    notEmpty: {
+      errorMessage: "Subtask title is required",
+    },
+    trim: true,
+    isLength: {
+      options: { min: 2, max: 255 },
+      errorMessage: "Subtask title must be between 2 and 255 characters",
+    },
+  },
+  assignee_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Assignee ID must be a valid UUID",
+    },
+  },
+};
+
+export const updateSubtaskSchema = {
+  title: {
+    optional: true,
+    trim: true,
+    isLength: {
+      options: { min: 2, max: 255 },
+      errorMessage: "Subtask title must be between 2 and 255 characters",
+    },
+  },
+  is_completed: {
+    optional: true,
+    isBoolean: {
+      errorMessage: "is_completed must be a boolean",
+    },
+  },
+  assignee_id: {
+    optional: true,
+    isUUID: {
+      errorMessage: "Assignee ID must be a valid UUID",
     },
   },
 };

@@ -1,35 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { tasksAPI, Task } from "../../services/dashboard";
-import { projectService } from "../../services/projectService";
-
-type SearchProject = {
-  id: string;
-  name: string;
-  description?: string;
-};
-
-const parseProjects = (payload: unknown): SearchProject[] => {
-  const direct = (payload as { data?: unknown })?.data;
-  if (Array.isArray(direct)) {
-    return direct.map((project: any) => ({
-      id: String(project?.id || ""),
-      name: String(project?.name || "Untitled Project"),
-      description: project?.description ? String(project.description) : undefined,
-    }));
-  }
-
-  const nested = (payload as { data?: { data?: unknown } })?.data?.data;
-  if (Array.isArray(nested)) {
-    return nested.map((project: any) => ({
-      id: String(project?.id || ""),
-      name: String(project?.name || "Untitled Project"),
-      description: project?.description ? String(project.description) : undefined,
-    }));
-  }
-
-  return [];
-};
+import {
+  searchAPI,
+  type GlobalSearchProject,
+  type GlobalSearchTask,
+} from "../../services/search";
 
 export default function GlobalSearch() {
   const navigate = useNavigate();
@@ -39,8 +14,8 @@ export default function GlobalSearch() {
 
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<SearchProject[]>([]);
+  const [tasks, setTasks] = useState<GlobalSearchTask[]>([]);
+  const [projects, setProjects] = useState<GlobalSearchProject[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -79,47 +54,33 @@ export default function GlobalSearch() {
       return;
     }
 
+    const controller = new AbortController();
+
     const timer = window.setTimeout(async () => {
       try {
         setLoading(true);
-        const [taskRes, projectRes] = await Promise.all([
-          tasksAPI.getTasks({ page: 1, limit: 80 }),
-          projectService.getProjects({ page: 1, limit: 80 }),
-        ]);
-
-        const filteredTasks = (taskRes.data || [])
-          .filter((task) => {
-            const title = String(task.title || "").toLowerCase();
-            const description = String(task.description || "").toLowerCase();
-            const projectName = String(task.project?.name || "").toLowerCase();
-            return (
-              title.includes(trimmed) ||
-              description.includes(trimmed) ||
-              projectName.includes(trimmed)
-            );
-          })
-          .slice(0, 5);
-
-        const filteredProjects = parseProjects(projectRes)
-          .filter((project) => {
-            const name = String(project.name || "").toLowerCase();
-            const description = String(project.description || "").toLowerCase();
-            return name.includes(trimmed) || description.includes(trimmed);
-          })
-          .slice(0, 5);
-
-        setTasks(filteredTasks);
-        setProjects(filteredProjects);
-        setOpen(true);
+        const response = await searchAPI.global(trimmed, 5, controller.signal);
+        if (!controller.signal.aborted && response.success) {
+          setTasks(response.data.tasks || []);
+          setProjects(response.data.projects || []);
+          setOpen(true);
+        }
       } catch (error) {
-        setTasks([]);
-        setProjects([]);
+        if (!controller.signal.aborted) {
+          setTasks([]);
+          setProjects([]);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }, 280);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [query]);
 
   const hasResults = useMemo(

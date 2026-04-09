@@ -12,9 +12,14 @@ import { API_BASE_URL } from "../config/api";
 import { projectsAPI, ActivityLog } from "../services/dashboard";
 import { projectService } from "../services/projectService";
 import { taskService } from "../services/taskService";
-import { Project } from "../types/project";
+import { sprintsAPI } from "../services/sprints";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { Project, ProjectConfidentialAccessConfig } from "../types/project";
 import { isWorkspaceAdmin } from "../types/roles";
 import { Task } from "../types/task";
+import { ProjectStatus, ProjectPriority } from "../enums";
+import type { Sprint } from "../types/sprint";
+import { TASK_STATUSES, isDoneTaskStatus } from "../utils/taskStatus";
 
 type ProjectTab = "tasks" | "roadmap" | "files" | "activity";
 
@@ -29,6 +34,7 @@ const ProjectDetail: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [roadmapTasksRaw, setRoadmapTasksRaw] = useState<Task[]>([]);
   const [files, setFiles] = useState<any[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
@@ -44,6 +50,20 @@ const ProjectDetail: React.FC = () => {
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [reviewingRequestId, setReviewingRequestId] = useState("");
+  const [confidentialConfig, setConfidentialConfig] =
+    useState<ProjectConfidentialAccessConfig | null>(null);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configError, setConfigError] = useState("");
+  const [configSearch, setConfigSearch] = useState("");
+  const [configSearchLoading, setConfigSearchLoading] = useState(false);
+  const [configUserOptions, setConfigUserOptions] = useState<
+    Array<{
+      id: string;
+      full_name: string;
+      email: string;
+      role: string;
+    }>
+  >([]);
 
   const [uploading, setUploading] = useState(false);
   const [searchingUsers, setSearchingUsers] = useState(false);
@@ -59,12 +79,15 @@ const ProjectDetail: React.FC = () => {
   const [managementMessage, setManagementMessage] = useState<string>("");
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [showConfidentialPanel, setShowConfidentialPanel] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const debouncedManagementSearch = useDebouncedValue(memberSearchQuery, 300);
+  const debouncedConfigSearch = useDebouncedValue(configSearch, 300);
 
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [offset, setOffset] = useState(0);
   const [roadmapQuery, setRoadmapQuery] = useState("");
   const [roadmapStatusFilter, setRoadmapStatusFilter] = useState<
-    "all" | "To Do" | "In Progress" | "Done"
+    "all" | (typeof TASK_STATUSES)[number]
   >("all");
   const [roadmapPriorityFilter, setRoadmapPriorityFilter] = useState<
     "all" | "high" | "medium" | "low"
@@ -85,6 +108,82 @@ const ProjectDetail: React.FC = () => {
       setActiveTab("tasks");
     }
   }, [project, activeTab]);
+
+  useEffect(() => {
+    const keyword = debouncedManagementSearch.trim();
+    if (!keyword) {
+      setSearchedUsers([]);
+      setSearchingUsers(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const searchUsers = async () => {
+      try {
+        setSearchingUsers(true);
+        const response = await projectService.getProjectUsers(
+          keyword,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setSearchedUsers(response.success ? response.data || [] : []);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setSearchedUsers([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setSearchingUsers(false);
+        }
+      }
+    };
+
+    searchUsers();
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedManagementSearch]);
+
+  useEffect(() => {
+    const keyword = debouncedConfigSearch.trim();
+    if (!keyword) {
+      setConfigUserOptions([]);
+      setConfigSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const searchConfigUsers = async () => {
+      try {
+        setConfigSearchLoading(true);
+        const response = await projectService.getProjectUsers(
+          keyword,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setConfigUserOptions(response.success ? response.data || [] : []);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setConfigUserOptions([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setConfigSearchLoading(false);
+        }
+      }
+    };
+
+    searchConfigUsers();
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedConfigSearch]);
 
   useEffect(() => {
     if (!id || !project) return;
@@ -118,6 +217,11 @@ const ProjectDetail: React.FC = () => {
       in_progress: "In Progress",
       inprogress: "In Progress",
       progress: "In Progress",
+      ready_for_qa: "Ready for QA",
+      readyforqa: "Ready for QA",
+      in_qa: "In QA",
+      inqa: "In QA",
+      blocked: "Blocked",
       done: "Done",
       completed: "Done",
     };
@@ -135,10 +239,14 @@ const ProjectDetail: React.FC = () => {
       description: task.description,
       status: statusMap[rawStatus] || "To Do",
       priority: priorityMap[rawPriority] || "medium",
+      issueType: task.issueType || task.issue_type || "Task",
       startDate: task.startDate || task.start_date,
       dueDate: task.dueDate || task.due_date,
+      sprintId: task.sprintId || task.sprint_id,
+      sprint: task.sprint || undefined,
       projectId: task.projectId || task.project_id,
       assigneeId: task.assigneeId || task.assignee_id,
+      subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
       createdAt: task.createdAt || task.created_at || new Date().toISOString(),
       updatedAt: task.updatedAt || task.updated_at || new Date().toISOString(),
     };
@@ -188,6 +296,25 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  const fetchConfidentialAccessConfig = async (projectId: string) => {
+    try {
+      setConfigError("");
+      const response = await projectService.getConfidentialAccessConfig(projectId);
+      if (response.success) {
+        setConfidentialConfig(response.data);
+      }
+    } catch (error: any) {
+      setConfidentialConfig({
+        access_scope: "specific_users",
+        allowed_user_ids: [],
+        allowed_users: [],
+      });
+      setConfigError(
+        error?.response?.data?.message || "Failed to load confidential access config.",
+      );
+    }
+  };
+
   const fetchProjectData = async () => {
     if (!id) return;
 
@@ -204,6 +331,11 @@ const ProjectDetail: React.FC = () => {
 
       const loadedProject = projectResponse.data;
       setProject(loadedProject);
+      const sprintResponse = await sprintsAPI.getSprints({ project_id: id });
+      if (sprintResponse.success) {
+        setSprints(sprintResponse.data);
+      }
+      setConfidentialConfig(loadedProject.confidential_access?.config || null);
 
       await fetchTaskData(id);
 
@@ -218,6 +350,9 @@ const ProjectDetail: React.FC = () => {
         if (canReview) {
           await fetchConfidentialAccessRequests();
         }
+        if (isWorkspaceAdmin(user.role)) {
+          await fetchConfidentialAccessConfig(id);
+        }
       }
     } catch {
       setProject(null);
@@ -225,6 +360,7 @@ const ProjectDetail: React.FC = () => {
       setRoadmapTasksRaw([]);
       setFiles([]);
       setActivityLogs([]);
+      setConfidentialConfig(null);
     } finally {
       setLoading(false);
     }
@@ -255,17 +391,17 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = async (newStatus: string) => {
+  const handleStatusUpdate = async (newStatus: ProjectStatus) => {
     if (!project) return;
     try {
       await projectService.updateProject(project.id, {
-        status: newStatus as "planning" | "active" | "on_hold" | "completed" | "cancelled",
+        status: newStatus,
       });
       setProject((prev) =>
         prev
           ? {
               ...prev,
-              status: newStatus as "planning" | "active" | "on_hold" | "completed" | "cancelled",
+              status: newStatus,
             }
           : prev,
       );
@@ -314,9 +450,7 @@ const ProjectDetail: React.FC = () => {
 
       const response = await fetch(`${API_BASE_URL}/api/projects/${project.id}/files/upload`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        credentials: "include",
         body: formData,
       });
 
@@ -335,21 +469,97 @@ const ProjectDetail: React.FC = () => {
     setActiveTab(tab);
   };
 
-  const handleSearchUsers = async (query: string) => {
-    const keyword = query.trim();
-    if (!keyword) {
+  const handleSearchUsers = (query: string) => {
+    setMemberSearchQuery(query);
+    if (!query.trim()) {
       setSearchedUsers([]);
-      return;
+      setSearchingUsers(false);
     }
+  };
+
+  const handleConfigSearch = (query: string) => {
+    setConfigSearch(query);
+    if (!query.trim()) {
+      setConfigUserOptions([]);
+      setConfigSearchLoading(false);
+    }
+  };
+
+  const handleConfigScopeChange = (access_scope: "specific_users" | "organization") => {
+    setConfigError("");
+    setConfidentialConfig((prev) => ({
+      access_scope,
+      allowed_user_ids:
+        access_scope === "organization" ? [] : prev?.allowed_user_ids || [],
+      allowed_users:
+        access_scope === "organization" ? [] : prev?.allowed_users || [],
+      updated_at: prev?.updated_at || null,
+    }));
+  };
+
+  const handleToggleAllowedUser = (selectedUser: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  }) => {
+    setConfigError("");
+    setConfidentialConfig((prev) => {
+      const base = prev || {
+        access_scope: "specific_users" as const,
+        allowed_user_ids: [],
+        allowed_users: [],
+        updated_at: null,
+      };
+      const exists = base.allowed_user_ids.includes(selectedUser.id);
+      return {
+        ...base,
+        access_scope: "specific_users",
+        allowed_user_ids: exists
+          ? base.allowed_user_ids.filter((userId) => userId !== selectedUser.id)
+          : [...base.allowed_user_ids, selectedUser.id],
+        allowed_users: exists
+          ? base.allowed_users.filter((user) => user.id !== selectedUser.id)
+          : [...base.allowed_users, selectedUser],
+      };
+    });
+  };
+
+  const handleRemoveAllowedUser = (userId: string) => {
+    setConfigError("");
+    setConfidentialConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        allowed_user_ids: prev.allowed_user_ids.filter((value) => value !== userId),
+        allowed_users: prev.allowed_users.filter((user) => user.id !== userId),
+      };
+    });
+  };
+
+  const handleSaveConfidentialConfig = async () => {
+    if (!project || !confidentialConfig) return;
 
     try {
-      setSearchingUsers(true);
-      const response = await projectService.getProjectUsers(keyword);
-      setSearchedUsers(response.success ? response.data || [] : []);
-    } catch {
-      setSearchedUsers([]);
+      setConfigSaving(true);
+      setConfigError("");
+      const response = await projectService.updateConfidentialAccessConfig(project.id, {
+        access_scope: confidentialConfig.access_scope,
+        allowed_user_ids:
+          confidentialConfig.access_scope === "organization"
+            ? []
+            : confidentialConfig.allowed_user_ids,
+      });
+      if (response.success) {
+        setConfidentialConfig(response.data);
+        await fetchProjectData();
+      }
+    } catch (error: any) {
+      setConfigError(
+        error?.response?.data?.message || "Failed to save confidential access config.",
+      );
     } finally {
-      setSearchingUsers(false);
+      setConfigSaving(false);
     }
   };
 
@@ -383,7 +593,7 @@ const ProjectDetail: React.FC = () => {
   const handleProjectUpdate = async (payload: {
     name: string;
     description: string;
-    priority: "low" | "medium" | "high";
+    priority: ProjectPriority;
     startDate?: string;
     endDate?: string;
   }) => {
@@ -468,7 +678,7 @@ const ProjectDetail: React.FC = () => {
         roadmapStatusFilter === "all" || task.status === roadmapStatusFilter;
       const matchesPriority =
         roadmapPriorityFilter === "all" || task.priority === roadmapPriorityFilter;
-      const matchesDone = !roadmapHideCompleted || task.status !== "Done";
+      const matchesDone = !roadmapHideCompleted || !isDoneTaskStatus(task.status);
       return matchesQuery && matchesStatus && matchesPriority && matchesDone;
     });
   }, [
@@ -485,13 +695,13 @@ const ProjectDetail: React.FC = () => {
     thisWeekEnd.setDate(now.getDate() + 7);
     thisWeekEnd.setHours(23, 59, 59, 999);
 
-    const done = filteredRoadmapTasks.filter((task) => task.status === "Done").length;
+    const done = filteredRoadmapTasks.filter((task) => isDoneTaskStatus(task.status)).length;
     const overdue = filteredRoadmapTasks.filter((task) => {
-      if (!task.dueDate || task.status === "Done") return false;
+      if (!task.dueDate || isDoneTaskStatus(task.status)) return false;
       return new Date(task.dueDate) < now;
     }).length;
     const dueThisWeek = filteredRoadmapTasks.filter((task) => {
-      if (!task.dueDate || task.status === "Done") return false;
+      if (!task.dueDate || isDoneTaskStatus(task.status)) return false;
       const due = new Date(task.dueDate);
       return due >= now && due <= thisWeekEnd;
     }).length;
@@ -529,7 +739,7 @@ const ProjectDetail: React.FC = () => {
       }
 
       const date = new Date(task.dueDate || task.startDate || task.createdAt);
-      if (task.status !== "Done" && date < todayStart) {
+      if (!isDoneTaskStatus(task.status) && date < todayStart) {
         groups[0].tasks.push(task);
       } else if (date >= todayStart && date <= todayEnd) {
         groups[1].tasks.push(task);
@@ -592,6 +802,7 @@ const ProjectDetail: React.FC = () => {
           isOwnerOrAdmin={isOwnerOrAdmin}
           onStatusChange={handleStatusUpdate}
           onCreateTask={() => setShowCreateTaskModal(true)}
+          sprintLabel={sprints[0]?.name}
         />
 
         <ProjectTabNav
@@ -639,6 +850,7 @@ const ProjectDetail: React.FC = () => {
         {showConfidentialPanel && (
           <ProjectConfidentialAccessPanel
             canViewConfidential={canViewConfidential}
+            hasAdminAccess={Boolean(user && isWorkspaceAdmin(user.role))}
             requestStatus={requestStatus}
             requestReason={requestReason}
             submitting={requestSubmitting}
@@ -648,6 +860,24 @@ const ProjectDetail: React.FC = () => {
             reviewItems={accessRequests}
             reviewing={reviewingRequestId}
             onReview={reviewConfidentialRequest}
+            canManageConfig={false}
+            config={
+              confidentialConfig || {
+                access_scope: "specific_users",
+                allowed_user_ids: [],
+                allowed_users: [],
+              }
+            }
+            configSaving={configSaving}
+            configError={configError}
+            configSearch={configSearch}
+            configSearchLoading={configSearchLoading}
+            configUserOptions={configUserOptions}
+            onConfigSearchChange={handleConfigSearch}
+            onConfigScopeChange={handleConfigScopeChange}
+            onToggleAllowedUser={handleToggleAllowedUser}
+            onRemoveAllowedUser={handleRemoveAllowedUser}
+            onSaveConfig={handleSaveConfidentialConfig}
           />
         )}
 
@@ -771,15 +1001,18 @@ const ProjectDetail: React.FC = () => {
                   value={roadmapStatusFilter}
                   onChange={(event) =>
                     setRoadmapStatusFilter(
-                      event.target.value as "all" | "To Do" | "In Progress" | "Done",
+                      event.target.value as "all" | (typeof TASK_STATUSES)[number],
                     )
                   }
+                  aria-label="Filter roadmap tasks by status"
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
                   <option value="all">All status</option>
-                  <option value="To Do">To Do</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Done">Done</option>
+                  {TASK_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={roadmapPriorityFilter}
@@ -788,6 +1021,7 @@ const ProjectDetail: React.FC = () => {
                       event.target.value as "all" | "high" | "medium" | "low",
                     )
                   }
+                  aria-label="Filter roadmap tasks by priority"
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
                   <option value="all">All priority</option>

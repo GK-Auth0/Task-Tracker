@@ -3,6 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { exchangeAuth0CodeForAccessToken, isAuth0Visible } from "../config/auth0";
 
+const getPostAuthPath = (onboardingRequired: boolean) =>
+  onboardingRequired ? "/organization/onboarding" : "/dashboard";
+
 export default function AuthCallback() {
   const { loginWithAuth0 } = useAuth();
   const navigate = useNavigate();
@@ -16,8 +19,8 @@ export default function AuthCallback() {
           throw new Error("Auth0 sign-in is disabled.");
         }
         const { accessToken } = await exchangeAuth0CodeForAccessToken();
-        await loginWithAuth0(accessToken);
-        navigate("/dashboard", { replace: true });
+        const user = await loginWithAuth0(accessToken);
+        navigate(getPostAuthPath(user.onboardingRequired), { replace: true });
       } catch (err: any) {
         setError(err?.message || "Failed to complete Auth0 login");
       } finally {

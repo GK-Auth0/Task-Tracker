@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "react-query";
 import {
   ActivityLog as AuditActivityLog,
   auditLogsAPI,
@@ -67,44 +68,39 @@ function asValidDate(input?: string | Date | null): Date | null {
 }
 
 const ActivityLog: React.FC = () => {
-  const [logs, setLogs] = useState<AuditActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   useEffect(() => {
-    fetchActivities();
-  }, []);
-
-  useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [filters]);
 
-  const fetchActivities = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const {
+    data: logs = [],
+    isLoading: loading,
+    error,
+    refetch: refetchActivities,
+  } = useQuery<AuditActivityLog[]>(
+    ["activity-logs"],
+    async () => {
       const response = await auditLogsAPI.getActivityLogs({ limit: 500 });
-      if (response.success && response.data) {
-        const sorted = [...response.data].sort(
-          (a, b) => getLogDate(b).getTime() - getLogDate(a).getTime(),
-        );
-        setLogs(sorted);
-      } else {
-        setLogs([]);
+      if (!response.success || !response.data) {
+        return [];
       }
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to load activity logs. Please try again.",
+      return [...response.data].sort(
+        (a, b) => getLogDate(b).getTime() - getLogDate(a).getTime(),
       );
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    {
+      staleTime: 30_000,
+    },
+  );
+
+  const errorMessage =
+    (error as any)?.response?.data?.message ||
+    (error as Error | null)?.message ||
+    null;
 
   const handleFilterChange = <K extends keyof FiltersState>(
     key: K,
@@ -271,6 +267,7 @@ const ActivityLog: React.FC = () => {
               <div className="flex gap-2">
                 <select
                   value={filters.sortBy}
+                  aria-label="Sort activities"
                   onChange={(e) =>
                     handleFilterChange("sortBy", e.target.value as FiltersState["sortBy"])
                   }
@@ -280,7 +277,7 @@ const ActivityLog: React.FC = () => {
                   <option value="oldest">Oldest first</option>
                 </select>
                 <button
-                  onClick={fetchActivities}
+                  onClick={() => void refetchActivities()}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700"
                 >
                   Refresh
@@ -294,11 +291,11 @@ const ActivityLog: React.FC = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
               <p className="text-slate-500 mt-2">Loading activity...</p>
             </div>
-          ) : error ? (
+          ) : errorMessage ? (
             <div className="text-center py-10">
-              <p className="text-red-500">{error}</p>
+              <p className="text-red-500">{errorMessage || "Failed to load activity logs. Please try again."}</p>
               <button
-                onClick={fetchActivities}
+                onClick={() => void refetchActivities()}
                 className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700"
               >
                 Retry
@@ -366,7 +363,12 @@ const ActivityLog: React.FC = () => {
 };
 
 function getLogDate(log: AuditActivityLog): Date {
-  return asValidDate(log.created_at) || new Date();
+  return (
+    asValidDate(log.created_at) ||
+    asValidDate(log.changes?.timestamp) ||
+    asValidDate(log.changes?.action_time) ||
+    new Date()
+  );
 }
 
 function isCommentLike(log: AuditActivityLog): boolean {
@@ -747,6 +749,7 @@ function ActivityFiltersPanel({
         <p className="mb-4 text-xs font-bold uppercase text-slate-400">Date Period</p>
         <select
           value={filters.dateRange}
+          aria-label="Filter Activites"
           onChange={(e) =>
             onFilterChange(
               "dateRange",

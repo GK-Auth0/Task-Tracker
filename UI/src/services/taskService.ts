@@ -2,22 +2,18 @@ import axios from "axios";
 import { Task, CreateTaskRequest, TasksResponse } from "../types/task";
 
 import { API_BASE_URL } from "../config/api";
+import { applyAuthInterceptors } from "./auth";
+import { normalizeTaskPriority } from "../utils/normalizeTaskPriority";
 
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const api = applyAuthInterceptors(
+  axios.create({
+    baseURL: `${API_BASE_URL}/api/v1`,
+    withCredentials: true,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  }),
+);
 
 export const taskService = {
   // Get all tasks
@@ -52,7 +48,14 @@ export const taskService = {
   createTask: async (
     data: CreateTaskRequest,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.post("/tasks", data);
+    const response = await api.post("/tasks", {
+      ...data,
+      ...(data.priority
+        ? { priority: normalizeTaskPriority(data.priority) || data.priority }
+        : {}),
+      ...(data.defectId ? { defect_id: data.defectId } : {}),
+      ...(data.sprintId ? { sprint_id: data.sprintId } : {}),
+    });
     return response.data;
   },
 
@@ -61,7 +64,14 @@ export const taskService = {
     id: string,
     data: Partial<CreateTaskRequest>,
   ): Promise<{ success: boolean; data: Task }> => {
-    const response = await api.put(`/tasks/${id}`, data);
+    const response = await api.put(`/tasks/${id}`, {
+      ...data,
+      ...(data.priority
+        ? { priority: normalizeTaskPriority(data.priority) || data.priority }
+        : {}),
+      ...(data.defectId !== undefined ? { defect_id: data.defectId } : {}),
+      ...(data.sprintId !== undefined ? { sprint_id: data.sprintId } : {}),
+    });
     return response.data;
   },
 

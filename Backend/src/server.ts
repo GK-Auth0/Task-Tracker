@@ -6,6 +6,20 @@ import { handleChatUpgrade } from "./realtime/chatSocket";
 
 let isShuttingDown = false;
 
+const getPublicBaseUrl = () => {
+  const configuredUrl =
+    process.env.BACKEND_PUBLIC_URL ||
+    process.env.API_BASE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    process.env.PUBLIC_URL;
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  return `http://localhost:${appConfig.port}`;
+};
+
 const registerProcessGuards = (server: http.Server) => {
   const gracefulShutdown = async (signal: string) => {
     if (isShuttingDown) return;
@@ -58,10 +72,13 @@ const startServer = async () => {
     registerProcessGuards(server);
 
     server.listen(appConfig.port, () => {
+      const publicBaseUrl = getPublicBaseUrl();
+      const websocketBaseUrl = publicBaseUrl.replace(/^http/, "ws");
+
       console.log(`Server running on port ${appConfig.port}`);
       console.log(`Environment: ${appConfig.env}`);
-      console.log(`Swagger docs: http://localhost:${appConfig.port}/api-docs`);
-      console.log(`Chat websocket: ws://localhost:${appConfig.port}/ws/chat`);
+      console.log(`API docs: ${publicBaseUrl}/api-docs`);
+      console.log(`Chat websocket: ${websocketBaseUrl}/ws/chat`);
     });
   } catch (error) {
     console.error("Unable to start server:", error);
