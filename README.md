@@ -1,168 +1,209 @@
 # Task Tracker
 
-Task Tracker is a full-stack project and task management platform with role-based access control, confidentiality workflows, and AI-assisted planning.
+Task Tracker is a multi-service project management platform with:
 
-This is the **main repository README**. Detailed setup and service-specific instructions are documented in module READMEs.
+- **Backend API** (Node.js + TypeScript + Express + PostgreSQL)
+- **Frontend Web App** (React + TypeScript + Vite + Tailwind)
+- **Database migrations/seeding** (Flyway + PostgreSQL)
+- **AI Assistant service** (Python HTTP service with rule-based + optional Gemini support)
 
-## Repository Map
+---
+
+## Repository Structure
 
 ```text
 Task-Tracker/
-├── Backend/     # API server (Node.js + TypeScript + Express)
-├── UI/          # Frontend app (React + TypeScript + Vite)
-├── DB/          # Flyway migrations + seeds
-├── AI/          # AI service
-└── README.md    # Main project overview (this file)
+├── Backend/     # REST API, auth, task/project logic
+├── UI/          # React frontend
+├── DB/          # PostgreSQL + Flyway migrations/seeds
+├── AI/          # Separate Python AI assistant service
+├── render.yaml  # Render blueprint for all services
+└── README.md
 ```
 
-## Module Documentation
+---
 
-- Backend setup and API runtime: [Backend/README.md](Backend/README.md)
-- Frontend setup and UI runtime: [UI/README.md](UI/README.md)
-- Database and migration setup: [DB/README.md](DB/README.md)
-- AI service setup and endpoints: [AI/README.md](AI/README.md)
+## What You Get
 
-## Highlights
+### Core product capabilities
+- Authentication (email/password, OTP flows, Auth0 support in backend APIs)
+- Role-based access (Admin, Member, Viewer)
+- Task management (status, priority, assignee, due dates)
+- Project management (members, files, activity, confidential access requests)
+- AI-assisted productivity features (chat + planning endpoints)
 
-### Authentication and Security
-- JWT authentication
-- Auth0 login support
-- OTP verification and password reset flows
-- Role-based authorization (`Admin`, `Member`, `Viewer`)
+### Deployment-ready layout
+- Independent deploy targets for API, UI, and AI service
+- Render blueprint (`render.yaml`) for reproducible cloud setup
+- Dockerized DB + migration workflow
 
-### Task Workspace
-- Task CRUD with assignee and due date support
-- Status lifecycle: `To Do`, `In Progress`, `Done`
-- Priority lifecycle: `Low`, `Medium`, `High`
-- Multi-tab task interface:
-  - `Overview`
-  - `Board`
-  - `Timeline`
-  - `AI Planner`
-- Saved views and pinned tasks
+---
 
-### Project Workspace
-- Project CRUD with ownership and members
-- Member role management (`owner`, `admin`, `member`, `viewer`)
-- Project detail tabs:
-  - Tasks
-  - Roadmap
-  - Files
-  - Activity
-- Project file uploads
-- Project activity logs
+## Prerequisites
 
-### Confidential Access Workflow
-- Confidential project details can be restricted
-- Members can request confidential access with reason
-- Owner/admin review flow (approve/reject)
-- Request state tracking (`none`, `pending`, `approved`, `rejected`)
+Install these locally before running the full stack:
 
-### AI Capabilities
-- AI chat endpoint (`/api/ai/chat`)
-- AI day planner integrated in Tasks page
-- AI assistant widget in application layout
+- **Node.js 18+**
+- **Yarn**
+- **Python 3.10+** (for `AI/` service)
+- **Docker + Docker Compose** (for PostgreSQL + Flyway migrations)
 
-## Role Permissions Matrix
+---
 
-| Capability | Admin | Member | Viewer |
-|---|---|---|---|
-| Login and access app | Yes | Yes | Yes |
-| View tasks/projects they can access | Yes | Yes | Yes |
-| Create tasks | Yes | Yes | No |
-| Update task details/status | Yes | Yes | No |
-| Delete tasks | Yes | Yes | No |
-| Create projects | Yes | Yes | No |
-| Update project details (owner/admin in project) | Yes | Yes | No |
-| Manage project members (owner/admin in project) | Yes | Yes | No |
-| Request confidential access | Yes | Yes | Yes |
-| Review confidential access requests | Yes | Owner/Admin only | No |
-| Delete project | Yes | Owner only | No |
+## Quick Start (Local Development)
 
-## Quick Start (Top-Level)
+> Recommended: run each service in its own terminal.
 
-### 1) Clone
+### 1) Start database + run migrations
 
 ```bash
-git clone <repository-url>
-cd Task-Tracker
+cd DB
+docker-compose up -d postgres
+docker-compose up migrator
 ```
 
-### 2) Environment
+Database defaults from `DB/docker-compose.yml`:
+- Host: `localhost`
+- Port: `5432`
+- DB: `task_tracker`
+- User: `postgres`
+- Password: `password`
+
+### 2) Start backend API
 
 ```bash
+cd Backend
+yarn install
+cp config/env/.env.example config/env/.env
+yarn dev
+```
+
+Backend default URL: `http://localhost:3000`
+
+Useful health/docs endpoints:
+- `GET /health`
+- `GET /ready`
+- Swagger: `http://localhost:3000/api-docs`
+
+### 3) Start AI service
+
+```bash
+cd AI
+pip install -r requirements.txt
+python3 assistant_server.py
+```
+
+AI default URL: `http://127.0.0.1:8787`
+
+### 4) Start frontend
+
+```bash
+cd UI
+yarn install
 cp .env.example .env
+yarn dev
 ```
 
-### 3) Run with Docker
+Frontend default URL: `http://localhost:3001`
 
-```bash
-docker-compose up -d
-docker-compose logs -f
-```
+---
 
-## Service URLs (Default)
+## Environment Variables (high-level)
 
-- Frontend: `http://localhost:3001`
-- Backend API: `http://localhost:3000`
-- Swagger docs: `http://localhost:3000/api-docs`
-- PostgreSQL: `localhost:5433`
+### Backend (`Backend/config/env/.env`)
+Common required values:
 
-## Primary API Surface
+- `PORT=3000`
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `JWT_SECRET`, `JWT_EXPIRES_IN`
+- AI provider values (`AI_PROVIDER`, and optionally Gemini/Ollama settings)
 
-### Auth
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/auth0`
-- `POST /api/auth/verify-otp`
-- `POST /api/auth/resend-otp`
-- `POST /api/auth/forgot-password`
-- `POST /api/auth/reset-password`
-- `GET /api/auth/me`
+### Frontend (`UI/.env`)
 
-### Tasks
-- `GET /api/tasks`
-- `POST /api/tasks`
-- `GET /api/tasks/:id`
-- `PATCH /api/tasks/:id`
-- `DELETE /api/tasks/:id`
-- `GET /api/tasks/:id/activity`
-- `GET /api/tasks/:id/pull-requests`
-- `GET /api/tasks/:id/commits`
+- `VITE_API_BASE_URL=http://localhost:3000`
+- `VITE_WS_BASE_URL=ws://localhost:3000`
+- `VITE_AI_ASSISTANT_URL=http://127.0.0.1:8787`
+- `VITE_AI_API_KEY=` (optional)
 
-### Projects
-- `GET /api/projects`
-- `POST /api/projects`
-- `GET /api/projects/:id`
-- `PUT /api/projects/:id`
-- `DELETE /api/projects/:id`
-- `GET /api/projects/:id/stats`
-- `GET /api/projects/:id/roadmap`
-- `GET /api/projects/:id/files`
-- `POST /api/projects/:id/files/upload`
-- `GET /api/projects/:id/activity`
-- `GET /api/projects/users`
-- `POST /api/projects/:id/members`
-- `PUT /api/projects/:id/members/:userId`
-- `DELETE /api/projects/:id/members/:userId`
-- `POST /api/projects/:id/confidential-access/request`
-- `GET /api/projects/:id/confidential-access/requests`
-- `PATCH /api/projects/:id/confidential-access/requests/:requestId`
+### AI service (optional)
 
-### AI
-- `POST /api/ai/chat`
+- `AI_ASSISTANT_HOST`, `AI_ASSISTANT_PORT` / `PORT`
+- `AI_ALLOWED_ORIGINS`
+- `AI_API_KEY` (if you want protected POST endpoints)
+- `AI_CHAT_PROVIDER` + optional Gemini keys/config
 
-## Seed Users (Development)
+For complete service-specific configuration, see each module README.
 
-| Email | Password | Role |
-|---|---|---|
-| giri.gk@company.com | password123 | Admin |
-| giridharan.gk@company.com | password123 | Member |
+---
+
+## Service Documentation
+
+- Backend details: [`Backend/README.md`](Backend/README.md)
+- Frontend details: [`UI/README.md`](UI/README.md)
+- Database details: [`DB/README.md`](DB/README.md)
+- AI service details: [`AI/README.md`](AI/README.md)
+
+---
+
+## API Surface (summary)
+
+### Backend API (`/api`)
+- Auth: register/login/profile + OTP/password reset flows
+- Tasks: CRUD, activity, VCS-related task endpoints
+- Projects: CRUD, stats, roadmap, files, members, confidential access workflow
+- AI proxy: `/api/ai/chat`
+
+Use Swagger for endpoint details and request/response schemas:
+`http://localhost:3000/api-docs`
+
+### AI Service (direct)
+- `/health`, `/ready`, `/metrics`
+- `/suggest-task`
+- `/plan-day`
+- `/project-insights`
+- `/auto-insights`
+- `/workload-forecast`
+- `/chat-context`
+
+---
+
+## Scripts Cheat Sheet
+
+### Backend
+- `yarn dev` – run in dev mode
+- `yarn build` – compile TypeScript
+- `yarn start` – run compiled server
+- `yarn test` – run Jest tests
+
+### Frontend
+- `yarn dev` – run Vite dev server
+- `yarn build` – build production bundle
+- `yarn test` – run Vitest
+- `yarn preview` – preview build
+
+### Root
+- `./deploy.sh` – helper script for Render-oriented build steps
+
+---
+
+## Deployment
+
+- Primary blueprint: [`render.yaml`](render.yaml)
+- Services defined there:
+  - `task-tracker-api` (Node web service)
+  - `task-tracker-ai` (Python web service)
+  - `task-tracker-frontend` (static site)
+  - `task-tracker-db` (PostgreSQL)
+
+---
 
 ## Notes
 
-- For implementation details, scripts, and environment specifics, use the module README files linked above.
-- Main README is intentionally maintained as a high-level project overview.
+- This is a **monorepo** with independent service lifecycles.
+- There is **no single root `docker-compose.yml`** orchestrating all services; DB orchestration lives in `DB/`.
+- If you only need one part (e.g., frontend), you can run that module independently.
+
+---
 
 ## License
 
