@@ -267,6 +267,7 @@ const ActivityLog: React.FC = () => {
               <div className="flex gap-2">
                 <select
                   value={filters.sortBy}
+                  aria-label="Sort activities"
                   onChange={(e) =>
                     handleFilterChange("sortBy", e.target.value as FiltersState["sortBy"])
                   }
@@ -748,6 +749,7 @@ function ActivityFiltersPanel({
         <p className="mb-4 text-xs font-bold uppercase text-slate-400">Date Period</p>
         <select
           value={filters.dateRange}
+          aria-label="Filter Activites"
           onChange={(e) =>
             onFilterChange(
               "dateRange",

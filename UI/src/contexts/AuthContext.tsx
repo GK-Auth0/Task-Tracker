@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 import {
@@ -87,9 +88,33 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const applyAuthenticatedUser = (nextUser: AuthenticatedUser) => {
+      if (!isMountedRef.current || !isActive) return;
+      setUser(normalizeUser(nextUser));
+    };
+
+    const clearAuthState = () => {
+      if (!isMountedRef.current || !isActive) return;
+      clearStoredAccessToken();
+      setUser(null);
+    };
+
     const initAuth = async () => {
+      if (!isMountedRef.current || !isActive) return;
+      setLoading(true);
+      const bootstrapToken = getStoredAccessToken();
       const currentPath =
         typeof window !== "undefined" ? window.location.pathname : "";
       const isAuthPage =
@@ -100,12 +125,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         currentPath.startsWith("/auth/callback");
 
       try {
-        const storedToken = getStoredAccessToken();
+        const storedToken = bootstrapToken;
 
         if (storedToken) {
-          const response = await authAPI.getCurrentUser();
-          setUser(normalizeUser(response.data));
-          return;
+          try {
+            const response = await authAPI.getCurrentUser();
+            applyAuthenticatedUser(response.data);
+            return;
+          } catch (tokenError) {
+            if (isAuthPage) {
+              throw tokenError;
+            }
+
+            const response = await authAPI.refreshSession();
+            const authenticatedData = response.data as Extract<
+              typeof response.data,
+              { user: AuthenticatedUser; token?: string }
+            >;
+            const { user, token } = authenticatedData;
+            if (token) {
+              setStoredAccessToken(token);
+            }
+            if (user) {
+              applyAuthenticatedUser(user);
+              return;
+            }
+          }
         }
 
         if (!isAuthPage) {
@@ -119,21 +164,35 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             setStoredAccessToken(token);
           }
           if (user) {
-            setUser(normalizeUser(user));
+            applyAuthenticatedUser(user);
             return;
           }
         }
 
+        if (!isMountedRef.current || !isActive) return;
         setUser(null);
       } catch (error) {
-        clearStoredAccessToken();
-        setUser(null);
-      }
+        if (!isMountedRef.current || !isActive) return;
+        if (getStoredAccessToken() === "") {
+          clearAuthState();
+          return;
+        }
 
-      setLoading(false);
+        const currentToken = getStoredAccessToken();
+        if (!currentToken || currentToken === bootstrapToken) {
+          clearAuthState();
+        }
+      } finally {
+        if (!isMountedRef.current || !isActive) return;
+        setLoading(false);
+      }
     };
 
     void initAuth();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {

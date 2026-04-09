@@ -10,6 +10,7 @@ const ACCESS_TOKEN_STORAGE_KEY = "task_tracker_session_token";
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
+  _authTokenUsed?: string;
 };
 
 const buildDefaultHeaders = () => ({
@@ -84,11 +85,13 @@ const refreshAccessToken = async () => {
 
 export const applyAuthInterceptors = (client: AxiosInstance) => {
   client.interceptors.request.use((config) => {
+    const nextConfig = config as RetryableRequestConfig;
     const token = getStoredAccessToken();
+    nextConfig._authTokenUsed = token;
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      nextConfig.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+    return nextConfig;
   });
 
   client.interceptors.response.use(
@@ -97,9 +100,14 @@ export const applyAuthInterceptors = (client: AxiosInstance) => {
       const status = error.response?.status;
       const originalRequest = error.config as RetryableRequestConfig | undefined;
       const requestUrl = String(originalRequest?.url || "");
+      const isUnauthorized = status === 401;
+      const currentToken = getStoredAccessToken();
+      const requestUsedCurrentToken =
+        !originalRequest?._authTokenUsed ||
+        originalRequest._authTokenUsed === currentToken;
 
       const shouldAttemptRefresh =
-        (status === 401 || status === 403) &&
+        isUnauthorized &&
         originalRequest &&
         !originalRequest._retry &&
         !isAuthRefreshExcludedRequest(requestUrl);
@@ -125,7 +133,7 @@ export const applyAuthInterceptors = (client: AxiosInstance) => {
         }
       }
 
-      if (status === 401 || status === 403) {
+      if (isUnauthorized && requestUsedCurrentToken) {
         clearStoredAccessToken();
         redirectToLogin();
       }
