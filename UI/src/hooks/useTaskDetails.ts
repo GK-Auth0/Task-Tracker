@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import {
   tasksAPI,
@@ -154,7 +154,7 @@ export function useTaskDetails() {
   };
 
   // Fetch PR data
-  const fetchPRData = async () => {
+  const fetchPRData = useCallback(async () => {
     if (!id) return;
     try {
       setPrLoading(true);
@@ -174,7 +174,7 @@ export function useTaskDetails() {
     } finally {
       setPrLoading(false);
     }
-  };
+  }, [id]);
 
   // Fetch linked test cases
   const fetchLinkedTestCases = async (taskId: string) => {
@@ -192,7 +192,7 @@ export function useTaskDetails() {
   };
 
   // Fetch activity logs
-  const fetchActivityLogs = async () => {
+  const fetchActivityLogs = useCallback(async () => {
     if (!id) return;
     try {
       setActivityLoading(true);
@@ -205,7 +205,7 @@ export function useTaskDetails() {
     } finally {
       setActivityLoading(false);
     }
-  };
+  }, [id]);
 
   // Task operations
   const handleStatusUpdate = async (newStatus: TaskStatusValue) => {

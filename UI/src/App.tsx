@@ -33,6 +33,8 @@ const TestRuns            = lazy(() => import("./pages/TestRuns"));
 const TestReports         = lazy(() => import("./pages/TestReports"));
 const TestTraceability    = lazy(() => import("./pages/TestTraceability"));
 const TestDefects         = lazy(() => import("./pages/TestDefects"));
+const DefectReports       = lazy(() => import("./pages/DefectReports"));
+const DefectDetailPage    = lazy(() => import("./pages/DefectDetailPage"));
 const RaiseDefect         = lazy(() => import("./pages/RaiseDefect"));
 const Analytics           = lazy(() => import("./pages/Analytics"));
 const ActivityLog         = lazy(() => import("./pages/ActivityLog"));
@@ -152,6 +154,8 @@ function AppRoutes() {
           <Route path="test-runs"                    element={<TestRuns />} />
           <Route path="test-traceability"            element={<TestTraceability />} />
           <Route path="test-defects"                 element={<TestDefects />} />
+          <Route path="test-defects/reports"         element={<DefectReports />} />
+          <Route path="test-defects/:id"             element={<DefectDetailPage />} />
           <Route path="test-defects/raise"           element={<RaiseDefect />} />
           <Route path="test-reports"                 element={<TestReports />} />
           <Route path="activity"                     element={<ActivityLog />} />

@@ -293,8 +293,8 @@ export default function TaskDetails() {
                   </div>
                 )}
 
-                <div className="rounded-xl border border-slate-200 bg-white px-4">
-                  <div className="pb-3 pt-4 sm:hidden">
+                <div className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
+                  <div className="py-3 sm:hidden">
                     <select
                       aria-label="Task detail tabs"
                       value={activeTab}
@@ -308,22 +308,22 @@ export default function TaskDetails() {
                       ))}
                     </select>
                   </div>
-                  <div className="hidden gap-3 overflow-x-auto scrollbar-hide sm:flex">
+                  <div className="hidden gap-2 overflow-x-auto py-3 scrollbar-hide sm:flex">
                     {taskTabs.map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
-                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold whitespace-nowrap ${
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
                           activeTab === tab.id
-                            ? "border-blue-200 bg-blue-50 text-blue-700"
+                            ? "border-blue-200 bg-blue-50 text-blue-700 shadow-sm"
                             : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-blue-600"
                         }`}
                         onClick={() => setActiveTab(tab.id)}
                       >
-                        <span className="material-symbols-outlined text-lg">{tab.icon}</span>
+                        <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
                         <span>{tab.label}</span>
                         {tab.count ? (
-                          <span className="rounded-full bg-blue-600/10 px-1.5 py-0.5 text-[10px] text-blue-600">
+                          <span className="rounded-full bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">
                             {tab.count}
                           </span>
                         ) : null}

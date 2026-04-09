@@ -1082,5 +1082,5 @@ export const testCaseSectionLinks = [
 export const defectSectionLinks = [
   { to: "/test-defects", label: "Defects", icon: "bug_report" },
   { to: "/test-defects/raise", label: "Raise Defect", icon: "add_circle" },
-  { to: "/test-reports", label: "Reports", icon: "analytics" },
+  { to: "/test-defects/reports", label: "Reports", icon: "analytics" },
 ];

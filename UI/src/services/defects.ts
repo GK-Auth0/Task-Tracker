@@ -3,10 +3,31 @@ import type { Defect } from "../types/defect";
 
 export const defectsAPI = {
   getDefects: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
     project_id?: string;
+    task_id?: string;
     status?: string;
     sprint_id?: string;
-  }): Promise<{ success: boolean; data: Defect[] }> => {
+    sprint_name?: string;
+  }): Promise<{
+    success: boolean;
+    data: Defect[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    filters?: {
+      projects: Array<{ id: string; name: string }>;
+      tasks: Array<{ id: string; title: string }>;
+      sprints: string[];
+    };
+  }> => {
     const response = await api.get("/api/defects", { params });
     return response.data;
   },

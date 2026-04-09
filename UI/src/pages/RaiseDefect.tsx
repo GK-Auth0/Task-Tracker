@@ -145,7 +145,7 @@ export default function RaiseDefect() {
 
     try {
       setSubmitting(true);
-      await defectsAPI.createDefect({
+      const response = await defectsAPI.createDefect({
         title: title.trim(),
         description: description.trim(),
         reproduction_steps: parsedSteps,
@@ -160,7 +160,13 @@ export default function RaiseDefect() {
         linked_case: linkedCase.trim() || undefined,
         environment: environment.trim() || undefined,
       });
-      navigate("/test-defects");
+      navigate("/test-defects", {
+        state: {
+          createdDefectId: response.data.id,
+          createdDefectReferenceCode: response.data.reference_code,
+          createdDefectTitle: response.data.title,
+        },
+      });
     } catch (error: any) {
       console.error("Failed to create defect:", error);
       setSubmitError(

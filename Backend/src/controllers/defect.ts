@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import { Op } from "sequelize";
 import { Defect, Project, ProjectMember, Sprint, Task, User } from "../models";
+import { createAuditLog } from "../services/auditService";
 import { createTask } from "../services/task";
 import { tableHasColumn } from "../utils/runtimeSchema";
+import { parseBoundedInt } from "../helpers/query";
 
 const DEFECT_STATUSES = ["Open", "Approved", "Rejected", "In Progress", "Resolved"] as const;
 const DEFECT_SEVERITIES = ["Critical", "High", "Medium", "Low"] as const;
@@ -50,6 +52,54 @@ const mapDefectPriorityToTaskPriority = (priority: string): "Low" | "Medium" | "
   if (priority === "Critical" || priority === "High") return "High";
   if (priority === "Medium") return "Medium";
   return "Low";
+};
+
+const buildDefectTraceComment = (
+  defect: { reference_code?: string; title?: string; status?: string },
+  message: string,
+) => {
+  const parts = [
+    defect.reference_code ? `Defect ${defect.reference_code}` : "Defect",
+    defect.title ? `(${defect.title})` : "",
+    message,
+  ].filter(Boolean);
+  return parts.join(" ");
+};
+
+const createTaskDefectAuditLog = async ({
+  taskId,
+  userId,
+  defect,
+  comment,
+  oldValues,
+  newValues,
+}: {
+  taskId?: string | null;
+  userId: string;
+  defect: { id: string; reference_code?: string; title?: string; status?: string };
+  comment: string;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
+}) => {
+  if (!taskId) return;
+
+  await createAuditLog({
+    entity_type: "task",
+    entity_id: taskId,
+    action: "updated",
+    user_id: userId,
+    old_values: oldValues,
+    new_values: newValues,
+    changes: {
+      comment,
+      defect_id: defect.id,
+      defect_reference_code: defect.reference_code,
+      defect_title: defect.title,
+      defect_status: defect.status,
+      timestamp: new Date().toISOString(),
+      action_time: new Date(),
+    },
+  });
 };
 
 const serializeDefect = (defect: any) => ({
@@ -183,14 +233,99 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const { supportsSprintId, attributes } = await getDefectQueryMetadata();
+    const page = parseBoundedInt(req.query.page, 1, 1, 100000);
+    const limit = parseBoundedInt(req.query.limit, 10, 1, 100);
+    const offset = (page - 1) * limit;
+    const search = String(req.query.search || "").trim();
     const where: any = {};
+
     if (req.query.project_id) where.project_id = String(req.query.project_id);
     if (req.query.status) where.status = String(req.query.status);
     if (req.query.sprint_id && supportsSprintId) where.sprint_id = String(req.query.sprint_id);
+    if (req.query.sprint_name) where.sprint_name = String(req.query.sprint_name);
 
-    const defects = await Defect.findAll({
+    const include = [
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id", "name", "owner_id"],
+        include: [
+          {
+            model: User,
+            as: "owner",
+            attributes: ["id", "organization_id"],
+            where: { organization_id: organizationId },
+          },
+        ],
+      },
+      {
+        model: User,
+        as: "creator",
+        attributes: ["id", "full_name", "email"],
+      },
+      {
+        model: User,
+        as: "assignee",
+        attributes: ["id", "full_name", "email"],
+      },
+      ...(supportsSprintId
+        ? [
+            {
+              model: Sprint,
+              as: "sprint",
+              attributes: ["id", "name", "status"],
+            },
+          ]
+        : []),
+      {
+        model: Task,
+        as: "linked_task",
+        attributes: ["id", "title"],
+      },
+      {
+        model: Task,
+        as: "created_task",
+        attributes: ["id", "title"],
+      },
+    ];
+
+    if (req.query.task_id) {
+      const taskId = String(req.query.task_id);
+      where[Op.or] = [{ linked_task_id: taskId }, { created_task_id: taskId }];
+    }
+
+    if (search) {
+      const searchClause = {
+        [Op.or]: [
+          { reference_code: { [Op.iLike]: `%${search}%` } },
+          { title: { [Op.iLike]: `%${search}%` } },
+          { description: { [Op.iLike]: `%${search}%` } },
+          { "$project.name$": { [Op.iLike]: `%${search}%` } },
+          { "$linked_task.title$": { [Op.iLike]: `%${search}%` } },
+          { "$created_task.title$": { [Op.iLike]: `%${search}%` } },
+        ],
+      };
+
+      if (where[Op.or]) {
+        where[Op.and] = [{ [Op.or]: where[Op.or] }, searchClause];
+        delete where[Op.or];
+      } else {
+        where[Op.and] = [searchClause];
+      }
+    }
+
+    const defects = await Defect.findAndCountAll({
       attributes,
       where,
+      include,
+      distinct: true,
+      order: [["created_at", "DESC"]],
+      limit,
+      offset,
+    });
+
+    const filterOptionRows = await Defect.findAll({
+      attributes: ["id", "project_id", "sprint_name", "linked_task_id", "created_task_id"],
       include: [
         {
           model: Project,
@@ -206,25 +341,6 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
           ],
         },
         {
-          model: User,
-          as: "creator",
-          attributes: ["id", "full_name", "email"],
-        },
-        {
-          model: User,
-          as: "assignee",
-          attributes: ["id", "full_name", "email"],
-        },
-        ...(supportsSprintId
-          ? [
-              {
-                model: Sprint,
-                as: "sprint",
-                attributes: ["id", "name", "status"],
-              },
-            ]
-          : []),
-        {
           model: Task,
           as: "linked_task",
           attributes: ["id", "title"],
@@ -238,9 +354,49 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
       order: [["created_at", "DESC"]],
     });
 
+    const projects = new Map<string, { id: string; name: string }>();
+    const tasks = new Map<string, { id: string; title: string }>();
+    const sprints = new Set<string>();
+
+    filterOptionRows.forEach((defect: any) => {
+      const plain = defect.get({ plain: true });
+      if (plain.project?.id && plain.project?.name) {
+        projects.set(plain.project.id, { id: plain.project.id, name: plain.project.name });
+      }
+      if (plain.linked_task?.id && plain.linked_task?.title) {
+        tasks.set(plain.linked_task.id, {
+          id: plain.linked_task.id,
+          title: plain.linked_task.title,
+        });
+      }
+      if (plain.created_task?.id && plain.created_task?.title) {
+        tasks.set(plain.created_task.id, {
+          id: plain.created_task.id,
+          title: plain.created_task.title,
+        });
+      }
+      const sprintName = String(plain.sprint_name || "").trim();
+      if (sprintName) {
+        sprints.add(sprintName);
+      }
+    });
+
     return res.status(200).json({
       success: true,
-      data: defects.map((defect) => serializeDefect(defect.get({ plain: true }))),
+      data: defects.rows.map((defect) => serializeDefect(defect.get({ plain: true }))),
+      pagination: {
+        page,
+        limit,
+        total: defects.count,
+        totalPages: Math.ceil(defects.count / limit),
+        hasNext: page < Math.ceil(defects.count / limit),
+        hasPrev: page > 1,
+      },
+      filters: {
+        projects: Array.from(projects.values()).sort((a, b) => a.name.localeCompare(b.name)),
+        tasks: Array.from(tasks.values()).sort((a, b) => a.title.localeCompare(b.title)),
+        sprints: Array.from(sprints.values()).sort((a, b) => a.localeCompare(b)),
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -351,6 +507,29 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
           where: { id: linkedTaskId },
         },
       );
+
+      await createTaskDefectAuditLog({
+        taskId: linkedTaskId,
+        userId,
+        defect: {
+          id: defect.id,
+          reference_code: defect.reference_code,
+          title: defect.title,
+          status: "Open",
+        },
+        comment: buildDefectTraceComment(
+          {
+            reference_code: defect.reference_code,
+            title: defect.title,
+            status: "Open",
+          },
+          "was linked to this task.",
+        ),
+        newValues: {
+          defect_id: defect.id,
+          linked_task_id: linkedTaskId,
+        },
+      });
     }
 
     const created = await Defect.findByPk(defect.id, {
@@ -493,14 +672,70 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
       updates.sprint_name = req.body.sprint_name ? String(req.body.sprint_name).trim() : null;
     }
 
+    const previousLinkedTaskId = defect.linked_task_id;
     await defect.update(updates);
 
     if (updates.linked_task_id !== undefined) {
       if (updates.linked_task_id) {
         await Task.update({ defect_id: defect.id }, { where: { id: updates.linked_task_id } });
+        await createTaskDefectAuditLog({
+          taskId: String(updates.linked_task_id),
+          userId,
+          defect: {
+            id: defect.id,
+            reference_code: defect.reference_code,
+            title: defect.title,
+            status: defect.status,
+          },
+          comment: buildDefectTraceComment(
+            {
+              reference_code: defect.reference_code,
+              title: defect.title,
+              status: defect.status,
+            },
+            previousLinkedTaskId && previousLinkedTaskId !== updates.linked_task_id
+              ? "was re-linked to this task."
+              : "was linked to this task.",
+          ),
+          oldValues: previousLinkedTaskId
+            ? {
+                linked_task_id: previousLinkedTaskId,
+              }
+            : undefined,
+          newValues: {
+            linked_task_id: updates.linked_task_id,
+            defect_id: defect.id,
+          },
+        });
       }
-      if (defect.linked_task_id && defect.linked_task_id !== updates.linked_task_id) {
-        await Task.update({ defect_id: null }, { where: { id: defect.linked_task_id } });
+      if (previousLinkedTaskId && previousLinkedTaskId !== updates.linked_task_id) {
+        await Task.update({ defect_id: null }, { where: { id: previousLinkedTaskId } });
+        await createTaskDefectAuditLog({
+          taskId: previousLinkedTaskId,
+          userId,
+          defect: {
+            id: defect.id,
+            reference_code: defect.reference_code,
+            title: defect.title,
+            status: defect.status,
+          },
+          comment: buildDefectTraceComment(
+            {
+              reference_code: defect.reference_code,
+              title: defect.title,
+              status: defect.status,
+            },
+            "was unlinked from this task.",
+          ),
+          oldValues: {
+            linked_task_id: previousLinkedTaskId,
+            defect_id: defect.id,
+          },
+          newValues: {
+            linked_task_id: updates.linked_task_id ?? null,
+            defect_id: null,
+          },
+        });
       }
     }
 
@@ -583,6 +818,7 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
 
     if (action === "approve") {
       let createdTaskId = defect.created_task_id;
+      let createdTaskTitle = defect.created_task?.title || null;
 
       if (!createdTaskId) {
         const createdTask = await createTask({
@@ -606,6 +842,7 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
         });
 
         createdTaskId = createdTask?.id;
+        createdTaskTitle = createdTask?.title || createdTaskTitle;
       }
 
       await defect.update({
@@ -617,6 +854,35 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
         rejection_reason: null,
         created_task_id: createdTaskId,
         linked_task_id: defect.linked_task_id || createdTaskId,
+      });
+
+      await createTaskDefectAuditLog({
+        taskId: createdTaskId,
+        userId,
+        defect: {
+          id: defect.id,
+          reference_code: defect.reference_code,
+          title: defect.title,
+          status: "Approved",
+        },
+        comment: buildDefectTraceComment(
+          {
+            reference_code: defect.reference_code,
+            title: defect.title,
+            status: "Approved",
+          },
+          defect.created_task_id
+            ? "was approved and remains connected to this task."
+            : `was approved and created follow-up task${createdTaskTitle ? ` ${createdTaskTitle}` : ""}.`,
+        ),
+        oldValues: {
+          defect_status: defect.status,
+        },
+        newValues: {
+          defect_status: "Approved",
+          defect_id: defect.id,
+          created_task_id: createdTaskId,
+        },
       });
     } else {
       await defect.update({
