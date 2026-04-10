@@ -1,6 +1,9 @@
+import type { TaskStatusValue } from "../utils/taskStatus";
+import { TaskIssueType, TaskPriority } from "../enums";
+
 export interface TaskFilters {
-  status?: string;
-  priority?: string;
+  status?: TaskStatusValue;
+  priority?: TaskPriority;
   project_id?: string;
   sprint_id?: string;
   due_from?: Date;
@@ -12,9 +15,9 @@ export interface TaskFilters {
 export interface CreateTaskDto {
   title: string;
   description: string;
-  status: string;
-  priority: string;
-  issue_type?: string;
+  status: TaskStatusValue;
+  priority: TaskPriority;
+  issue_type?: TaskIssueType;
   project_id: string;
   assignee_id?: string;
   defect_id?: string;
@@ -26,9 +29,9 @@ export interface CreateTaskDto {
 export interface UpdateTaskDto {
   title?: string;
   description?: string;
-  status?: string;
-  priority?: string;
-  issue_type?: string;
+  status?: TaskStatusValue;
+  priority?: TaskPriority;
+  issue_type?: TaskIssueType;
   assignee_id?: string;
   defect_id?: string;
   sprint_id?: string;

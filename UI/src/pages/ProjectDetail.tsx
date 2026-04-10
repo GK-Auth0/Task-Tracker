@@ -20,6 +20,7 @@ import { Task } from "../types/task";
 import { ProjectStatus, ProjectPriority } from "../enums";
 import type { Sprint } from "../types/sprint";
 import { TASK_STATUSES, isDoneTaskStatus } from "../utils/taskStatus";
+import { TaskStatus } from "../enums";
 
 type ProjectTab = "tasks" | "roadmap" | "files" | "activity";
 
@@ -211,19 +212,19 @@ const ProjectDetail: React.FC = () => {
   const normalizeTask = (task: any): Task => {
     const rawStatus = String(task.status || "").trim().toLowerCase().replace(/\s+/g, "_");
     const statusMap: Record<string, Task["status"]> = {
-      todo: "To Do",
-      to_do: "To Do",
-      "to-do": "To Do",
-      in_progress: "In Progress",
-      inprogress: "In Progress",
-      progress: "In Progress",
-      ready_for_qa: "Ready for QA",
-      readyforqa: "Ready for QA",
-      in_qa: "In QA",
-      inqa: "In QA",
-      blocked: "Blocked",
-      done: "Done",
-      completed: "Done",
+      todo: TaskStatus.TODO,
+      to_do: TaskStatus.TODO,
+      "to-do": TaskStatus.TODO,
+      in_progress: TaskStatus.IN_PROGRESS,
+      inprogress: TaskStatus.IN_PROGRESS,
+      progress: TaskStatus.IN_PROGRESS,
+      ready_for_qa: TaskStatus.READY_FOR_QA,
+      readyforqa: TaskStatus.READY_FOR_QA,
+      in_qa: TaskStatus.IN_QA,
+      inqa: TaskStatus.IN_QA,
+      blocked: TaskStatus.BLOCKED,
+      done: TaskStatus.DONE,
+      completed: TaskStatus.DONE,
     };
 
     const rawPriority = String(task.priority || "medium").trim().toLowerCase();
@@ -237,7 +238,7 @@ const ProjectDetail: React.FC = () => {
       id: String(task.id),
       title: String(task.title || ""),
       description: task.description,
-      status: statusMap[rawStatus] || "To Do",
+      status: statusMap[rawStatus] || TaskStatus.TODO,
       priority: priorityMap[rawPriority] || "medium",
       issueType: task.issueType || task.issue_type || "Task",
       startDate: task.startDate || task.start_date,

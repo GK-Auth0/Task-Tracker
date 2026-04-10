@@ -1,3 +1,5 @@
+import type { TaskStatusValue } from "../utils/taskStatus";
+
 export interface Sprint {
   id: string;
   name: string;
@@ -27,7 +29,7 @@ export interface Sprint {
 export interface SprintTaskSummary {
   id: string;
   title: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: TaskStatusValue;
   priority: "Low" | "Medium" | "High";
   issue_type?: "Story" | "Task" | "Bug";
   due_date?: string | null;

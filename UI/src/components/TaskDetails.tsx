@@ -9,6 +9,7 @@ import TaskActivityTab from "./task-detail/TaskActivityTab";
 import TaskAttachmentsTab from "./task-detail/TaskAttachmentsTab";
 import { useTaskDetails } from "../hooks/useTaskDetails";
 import { isDoneTaskStatus, type TaskStatusValue } from "../utils/taskStatus";
+import { TaskStatus } from "../enums";
 
 type TaskTab = "overview" | "prs" | "activity" | "attachments";
 
@@ -258,25 +259,12 @@ export default function TaskDetails() {
             taskStatus={task.status}
             taskPriority={task.priority}
             priorityColors={derived.priorityColors}
-            slaLabel={derived.slaLabel}
-            issueHealthTone={derived.issueHealthTone}
             createdDateLabel={derived.createdDateLabel}
             creatorName={task.creator.full_name}
-            daysSinceCreated={derived.daysSinceCreated}
-            pullRequestsCount={pullRequests.length}
-            commitsCount={commits.length}
-            activityPulse={derived.activityPulse}
-            activityLogsCount={activityLogs.length}
-            assigneeLabel={derived.assigneeLabel}
-            sprintName={task.sprint?.name}
-            dueDateLabel={derived.dueDateLabel}
             statusSaving={statusSaving}
             onOpenProject={handleOpenProject}
             onBack={handleBack}
             onStatusChange={handleStatusChange}
-            onEdit={handleEdit}
-            onAddTestCase={handleAddTestCase}
-            onMarkDone={() => handleStatusChange("Done")}
           />
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -421,10 +409,10 @@ export default function TaskDetails() {
               <div className="border-t border-slate-200 bg-white p-4 md:hidden">
                 <button
                   className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => handleStatusChange("Done")}
-                  disabled={task.status === "Done" || statusSaving}
+                  onClick={() => handleStatusChange(TaskStatus.DONE)}
+                  disabled={task.status === TaskStatus.DONE || statusSaving}
                 >
-                  {task.status === "Done" ? "Completed" : statusSaving ? "Updating..." : "Mark as Complete"}
+                  {task.status === TaskStatus.DONE ? "Completed" : statusSaving ? "Updating..." : "Mark as Complete"}
                 </button>
               </div>
             </div>

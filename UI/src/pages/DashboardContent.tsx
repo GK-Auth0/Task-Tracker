@@ -7,6 +7,7 @@ import {
   DashboardSummary,
 } from "../services/dashboard";
 import CreateTaskModal from "../components/CreateTaskModal";
+import { TaskStatus } from "../enums";
 
 export default function DashboardContent() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export default function DashboardContent() {
         page: currentPage,
         limit: itemsPerPage,
       };
-      if (filter === "In Progress") filters.status = "In Progress";
+      if (filter === TaskStatus.IN_PROGRESS) filters.status = TaskStatus.IN_PROGRESS;
       if (filter === "High Priority") filters.priority = "High";
       if (priorityFilter) filters.priority = priorityFilter;
       if (statusFilter) filters.status = statusFilter;
@@ -59,11 +60,11 @@ export default function DashboardContent() {
   const handleTaskToggle = async (taskId: string, completed: boolean) => {
     try {
       await tasksAPI.updateTask(taskId, {
-        status: completed ? "Done" : "To Do",
+        status: completed ? TaskStatus.DONE : TaskStatus.TODO,
       });
       const tasksRes = await tasksAPI.getTasks(
-        filter === "In Progress"
-          ? { status: "In Progress" }
+        filter === TaskStatus.IN_PROGRESS
+          ? { status: TaskStatus.IN_PROGRESS }
           : filter === "High Priority"
             ? { priority: "High" }
             : {},
@@ -228,7 +229,7 @@ export default function DashboardContent() {
               <button
                 className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50"
                 onClick={() => {
-                  setStatusFilter("To Do");
+                  setStatusFilter(TaskStatus.TODO);
                   setShowStatusDropdown(false);
                 }}
               >
@@ -237,7 +238,7 @@ export default function DashboardContent() {
               <button
                 className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50"
                 onClick={() => {
-                  setStatusFilter("In Progress");
+                  setStatusFilter(TaskStatus.IN_PROGRESS);
                   setShowStatusDropdown(false);
                 }}
               >
@@ -246,7 +247,7 @@ export default function DashboardContent() {
               <button
                 className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 last:rounded-b-lg"
                 onClick={() => {
-                  setStatusFilter("Done");
+                  setStatusFilter(TaskStatus.DONE);
                   setShowStatusDropdown(false);
                 }}
               >

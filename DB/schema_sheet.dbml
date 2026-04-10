@@ -55,7 +55,7 @@ Table tasks {
   project_id uuid [not null]
   title varchar(255) [not null]
   description text [not null]
-  status varchar(20) [not null, note: 'To Do, In Progress, Done']
+  status varchar(30) [not null, note: 'To Do, In Progress, Ready for QA, In QA, Blocked, Done']
   priority varchar(10) [not null, note: 'Low, Medium, High']
   issue_type varchar(20) [not null, note: 'Story, Task, Bug']
   due_date date

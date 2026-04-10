@@ -19,10 +19,11 @@ import { parseBoundedInt, parseIsoDate } from "../helpers/query";
 import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
 import cloudinary from "../config/cloudinary";
 import { TaskFile, User } from "../models";
+import type { TaskFilters } from "../types/task";
 
-const normalizeTaskPriority = (value: unknown): string | undefined => {
+const normalizeTaskPriority = (value: unknown): TaskPriority | undefined => {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string") return String(value);
+  if (typeof value !== "string") return undefined;
 
   const normalized = value.trim().toLowerCase();
   const priorityMap: Record<string, TaskPriority> = {
@@ -34,9 +35,9 @@ const normalizeTaskPriority = (value: unknown): string | undefined => {
   return priorityMap[normalized] ?? value;
 };
 
-const normalizeTaskIssueType = (value: unknown): string | undefined => {
+const normalizeTaskIssueType = (value: unknown): TaskIssueType | undefined => {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string") return String(value);
+  if (typeof value !== "string") return undefined;
 
   const normalized = value.trim().toLowerCase();
   const typeMap: Record<string, TaskIssueType> = {
@@ -60,9 +61,15 @@ export const getTasks = async (req: Request, res: Response) => {
       });
     }
 
-    const filters = {
-      status: req.query.status as string,
-      priority: req.query.priority as string,
+    const filters: TaskFilters = {
+      status:
+        typeof req.query.status === "string"
+          ? (req.query.status as TaskStatus)
+          : undefined,
+      priority:
+        typeof req.query.priority === "string"
+          ? normalizeTaskPriority(req.query.priority)
+          : undefined,
       project_id: req.query.project_id as string,
       sprint_id: req.query.sprint_id as string,
       due_from: parseIsoDate(req.query.due_from),

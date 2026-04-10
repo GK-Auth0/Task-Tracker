@@ -4,7 +4,11 @@ import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
 import { Avatar, Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { ViewMode } from "./TasksFiltersBar";
 import TaskTooltip from "../TaskTooltip";
-import { getTaskStatusTone, isDoneTaskStatus } from "../../utils/taskStatus";
+import {
+  getTaskStatusTone,
+  isDoneTaskStatus,
+  TASK_STATUS_ORDER,
+} from "../../utils/taskStatus";
 
 interface TasksListProps {
   tasks: TaskItem[];
@@ -77,29 +81,59 @@ const getPriorityTone = (priority: string) => {
 };
 
 const getStatusPillTone = (status: string) => {
-  switch (status) {
-    case "Done":
-      return {
-        dot: "rgb(34, 197, 94)",
-        background: "rgba(220, 252, 231, 0.92)",
-        border: "rgba(74, 222, 128, 0.35)",
-        color: "rgb(21, 128, 61)",
-      };
-    case "In Progress":
-      return {
-        dot: "rgb(59, 130, 246)",
-        background: "rgba(219, 234, 254, 0.92)",
-        border: "rgba(96, 165, 250, 0.35)",
-        color: "rgb(29, 78, 216)",
-      };
-    default:
-      return {
-        dot: "rgb(148, 163, 184)",
-        background: "rgba(241, 245, 249, 0.96)",
-        border: "rgba(203, 213, 225, 0.7)",
-        color: "rgb(71, 85, 105)",
-      };
+  const tone = getTaskStatusTone(status);
+
+  if (tone.badge.includes("emerald")) {
+    return {
+      dot: "rgb(34, 197, 94)",
+      background: "rgba(220, 252, 231, 0.92)",
+      border: "rgba(74, 222, 128, 0.35)",
+      color: "rgb(21, 128, 61)",
+    };
   }
+
+  if (tone.badge.includes("blue")) {
+    return {
+      dot: "rgb(59, 130, 246)",
+      background: "rgba(219, 234, 254, 0.92)",
+      border: "rgba(96, 165, 250, 0.35)",
+      color: "rgb(29, 78, 216)",
+    };
+  }
+
+  if (tone.badge.includes("violet")) {
+    return {
+      dot: "rgb(139, 92, 246)",
+      background: "rgba(243, 232, 255, 0.92)",
+      border: "rgba(167, 139, 250, 0.35)",
+      color: "rgb(109, 40, 217)",
+    };
+  }
+
+  if (tone.badge.includes("cyan")) {
+    return {
+      dot: "rgb(6, 182, 212)",
+      background: "rgba(207, 250, 254, 0.92)",
+      border: "rgba(34, 211, 238, 0.35)",
+      color: "rgb(14, 116, 144)",
+    };
+  }
+
+  if (tone.badge.includes("rose")) {
+    return {
+      dot: "rgb(244, 63, 94)",
+      background: "rgba(255, 228, 230, 0.92)",
+      border: "rgba(251, 113, 133, 0.35)",
+      color: "rgb(190, 24, 93)",
+    };
+  }
+
+  return {
+    dot: "rgb(148, 163, 184)",
+    background: "rgba(241, 245, 249, 0.96)",
+    border: "rgba(203, 213, 225, 0.7)",
+    color: "rgb(71, 85, 105)",
+  };
 };
 
 const formatDate = (dateString: string) => {
@@ -177,7 +211,7 @@ const TasksList: React.FC<TasksListProps> = ({
       headerAlign: "left",
       align: "left",
       renderCell: (params) => {
-        const isCompleted = params.row.status === "Done";
+        const isCompleted = isDoneTaskStatus(params.row.status);
         return (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%", minWidth: 0 }}>
             <input
@@ -430,7 +464,7 @@ const TasksList: React.FC<TasksListProps> = ({
       groups.set(key, existing);
     }
 
-    const statusOrder = ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"];
+    const statusOrder = TASK_STATUS_ORDER;
     const priorityOrder = ["High", "Medium", "Low"];
     const dueOrder = ["Overdue", "Due Today", "Next 3 Days", "Later", "No Due Date"];
 
@@ -441,7 +475,9 @@ const TasksList: React.FC<TasksListProps> = ({
 
     if (groupBy === "status") {
       return entries.sort(
-        (a, b) => statusOrder.indexOf(a.label) - statusOrder.indexOf(b.label),
+        (a, b) =>
+          statusOrder.indexOf(a.label as (typeof statusOrder)[number]) -
+          statusOrder.indexOf(b.label as (typeof statusOrder)[number]),
       );
     }
     if (groupBy === "priority") {

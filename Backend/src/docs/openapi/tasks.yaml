@@ -27,7 +27,7 @@ components:
         id: { type: string, format: uuid }
         title: { type: string }
         description: { type: string }
-        status: { type: string, enum: ["To Do", "In Progress", "Done"] }
+        status: { type: string, enum: ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"] }
         priority: { type: string, enum: [Low, Medium, High] }
         project_id: { type: string, format: uuid }
         assignee_id: { type: string, format: uuid, nullable: true }
@@ -40,7 +40,7 @@ components:
       properties:
         title: { type: string, minLength: 2, maxLength: 200 }
         description: { type: string, minLength: 10, maxLength: 1000 }
-        status: { type: string, enum: ["To Do", "In Progress", "Done"] }
+        status: { type: string, enum: ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"] }
         priority: { type: string, enum: [Low, Medium, High] }
         project_id: { type: string, format: uuid }
         assignee_id: { type: string, format: uuid }
@@ -57,7 +57,7 @@ components:
       properties:
         title: { type: string, minLength: 2, maxLength: 200 }
         description: { type: string, maxLength: 1000 }
-        status: { type: string, enum: ["To Do", "In Progress", "Done"] }
+        status: { type: string, enum: ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"] }
         priority: { type: string, enum: [Low, Medium, High] }
         assignee_id: { type: string, format: uuid }
         due_date: { type: string, format: date-time, nullable: true }

@@ -10,7 +10,7 @@ paths:
           name: status
           schema:
             type: string
-            enum: ["To Do", "In Progress", "Completed"]
+            enum: ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"]
           description: Filter by task status
         - in: query
           name: priority
@@ -70,7 +70,7 @@ paths:
                   example: "Add JWT-based authentication system"
                 status:
                   type: string
-                  enum: ["To Do", "In Progress", "Completed"]
+                  enum: ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"]
                   default: "To Do"
                 priority:
                   type: string
@@ -171,7 +171,7 @@ paths:
                   type: string
                 status:
                   type: string
-                  enum: ["To Do", "In Progress", "Completed"]
+                  enum: ["To Do", "In Progress", "Ready for QA", "In QA", "Blocked", "Done"]
                 priority:
                   type: string
                   enum: ["Low", "Medium", "High"]
