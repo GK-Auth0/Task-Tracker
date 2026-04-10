@@ -8,6 +8,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { responseHandler } from "./middleware/responseHandler";
 import { setupApiDocs } from "./api-docs";
 import { globalRateLimiter } from "./middleware/rateLimit";
+import { globalThrottle } from "./middleware/throttle";
 import { requestTimeoutGuard } from "./middleware/requestGuard";
 import { database, appConfig } from "./config";
 
@@ -31,6 +32,7 @@ app.use(
   }),
 );
 app.use(requestTimeoutGuard);
+app.use(globalThrottle);
 app.use(globalRateLimiter);
 
 // Trust proxy for accurate IP addresses

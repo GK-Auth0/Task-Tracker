@@ -25,18 +25,19 @@ import {
 } from "../validators/auth";
 import { authenticateToken } from "../middleware/auth";
 import { authRateLimiter } from "../middleware/rateLimit";
+import { authThrottle } from "../middleware/throttle";
 
 const router = express.Router();
 
-router.post("/register", authRateLimiter, checkSchema(registerSchema), register);
-router.post("/login", authRateLimiter, checkSchema(loginSchema), login);
-router.post("/auth0", authRateLimiter, checkSchema(auth0LoginSchema), auth0Login);
-router.post("/verify-otp", authRateLimiter, checkSchema(verifyOtpSchema), verifyOtp);
-router.post("/resend-otp", authRateLimiter, checkSchema(resendOtpSchema), resendOtpCode);
-router.post("/forgot-password", authRateLimiter, checkSchema(forgotPasswordSchema), forgotPassword);
-router.post("/reset-password", authRateLimiter, checkSchema(resetPasswordSchema), resetPassword);
-router.post("/change-password-invited", authRateLimiter, checkSchema(changePasswordInvitedSchema), changePasswordInvited);
-router.post("/refresh", authRateLimiter, refreshSession);
+router.post("/register", authThrottle, authRateLimiter, checkSchema(registerSchema), register);
+router.post("/login", authThrottle, authRateLimiter, checkSchema(loginSchema), login);
+router.post("/auth0", authThrottle, authRateLimiter, checkSchema(auth0LoginSchema), auth0Login);
+router.post("/verify-otp", authThrottle, authRateLimiter, checkSchema(verifyOtpSchema), verifyOtp);
+router.post("/resend-otp", authThrottle, authRateLimiter, checkSchema(resendOtpSchema), resendOtpCode);
+router.post("/forgot-password", authThrottle, authRateLimiter, checkSchema(forgotPasswordSchema), forgotPassword);
+router.post("/reset-password", authThrottle, authRateLimiter, checkSchema(resetPasswordSchema), resetPassword);
+router.post("/change-password-invited", authThrottle, authRateLimiter, checkSchema(changePasswordInvitedSchema), changePasswordInvited);
+router.post("/refresh", authThrottle, authRateLimiter, refreshSession);
 router.post("/logout", logout);
 router.get("/me", authenticateToken, me);
 
