@@ -8,7 +8,12 @@ import {
   usersAPI,
 } from "../services/dashboard";
 import { aiAssistantAPI, AiTaskSuggestion } from "../services/aiAssistant";
-import { testCasesAPI, testCaseModulesAPI, type TestCaseModuleOption } from "../services/testCases";
+import {
+  testCasesAPI,
+  testCaseModulesAPI,
+  type TestCaseExecutionAttachment,
+  type TestCaseModuleOption,
+} from "../services/testCases";
 import type { TestCaseRecord, TestCaseStatus } from "../types/testCase";
 import { TaskStatusValue } from "../utils/taskStatus";
 
@@ -315,14 +320,21 @@ export function useTaskDetails() {
   // Test case operations
   const handleRunTestCase = async (
     testCaseId: string,
-    status: Extract<TestCaseStatus, "Passed" | "Failed" | "Blocked">
+    status: Extract<TestCaseStatus, "Passed" | "Failed" | "Blocked">,
+    options?: {
+      note?: string;
+      actualBehavior?: string;
+      attachments?: TestCaseExecutionAttachment[];
+    },
   ) => {
     try {
       setTestCaseRunLoadingId(`${testCaseId}:${status}`);
       const response = await testCasesAPI.addExecution(testCaseId, {
         status,
         cycle: task?.sprint?.name || "Task Detail Run",
-        note: `Executed from task ${task?.title || ""}`.trim(),
+        note: options?.note?.trim() || `Executed from task ${task?.title || ""}`.trim(),
+        actual_behavior: options?.actualBehavior?.trim() || undefined,
+        attachments: options?.attachments || [],
       });
       if (response.success) {
         setLinkedTestCases(current =>
@@ -331,6 +343,7 @@ export function useTaskDetails() {
       }
     } catch (error) {
       console.error("Failed to run test case:", error);
+      throw error;
     } finally {
       setTestCaseRunLoadingId("");
     }

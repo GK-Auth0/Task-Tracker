@@ -67,4 +67,38 @@ export const appConfig = {
   security: {
     trustProxy: getEnv("TRUST_PROXY") || "loopback",
   },
+  rateLimits: {
+    global: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_GLOBAL_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_GLOBAL_LIMIT"), 300),
+    },
+    auth: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_AUTH_WINDOW_MS"), 15 * 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_AUTH_LIMIT"), 40),
+    },
+    ai: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_AI_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_AI_LIMIT"), 40),
+    },
+    search: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_SEARCH_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_SEARCH_LIMIT"), 90),
+    },
+    dashboard: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_DASHBOARD_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_DASHBOARD_LIMIT"), 60),
+    },
+    chatRead: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_CHAT_READ_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_CHAT_READ_LIMIT"), 120),
+    },
+    chatWrite: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_CHAT_WRITE_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_CHAT_WRITE_LIMIT"), 45),
+    },
+    projectRead: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_PROJECT_READ_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_PROJECT_READ_LIMIT"), 90),
+    },
+  },
 };

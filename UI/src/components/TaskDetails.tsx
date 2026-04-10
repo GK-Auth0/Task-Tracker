@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import TaskDetailHeader from "./task-detail/TaskDetailHeader";
 import TaskDetailSidebar from "./task-detail/TaskDetailSidebar";
 import TaskOverviewTab from "./task-detail/TaskOverviewTab";
+import TaskAiTab from "./task-detail/TaskAiTab";
 import TaskTestCases from "./task-detail/TaskTestCases";
 import TaskPRsTab from "./task-detail/TaskPRsTab";
 import TaskActivityTab from "./task-detail/TaskActivityTab";
@@ -11,10 +12,11 @@ import { useTaskDetails } from "../hooks/useTaskDetails";
 import { isDoneTaskStatus, type TaskStatusValue } from "../utils/taskStatus";
 import { TaskStatus } from "../enums";
 
-type TaskTab = "overview" | "prs" | "activity" | "attachments";
+type TaskTab = "overview" | "ai" | "prs" | "activity" | "attachments";
 
 const isTaskTab = (value: string | null): value is TaskTab =>
   value === "overview" ||
+  value === "ai" ||
   value === "prs" ||
   value === "activity" ||
   value === "attachments";
@@ -94,10 +96,13 @@ export default function TaskDetails() {
     if (activeTab === "prs") {
       fetchPRData();
     }
+    if (activeTab === "ai" && !aiSuggestion && !aiLoading) {
+      fetchAiSuggestion();
+    }
     if (activeTab === "activity") {
       fetchActivityLogs();
     }
-  }, [activeTab, fetchPRData, fetchActivityLogs]);
+  }, [activeTab, aiLoading, aiSuggestion, fetchAiSuggestion, fetchPRData, fetchActivityLogs]);
 
   const handleStatusChange = async (newStatus: TaskStatusValue) => {
     await handleStatusUpdate(newStatus);
@@ -215,6 +220,7 @@ export default function TaskDetails() {
 
   const taskTabs: Array<{ id: TaskTab; label: string; icon: string; count?: number }> = [
     { id: "overview", label: "Overview", icon: "description" },
+    { id: "ai", label: "AI Assistant", icon: "auto_awesome" },
     { id: "prs", label: "PRs & Code", icon: "code", count: pullRequests.length || undefined },
     { id: "activity", label: "Activity", icon: "history", count: activityLogs.length || undefined },
     { id: "attachments", label: "Attachments", icon: "attach_file" },
@@ -281,7 +287,7 @@ export default function TaskDetails() {
                   </div>
                 )}
 
-                <div className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
                   <div className="py-3 sm:hidden">
                     <select
                       aria-label="Task detail tabs"
@@ -296,22 +302,28 @@ export default function TaskDetails() {
                       ))}
                     </select>
                   </div>
-                  <div className="hidden gap-2 overflow-x-auto py-3 scrollbar-hide sm:flex">
+                  <div className="hidden gap-2 overflow-x-auto scrollbar-hide sm:flex">
                     {taskTabs.map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
-                        className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+                        className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap transition-colors ${
                           activeTab === tab.id
-                            ? "border-blue-200 bg-blue-50 text-blue-700 shadow-sm"
-                            : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-blue-600"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-slate-100"
                         }`}
                         onClick={() => setActiveTab(tab.id)}
                       >
                         <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
                         <span>{tab.label}</span>
                         {tab.count ? (
-                          <span className="rounded-full bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                              activeTab === tab.id
+                                ? "bg-white/20 text-white"
+                                : "bg-blue-600/10 text-blue-600"
+                            }`}
+                          >
                             {tab.count}
                           </span>
                         ) : null}
@@ -325,16 +337,10 @@ export default function TaskDetails() {
                     <TaskOverviewTab
                       task={task}
                       workspaceUsers={workspaceUsers}
-                      aiSuggestion={aiSuggestion}
-                      aiLoading={aiLoading}
-                      aiError={aiError}
-                      prioritySaving={prioritySaving}
-                      onPriorityUpdate={handlePriorityChange}
                       onTaskUpdate={handleTaskUpdate}
                       onSubtaskCreate={handleSubtaskCreate}
                       onSubtaskUpdate={handleSubtaskUpdate}
                       onSubtaskDelete={handleSubtaskDelete}
-                      onRefreshAi={fetchAiSuggestion}
                     />
                     <div ref={testCasesRef}>
                       <TaskTestCases
@@ -348,6 +354,17 @@ export default function TaskDetails() {
                       />
                     </div>
                   </>
+                )}
+
+                {activeTab === "ai" && (
+                  <TaskAiTab
+                    aiSuggestion={aiSuggestion}
+                    aiLoading={aiLoading}
+                    aiError={aiError}
+                    prioritySaving={prioritySaving}
+                    onPriorityUpdate={handlePriorityChange}
+                    onRefreshAi={fetchAiSuggestion}
+                  />
                 )}
 
                 {activeTab === "prs" && (
