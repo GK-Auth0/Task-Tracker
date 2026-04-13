@@ -16,6 +16,7 @@ import { sprintsAPI } from "../services/sprints";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWorkspaceContent } from "../types/roles";
 import { ProjectStatus } from "../enums";
+import { richTextToPlainText } from "../utils/richText";
 
 type ProjectStatusFilter = "all" | ProjectStatus;
 
@@ -182,7 +183,7 @@ const Projects: React.FC = () => {
 
   const filteredProjects = projects.filter((project) => {
     const projectName = String(project?.name ?? "");
-    const projectDescription = String(project?.description ?? "");
+    const projectDescription = richTextToPlainText(String(project?.description ?? ""));
     const projectStatus = String(project?.status ?? "").toLowerCase();
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const matchesSearch =

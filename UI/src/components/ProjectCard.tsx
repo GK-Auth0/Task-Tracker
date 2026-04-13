@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Project } from "../types/project";
+import { getRichTextPreview } from "../utils/richText";
 
 interface ProjectCardProps {
   project: Project;
@@ -74,6 +75,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   };
 
   const progress = project.progress || 0;
+  const descriptionPreview = getRichTextPreview(project.description || "", 120);
 
   return (
     <div
@@ -90,9 +92,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           <h3 className="text-lg font-bold group-hover:text-blue-600 transition-colors">
             {safeName}
           </h3>
-          {project.description && (
+          {descriptionPreview && (
             <p className="text-sm text-slate-500 mt-1 line-clamp-2">
-              {project.description}
+              {descriptionPreview}
             </p>
           )}
         </div>

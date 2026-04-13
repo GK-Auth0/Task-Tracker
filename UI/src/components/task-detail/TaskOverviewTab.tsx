@@ -350,6 +350,7 @@ export default function TaskOverviewTab({
                 <div className="flex items-center gap-3 sm:flex-1">
                   <input
                     type="checkbox"
+                    aria-label="kl"
                     checked={subtask.is_completed}
                     onChange={(e) => handleToggleSubtask(subtask.id, e.target.checked)}
                     className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"

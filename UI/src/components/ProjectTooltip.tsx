@@ -1,5 +1,6 @@
 import React from "react";
 import { Tooltip, TooltipProps } from "@mui/material";
+import { getRichTextPreview } from "../utils/richText";
 
 interface ProjectItem {
   id: string;
@@ -42,11 +43,12 @@ const ProjectTooltip: React.FC<ProjectTooltipProps> = ({
   arrow = true,
   ...tooltipProps 
 }) => {
+  const descriptionPreview = getRichTextPreview(project.description || "", 160);
   const tooltipContent = (
     <div className="p-2 max-w-xs">
       <div className="font-semibold text-sm mb-1 text-white">{project.name}</div>
-      {project.description && (
-        <div className="text-xs text-gray-200 mb-2 line-clamp-3">{project.description}</div>
+      {descriptionPreview && (
+        <div className="text-xs text-gray-200 mb-2 line-clamp-3">{descriptionPreview}</div>
       )}
       <div className="space-y-1 text-xs text-gray-200">
         <div><span className="font-medium text-white">Status:</span> {project.status}</div>
