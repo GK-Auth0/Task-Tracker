@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { TaskPriority, TaskStatus } from "../enums";
 import { Op } from "sequelize";
 import { Defect, Project, ProjectMember, Sprint, Task, User } from "../models";
 import { createAuditLog } from "../services/auditService";
@@ -833,8 +834,8 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
               ? defect.reproduction_steps.map((step, index) => `${index + 1}. ${step}`)
               : []),
           ].join("\n"),
-          status: "To Do",
-          priority: mapDefectPriorityToTaskPriority(defect.priority),
+          status: TaskStatus.TODO,
+          priority: mapDefectPriorityToTaskPriority(defect.priority) as TaskPriority,
           project_id: defect.project_id,
           assignee_id: defect.assignee_id,
           defect_id: defect.id,

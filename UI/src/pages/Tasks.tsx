@@ -22,6 +22,8 @@ import {
   TaskSortOption,
 } from "../components/tasks/types";
 import { canManageWorkspaceContent } from "../types/roles";
+import { TaskStatus } from "../enums";
+import { isActiveTaskStatus, isDoneTaskStatus } from "../utils/taskStatus";
 
 export default function Tasks() {
   const navigate = useNavigate();
@@ -61,7 +63,7 @@ export default function Tasks() {
       page: currentPage,
       limit: itemsPerPage,
     };
-    if (filter === "In Progress") filters.status = "In Progress";
+    if (filter === TaskStatus.IN_PROGRESS) filters.status = TaskStatus.IN_PROGRESS;
     if (filter === "High Priority") filters.priority = "High";
     if (priorityFilter) filters.priority = priorityFilter;
     if (statusFilter) filters.status = statusFilter;
@@ -133,7 +135,7 @@ export default function Tasks() {
     if (!canCreateTask) return;
     try {
       await tasksAPI.updateTask(taskId, {
-        status: completed ? "Done" : "To Do",
+        status: completed ? TaskStatus.DONE : TaskStatus.TODO,
       });
       await Promise.all([
         queryClient.invalidateQueries(["tasks-page-data"]),
@@ -149,7 +151,7 @@ export default function Tasks() {
       task.title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     )
     .filter((task) => {
-      if (!showCompleted) return task.status !== "Done";
+      if (!showCompleted) return !isDoneTaskStatus(task.status);
       return true;
     })
     .filter((task) => {
@@ -167,7 +169,7 @@ export default function Tasks() {
         return diffDays >= 0 && diffDays <= 3;
       }
       if (filter === "My Focus") {
-        return task.priority === "High" || task.status === "In Progress";
+        return task.priority === "High" || isActiveTaskStatus(task.status);
       }
       return true;
     })
@@ -202,12 +204,12 @@ export default function Tasks() {
   });
 
   const highPriorityVisible = sortedTasks.filter(
-    (task) => task.priority === "High" && task.status !== "Done",
+    (task) => task.priority === "High" && !isDoneTaskStatus(task.status),
   ).length;
   const inProgressVisible = sortedTasks.filter(
-    (task) => task.status === "In Progress",
+    (task) => isActiveTaskStatus(task.status),
   ).length;
-  const doneVisible = sortedTasks.filter((task) => task.status === "Done").length;
+  const doneVisible = sortedTasks.filter((task) => isDoneTaskStatus(task.status)).length;
   const selectedTasks = sortedTasks.filter((task) =>
     selectedRowIds.type === "include"
       ? selectedRowIds.ids.has(task.id)

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
-import TestCaseNav from "../components/testcases/TestCaseNav";
 import TestCaseDetailPanel from "../components/testcases/TestCaseDetailPanel";
 import { testCasesAPI } from "../services/testCases";
 import type { TestCaseRecord } from "../types/testCase";
@@ -50,30 +49,22 @@ export default function TestCaseDetailPage() {
           showStaticBanner={false}
           actions={
             <div className="flex flex-wrap gap-3">
-              {testCase?.module ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(`/test-cases/modules/${encodeModuleSlug(testCase.module)}`)
-                  }
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Back to module
-                </button>
-              ) : null}
               <button
                 type="button"
-                onClick={() => navigate("/test-cases")}
+                onClick={() =>
+                  testCase?.module
+                    ? navigate(`/test-cases/modules/${encodeModuleSlug(testCase.module)}`)
+                    : navigate("/test-cases")
+                }
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                Back to modules
+                {testCase?.module ? "Back to module" : "Back to modules"}
               </button>
             </div>
           }
         />
 
         <div className="space-y-5">
-          <TestCaseNav />
           {loading ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
               Loading test case...

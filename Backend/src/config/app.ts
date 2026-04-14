@@ -67,4 +67,88 @@ export const appConfig = {
   security: {
     trustProxy: getEnv("TRUST_PROXY") || "loopback",
   },
+  rateLimits: {
+    global: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_GLOBAL_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_GLOBAL_LIMIT"), 300),
+    },
+    auth: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_AUTH_WINDOW_MS"), 15 * 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_AUTH_LIMIT"), 40),
+    },
+    ai: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_AI_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_AI_LIMIT"), 40),
+    },
+    search: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_SEARCH_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_SEARCH_LIMIT"), 90),
+    },
+    dashboard: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_DASHBOARD_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_DASHBOARD_LIMIT"), 60),
+    },
+    chatRead: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_CHAT_READ_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_CHAT_READ_LIMIT"), 120),
+    },
+    chatWrite: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_CHAT_WRITE_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_CHAT_WRITE_LIMIT"), 45),
+    },
+    projectRead: {
+      windowMs: parseNumber(getEnv("RATE_LIMIT_PROJECT_READ_WINDOW_MS"), 60 * 1000),
+      limit: parseNumber(getEnv("RATE_LIMIT_PROJECT_READ_LIMIT"), 90),
+    },
+  },
+  throttles: {
+    global: {
+      windowMs: parseNumber(getEnv("THROTTLE_GLOBAL_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_GLOBAL_DELAY_AFTER"), 60),
+      delayMs: parseNumber(getEnv("THROTTLE_GLOBAL_DELAY_MS"), 150),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_GLOBAL_MAX_DELAY_MS"), 1200),
+    },
+    auth: {
+      windowMs: parseNumber(getEnv("THROTTLE_AUTH_WINDOW_MS"), 15 * 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_AUTH_DELAY_AFTER"), 5),
+      delayMs: parseNumber(getEnv("THROTTLE_AUTH_DELAY_MS"), 500),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_AUTH_MAX_DELAY_MS"), 4000),
+    },
+    ai: {
+      windowMs: parseNumber(getEnv("THROTTLE_AI_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_AI_DELAY_AFTER"), 4),
+      delayMs: parseNumber(getEnv("THROTTLE_AI_DELAY_MS"), 400),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_AI_MAX_DELAY_MS"), 2500),
+    },
+    search: {
+      windowMs: parseNumber(getEnv("THROTTLE_SEARCH_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_SEARCH_DELAY_AFTER"), 15),
+      delayMs: parseNumber(getEnv("THROTTLE_SEARCH_DELAY_MS"), 200),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_SEARCH_MAX_DELAY_MS"), 1500),
+    },
+    dashboard: {
+      windowMs: parseNumber(getEnv("THROTTLE_DASHBOARD_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_DASHBOARD_DELAY_AFTER"), 10),
+      delayMs: parseNumber(getEnv("THROTTLE_DASHBOARD_DELAY_MS"), 250),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_DASHBOARD_MAX_DELAY_MS"), 1500),
+    },
+    chatRead: {
+      windowMs: parseNumber(getEnv("THROTTLE_CHAT_READ_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_CHAT_READ_DELAY_AFTER"), 30),
+      delayMs: parseNumber(getEnv("THROTTLE_CHAT_READ_DELAY_MS"), 120),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_CHAT_READ_MAX_DELAY_MS"), 1000),
+    },
+    chatWrite: {
+      windowMs: parseNumber(getEnv("THROTTLE_CHAT_WRITE_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_CHAT_WRITE_DELAY_AFTER"), 8),
+      delayMs: parseNumber(getEnv("THROTTLE_CHAT_WRITE_DELAY_MS"), 350),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_CHAT_WRITE_MAX_DELAY_MS"), 3000),
+    },
+    projectRead: {
+      windowMs: parseNumber(getEnv("THROTTLE_PROJECT_READ_WINDOW_MS"), 60 * 1000),
+      delayAfter: parseNumber(getEnv("THROTTLE_PROJECT_READ_DELAY_AFTER"), 20),
+      delayMs: parseNumber(getEnv("THROTTLE_PROJECT_READ_DELAY_MS"), 180),
+      maxDelayMs: parseNumber(getEnv("THROTTLE_PROJECT_READ_MAX_DELAY_MS"), 1200),
+    },
+  },
 };

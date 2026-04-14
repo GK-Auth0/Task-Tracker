@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { GridRowSelectionModel } from "@mui/x-data-grid";
 import { useNavigate, useParams } from "react-router-dom";
 import CreateTaskModal from "../components/CreateTaskModal";
 import ProjectConfidentialAccessPanel from "../components/projects/ProjectConfidentialAccessPanel";
+import ProjectActivityTab from "../components/projects/detail/ProjectActivityTab";
+import ProjectFilesTab from "../components/projects/detail/ProjectFilesTab";
 import ProjectHeader from "../components/projects/detail/ProjectHeader";
 import ProjectManagementPanel from "../components/projects/detail/ProjectManagementPanel";
+import ProjectRoadmapTab, {
+  type RoadmapViewMode,
+} from "../components/projects/detail/ProjectRoadmapTab";
 import ProjectTabNav from "../components/projects/detail/ProjectTabNav";
-import TaskBoard from "../components/projects/detail/TaskBoard";
-import TaskTrends from "../components/projects/detail/TaskTrends";
+import ProjectTasksTab from "../components/projects/detail/ProjectTasksTab";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE_URL } from "../config/api";
 import { projectsAPI, ActivityLog } from "../services/dashboard";
@@ -20,10 +25,9 @@ import { Task } from "../types/task";
 import { ProjectStatus, ProjectPriority } from "../enums";
 import type { Sprint } from "../types/sprint";
 import { TASK_STATUSES, isDoneTaskStatus } from "../utils/taskStatus";
+import { TaskStatus } from "../enums";
 
 type ProjectTab = "tasks" | "roadmap" | "files" | "activity";
-
-type ViewMode = "day" | "week" | "month";
 
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +37,15 @@ const ProjectDetail: React.FC = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [roadmapTasksRaw, setRoadmapTasksRaw] = useState<Task[]>([]);
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<
+    Array<{
+      id: string;
+      original_name: string;
+      file_size: number;
+      created_at: string;
+      file_url: string;
+    }>
+  >([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
@@ -83,7 +95,7 @@ const ProjectDetail: React.FC = () => {
   const debouncedManagementSearch = useDebouncedValue(memberSearchQuery, 300);
   const debouncedConfigSearch = useDebouncedValue(configSearch, 300);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const [viewMode, setViewMode] = useState<RoadmapViewMode>("week");
   const [offset, setOffset] = useState(0);
   const [roadmapQuery, setRoadmapQuery] = useState("");
   const [roadmapStatusFilter, setRoadmapStatusFilter] = useState<
@@ -93,6 +105,10 @@ const ProjectDetail: React.FC = () => {
     "all" | "high" | "medium" | "low"
   >("all");
   const [roadmapHideCompleted, setRoadmapHideCompleted] = useState(false);
+  const [selectedRowIds, setSelectedRowIds] = useState<GridRowSelectionModel>({
+    type: "include",
+    ids: new Set(),
+  });
 
   useEffect(() => {
     if (!id) {
@@ -211,19 +227,19 @@ const ProjectDetail: React.FC = () => {
   const normalizeTask = (task: any): Task => {
     const rawStatus = String(task.status || "").trim().toLowerCase().replace(/\s+/g, "_");
     const statusMap: Record<string, Task["status"]> = {
-      todo: "To Do",
-      to_do: "To Do",
-      "to-do": "To Do",
-      in_progress: "In Progress",
-      inprogress: "In Progress",
-      progress: "In Progress",
-      ready_for_qa: "Ready for QA",
-      readyforqa: "Ready for QA",
-      in_qa: "In QA",
-      inqa: "In QA",
-      blocked: "Blocked",
-      done: "Done",
-      completed: "Done",
+      todo: TaskStatus.TODO,
+      to_do: TaskStatus.TODO,
+      "to-do": TaskStatus.TODO,
+      in_progress: TaskStatus.IN_PROGRESS,
+      inprogress: TaskStatus.IN_PROGRESS,
+      progress: TaskStatus.IN_PROGRESS,
+      ready_for_qa: TaskStatus.READY_FOR_QA,
+      readyforqa: TaskStatus.READY_FOR_QA,
+      in_qa: TaskStatus.IN_QA,
+      inqa: TaskStatus.IN_QA,
+      blocked: TaskStatus.BLOCKED,
+      done: TaskStatus.DONE,
+      completed: TaskStatus.DONE,
     };
 
     const rawPriority = String(task.priority || "medium").trim().toLowerCase();
@@ -237,7 +253,7 @@ const ProjectDetail: React.FC = () => {
       id: String(task.id),
       title: String(task.title || ""),
       description: task.description,
-      status: statusMap[rawStatus] || "To Do",
+      status: statusMap[rawStatus] || TaskStatus.TODO,
       priority: priorityMap[rawPriority] || "medium",
       issueType: task.issueType || task.issue_type || "Task",
       startDate: task.startDate || task.start_date,
@@ -810,42 +826,14 @@ const ProjectDetail: React.FC = () => {
           canViewConfidential={canViewConfidential}
           taskCount={tasks.length}
           fileCount={files.length}
+          isProjectOwner={isProjectOwner}
+          showConfidentialPanel={showConfidentialPanel}
+          showManagementPanel={showManagementPanel}
           onTabChange={handleTabChange}
+          onToggleConfidentialPanel={() => setShowConfidentialPanel((value) => !value)}
+          onToggleManagementPanel={() => setShowManagementPanel((value) => !value)}
+          onOpenManagementPanel={() => setShowManagementPanel(true)}
         />
-
-        {isProjectOwner && (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowConfidentialPanel((value) => !value)}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-lg">lock</span>
-              {showConfidentialPanel ? "Hide Confidential Access" : "Confidential Access"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowManagementPanel((value) => !value)}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-lg">edit_square</span>
-              {showManagementPanel ? "Hide Update Options" : "Manage Project"}
-            </button>
-          </div>
-        )}
-
-        {!isProjectOwner && (
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowConfidentialPanel((value) => !value)}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-lg">lock</span>
-              {showConfidentialPanel ? "Hide Confidential Access" : "Confidential Access"}
-            </button>
-          </div>
-        )}
 
         {showConfidentialPanel && (
           <ProjectConfidentialAccessPanel
@@ -902,280 +890,60 @@ const ProjectDetail: React.FC = () => {
         )}
 
         {activeTab === "tasks" && (
-          <div className="space-y-4">
-            <TaskTrends tasks={tasks} />
-            {tasksLoading && (
-              <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-500">
-                Loading tasks...
-              </div>
-            )}
-            {tabError && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
-                {tabError}
-              </div>
-            )}
-            <TaskBoard tasks={tasks} onOpenTask={(taskId) => navigate(`/task/${taskId}`)} />
-          </div>
+          <ProjectTasksTab
+            tasks={tasks}
+            tasksLoading={tasksLoading}
+            tabError={tabError}
+            onOpenTask={(taskId) => navigate(`/task/${taskId}`)}
+            selectedRowIds={selectedRowIds}
+            onSelectedRowIdsChange={setSelectedRowIds}
+          />
         )}
 
         {activeTab === "roadmap" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Roadmap Window</p>
-                <h3 className="mt-1 text-lg font-black text-slate-900">{getRoadmapRangeLabel()}</h3>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  {(["day", "week", "month"] as ViewMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        setViewMode(mode);
-                        setOffset(0);
-                      }}
-                      className={`h-8 rounded-md px-3 text-xs font-semibold uppercase ${
-                        viewMode === mode ? "bg-white text-blue-600 shadow-sm" : "text-slate-600"
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                  onClick={() => setOffset((prev) => prev - 1)}
-                  aria-label="Previous range"
-                >
-                  <span className="material-symbols-outlined text-lg">chevron_left</span>
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  onClick={() => setOffset(0)}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                  onClick={() => setOffset((prev) => prev + 1)}
-                  aria-label="Next range"
-                >
-                  <span className="material-symbols-outlined text-lg">chevron_right</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium text-slate-500">Items</p>
-                <p className="mt-1 text-xl font-black text-slate-900">{roadmapStats.total}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium text-slate-500">Completed</p>
-                <p className="mt-1 text-xl font-black text-emerald-600">{roadmapStats.done}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium text-slate-500">Due This Week</p>
-                <p className="mt-1 text-xl font-black text-blue-600">{roadmapStats.dueThisWeek}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium text-slate-500">Overdue</p>
-                <p className="mt-1 text-xl font-black text-rose-600">{roadmapStats.overdue}</p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <input
-                  value={roadmapQuery}
-                  onChange={(event) => setRoadmapQuery(event.target.value)}
-                  placeholder="Search roadmap tasks"
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
-                />
-                <select
-                  value={roadmapStatusFilter}
-                  onChange={(event) =>
-                    setRoadmapStatusFilter(
-                      event.target.value as "all" | (typeof TASK_STATUSES)[number],
-                    )
-                  }
-                  aria-label="Filter roadmap tasks by status"
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
-                >
-                  <option value="all">All status</option>
-                  {TASK_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={roadmapPriorityFilter}
-                  onChange={(event) =>
-                    setRoadmapPriorityFilter(
-                      event.target.value as "all" | "high" | "medium" | "low",
-                    )
-                  }
-                  aria-label="Filter roadmap tasks by priority"
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
-                >
-                  <option value="all">All priority</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-                <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={roadmapHideCompleted}
-                    onChange={(event) => setRoadmapHideCompleted(event.target.checked)}
-                  />
-                  Hide completed
-                </label>
-              </div>
-            </div>
-
-            {roadmapLoading ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-                Loading roadmap...
-              </div>
-            ) : tabError ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
-                {tabError}
-              </div>
-            ) : filteredRoadmapTasks.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                No scheduled tasks in this range.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {roadmapGroups.map((group) => (
-                  <div key={group.key} className="space-y-2">
-                    <div className="flex items-center justify-between px-1">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">
-                        {group.title}
-                      </h4>
-                      <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                        {group.tasks.length}
-                      </span>
-                    </div>
-                    {group.tasks.map((task) => (
-                      <button
-                        key={task.id}
-                        type="button"
-                        onClick={() => navigate(`/task/${task.id}`)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-left hover:bg-slate-100 transition-colors"
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900 truncate">{task.title}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {task.status} • {task.priority.toUpperCase()}
-                            </p>
-                          </div>
-                          <div className="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
-                            <span className="material-symbols-outlined text-sm">calendar_today</span>
-                            {new Date(task.dueDate || task.startDate || task.createdAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <ProjectRoadmapTab
+            viewMode={viewMode}
+            offset={offset}
+            rangeLabel={getRoadmapRangeLabel()}
+            roadmapStats={roadmapStats}
+            roadmapQuery={roadmapQuery}
+            roadmapStatusFilter={roadmapStatusFilter}
+            roadmapPriorityFilter={roadmapPriorityFilter}
+            roadmapHideCompleted={roadmapHideCompleted}
+            roadmapLoading={roadmapLoading}
+            tabError={tabError}
+            filteredRoadmapTasks={filteredRoadmapTasks}
+            roadmapGroups={roadmapGroups}
+            onViewModeChange={(mode) => {
+              setViewMode(mode);
+              setOffset(0);
+            }}
+            onOffsetChange={setOffset}
+            onResetOffset={() => setOffset(0)}
+            onRoadmapQueryChange={setRoadmapQuery}
+            onRoadmapStatusFilterChange={setRoadmapStatusFilter}
+            onRoadmapPriorityFilterChange={setRoadmapPriorityFilter}
+            onRoadmapHideCompletedChange={setRoadmapHideCompleted}
+            onOpenTask={(taskId) => navigate(`/task/${taskId}`)}
+          />
         )}
 
         {activeTab === "files" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-black text-slate-900">Project Files</h3>
-              <label className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 cursor-pointer w-full sm:w-auto">
-                <span className="material-symbols-outlined text-lg">upload</span>
-                {uploading ? "Uploading..." : "Upload File"}
-                <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploading} />
-              </label>
-            </div>
-
-            {filesLoading ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-                Loading files...
-              </div>
-            ) : tabError ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
-                {tabError}
-              </div>
-            ) : files.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                No files uploaded yet.
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {files.map((file) => (
-                  <div key={file.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="material-symbols-outlined text-blue-600">description</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{file.original_name}</p>
-                        <p className="mt-1 text-xs text-slate-500">{(file.file_size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <p className="text-xs text-slate-500">
-                        {new Date(file.created_at).toLocaleDateString()}
-                      </p>
-                      <a
-                        href={file.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
-                      >
-                        <span className="material-symbols-outlined text-sm">download</span>
-                        Download
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <ProjectFilesTab
+            files={files}
+            filesLoading={filesLoading}
+            tabError={tabError}
+            uploading={uploading}
+            onFileUpload={handleFileUpload}
+          />
         )}
 
         {activeTab === "activity" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-            <h3 className="text-lg font-black text-slate-900">Project Activity</h3>
-
-            {activityLoading ? (
-              <div className="py-8 text-center">
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
-                <p className="mt-2 text-sm text-slate-500">Loading activity...</p>
-              </div>
-            ) : tabError ? (
-              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
-                {tabError}
-              </div>
-            ) : activityLogs.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-500">No activity found.</div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {activityLogs.map((log) => (
-                  <div key={log.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="font-semibold text-slate-900">{log.user.full_name}</span>
-                      <span className="text-slate-600">{log.action.replace(/_/g, " ")}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{new Date(log.created_at).toLocaleString()}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <ProjectActivityTab
+            activityLoading={activityLoading}
+            tabError={tabError}
+            activityLogs={activityLogs}
+          />
         )}
       </div>
 

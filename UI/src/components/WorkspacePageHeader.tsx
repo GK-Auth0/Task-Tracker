@@ -8,6 +8,8 @@ interface WorkspacePageHeaderProps {
   metaLabel: string;
   metaValue: string;
   actions?: ReactNode;
+  metaPosition?: "inline" | "right";
+  showMeta?: boolean;
   showStaticBanner?: boolean;
 }
 
@@ -18,6 +20,8 @@ export default function WorkspacePageHeader({
   metaLabel,
   metaValue,
   actions,
+  metaPosition = "inline",
+  showMeta = true,
   showStaticBanner = true,
 }: WorkspacePageHeaderProps) {
   return (
@@ -33,18 +37,30 @@ export default function WorkspacePageHeader({
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
-            {metaLabel}
-          </p>
-          <p className="mt-1 text-xs font-semibold text-slate-900 sm:text-sm">
-            {metaValue}
-          </p>
-        </div>
+        {showMeta && metaPosition === "inline" ? (
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+              {metaLabel}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-900 sm:text-sm">
+              {metaValue}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col items-start gap-3 sm:items-end">
         {showStaticBanner ? <StaticDataBanner /> : null}
+        {showMeta && metaPosition === "right" ? (
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
+              {metaLabel}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-900 sm:text-sm">
+              {metaValue}
+            </p>
+          </div>
+        ) : null}
         {actions}
       </div>
     </div>

@@ -3,6 +3,8 @@ import { Project } from "../../../types/project";
 import aiChatAPI from "../../../services/aiChat";
 import { buildProjectTemplate } from "../../../utils/descriptionTemplates";
 import { ProjectPriority } from "../../../enums";
+import RichTextEditor from "../../common/RichTextEditor";
+import { plainTextToRichText, richTextToPlainText } from "../../../utils/richText";
 
 interface ProjectUser {
   id: string;
@@ -55,6 +57,10 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
   const [editPriority, setEditPriority] = useState<ProjectPriority>(project.priority || ProjectPriority.MEDIUM);
   const [editStartDate, setEditStartDate] = useState(project.startDate?.slice(0, 10) || "");
   const [editEndDate, setEditEndDate] = useState(project.endDate?.slice(0, 10) || "");
+  const editDescriptionText = useMemo(
+    () => richTextToPlainText(editDescription),
+    [editDescription],
+  );
 
   const memberIds = useMemo(() => new Set((project.members || []).map((member) => member.user?.id)), [project.members]);
 
@@ -78,7 +84,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
   };
 
   const handleApplyTemplate = () => {
-    setEditDescription(buildProjectTemplate(editName));
+    setEditDescription(plainTextToRichText(buildProjectTemplate(editName)));
     setAiError("");
   };
 
@@ -99,7 +105,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
         setAiError("AI did not return a draft.");
         return;
       }
-      setEditDescription(draft.slice(0, 2000));
+      setEditDescription(plainTextToRichText(draft.slice(0, 2000)));
     } catch (error) {
       setAiError("AI draft unavailable right now.");
     } finally {
@@ -123,11 +129,12 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
             className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm"
             placeholder="Project name"
           />
-          <textarea
+          <RichTextEditor
             value={editDescription}
-            onChange={(event) => setEditDescription(event.target.value.slice(0, 2000))}
+            onChange={setEditDescription}
             maxLength={2000}
-            className="w-full min-h-[92px] rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            helperText={aiError || "Formatting is preserved when the project is updated."}
+            minHeightClassName="min-h-[140px]"
             placeholder="Project description"
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -136,7 +143,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
               onClick={handleApplyTemplate}
               className="h-8 rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100"
             >
-              Jira Template
+              Use Template
             </button>
             <button
               type="button"
@@ -144,10 +151,10 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
               disabled={aiLoading || saving}
               className="h-8 rounded-md border border-cyan-200 bg-cyan-50 px-3 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-60"
             >
-              {aiLoading ? "Generating..." : "AI Draft"}
+              {aiLoading ? "Generating..." : "Generate Draft"}
             </button>
             <span className="ml-auto text-[11px] text-slate-500">
-              {editDescription.length}/2000
+              {editDescriptionText.length}/2000
             </span>
           </div>
           {aiError && (
@@ -181,7 +188,12 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
           <button
             type="button"
             onClick={handleSaveProject}
-            disabled={saving || !editName.trim() || !editDescription.trim()}
+            disabled={
+              saving ||
+              !editName.trim() ||
+              !editDescriptionText.trim() ||
+              editDescriptionText.length > 2000
+            }
             className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
             {saving ? "Saving..." : "Update Project"}

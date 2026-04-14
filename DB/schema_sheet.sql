@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('To Do', 'In Progress', 'Done')) DEFAULT 'To Do',
+    status VARCHAR(30) NOT NULL CHECK (status IN ('To Do', 'In Progress', 'Ready for QA', 'In QA', 'Blocked', 'Done')) DEFAULT 'To Do',
     priority VARCHAR(10) NOT NULL CHECK (priority IN ('Low', 'Medium', 'High')) DEFAULT 'Medium',
     issue_type VARCHAR(20) NOT NULL CHECK (issue_type IN ('Story', 'Task', 'Bug')) DEFAULT 'Task',
     due_date DATE,

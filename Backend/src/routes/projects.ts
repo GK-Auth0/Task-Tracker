@@ -6,6 +6,7 @@ import { upload } from '../middleware/upload';
 import { requireWorkspaceRole } from '../middleware/rbac';
 import { cacheGetResponse } from '../middleware/responseCache';
 import { projectReadRateLimiter, searchRateLimiter } from '../middleware/rateLimit';
+import { projectReadThrottle, searchThrottle } from '../middleware/throttle';
 
 const router = Router();
 
@@ -156,8 +157,8 @@ router.use(authenticateToken);
  *                     totalPages:
  *                       type: integer
  */
-router.get('/', projectReadRateLimiter, cacheGetResponse(10000), projectController.getProjects);
-router.get('/confidential-access/projects', projectReadRateLimiter, cacheGetResponse(10000), projectController.getConfidentialAccessProjects);
+router.get('/', projectReadThrottle, projectReadRateLimiter, cacheGetResponse(10000), projectController.getProjects);
+router.get('/confidential-access/projects', projectReadThrottle, projectReadRateLimiter, cacheGetResponse(10000), projectController.getConfidentialAccessProjects);
 
 /**
  * @swagger
@@ -177,7 +178,7 @@ router.get('/confidential-access/projects', projectReadRateLimiter, cacheGetResp
  *       200:
  *         description: Users retrieved successfully
  */
-router.get('/users', searchRateLimiter, cacheGetResponse(5000), projectController.getUsers);
+router.get('/users', searchThrottle, searchRateLimiter, cacheGetResponse(5000), projectController.getUsers);
 
 /**
  * @swagger
@@ -209,7 +210,7 @@ router.get('/users', searchRateLimiter, cacheGetResponse(5000), projectControlle
  *       404:
  *         description: Project not found
  */
-router.get('/:id', projectReadRateLimiter, cacheGetResponse(8000), projectController.getProject);
+router.get('/:id', projectReadThrottle, projectReadRateLimiter, cacheGetResponse(8000), projectController.getProject);
 router.post('/:id/members', requireWorkspaceRole("Member"), projectController.addProjectMember);
 router.put('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.updateProjectMemberRole);
 router.delete('/:id/members/:userId', requireWorkspaceRole("Member"), projectController.removeProjectMember);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { aiAssistantAPI, AiTaskSuggestion } from "../../services/aiAssistant";
+import { aiAssistantAPI } from "../../services/aiAssistant";
 import { buildTaskTemplate, appendTaskAiDraft } from "../../utils/descriptionTemplates";
 import { TaskStatusValue } from "../../utils/taskStatus";
 
@@ -23,31 +23,19 @@ interface TaskOverviewTabProps {
     }>;
   };
   workspaceUsers: Array<{ id: string; full_name: string; email: string }>;
-  aiSuggestion: AiTaskSuggestion | null;
-  aiLoading: boolean;
-  aiError: string;
-  prioritySaving: boolean;
-  onPriorityUpdate: (priority: "Low" | "Medium" | "High") => void;
   onTaskUpdate: (updates: { title: string; description: string }) => void;
   onSubtaskCreate: (title: string, assigneeId?: string) => void;
   onSubtaskUpdate: (subtaskId: string, updates: any) => void;
   onSubtaskDelete: (subtaskId: string) => void;
-  onRefreshAi: () => void;
 }
 
 export default function TaskOverviewTab({
   task,
   workspaceUsers,
-  aiSuggestion,
-  aiLoading,
-  aiError,
-  prioritySaving,
-  onPriorityUpdate,
   onTaskUpdate,
   onSubtaskCreate,
   onSubtaskUpdate,
   onSubtaskDelete,
-  onRefreshAi,
 }: TaskOverviewTabProps) {
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState(false);
@@ -174,19 +162,22 @@ export default function TaskOverviewTab({
     setComment("");
   };
 
-  const navigateToCreateTestCase = () => {
-    navigate(`/test-cases/create?sourceTaskId=${task.id}`);
-  };
+  const description = task.description?.trim();
 
   return (
-    <>
+    <div className="space-y-4">
       {/* Description Section */}
-      <div className="group relative space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-slate-900">Description</h3>
+      <div className="group relative rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              Overview
+            </p>
+            <h3 className="text-sm font-semibold text-slate-900">Description</h3>
+          </div>
           <button
             type="button"
-            className="text-blue-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+            className="flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 transition-opacity group-hover:opacity-100"
             onClick={() => {
               if (editMode) {
                 setEditMode(false);
@@ -204,11 +195,18 @@ export default function TaskOverviewTab({
           </button>
         </div>
         {!editMode ? (
-          <div className="prose max-w-none text-slate-600 leading-relaxed">
-            <p>{task.description || "No description provided."}</p>
+          <div className="space-y-3 pt-3">
+            <div className="rounded-lg bg-slate-50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Summary
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-700 whitespace-pre-wrap break-words">
+                {description || "No description provided."}
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 pt-3">
             {editError && (
               <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1">
                 {editError}
@@ -233,7 +231,7 @@ export default function TaskOverviewTab({
               <textarea
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                className="min-h-[120px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                className="min-h-[120px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm leading-6 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                 placeholder="Task description"
               />
               <p className="mt-1 text-[11px] text-slate-500">{editDescription.length}/1000</p>
@@ -289,8 +287,11 @@ export default function TaskOverviewTab({
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Subtasks</h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              Overview
+            </p>
+            <h3 className="text-sm font-semibold text-slate-900">Subtasks</h3>
+            <p className="text-xs text-slate-500">
               {completedSubtasks}/{task.subtasks?.length || 0} completed
             </p>
           </div>
@@ -349,6 +350,7 @@ export default function TaskOverviewTab({
                 <div className="flex items-center gap-3 sm:flex-1">
                   <input
                     type="checkbox"
+                    aria-label="kl"
                     checked={subtask.is_completed}
                     onChange={(e) => handleToggleSubtask(subtask.id, e.target.checked)}
                     className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
@@ -410,106 +412,16 @@ export default function TaskOverviewTab({
         )}
       </div>
 
-      {/* Test Case Shortcut */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
-              Quality Shortcut
-            </p>
-            <h3 className="mt-2 text-base font-semibold text-blue-950">
-              Add a test case from this task
-            </h3>
-            <p className="mt-1 text-sm text-blue-900/80">
-              Open the test case flow with this task already linked, plus project and sprint context prefilled.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={navigateToCreateTestCase}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            <span className="material-symbols-outlined text-lg">add_task</span>
-            <span>Add Test Case</span>
-          </button>
-        </div>
-      </div>
-
-      {/* AI Assistant */}
-      <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-blue-900">
-            <span className="material-symbols-outlined text-lg">auto_awesome</span>
-            AI Task Assistant
-          </h3>
-          <button
-            className="h-8 px-3 rounded-md bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 disabled:opacity-50"
-            onClick={onRefreshAi}
-            disabled={aiLoading}
-          >
-            {aiLoading ? "Analyzing..." : "Refresh"}
-          </button>
-        </div>
-
-        {aiError && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-            {aiError}
-          </p>
-        )}
-
-        {aiSuggestion && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Suggested Priority
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">
-                {aiSuggestion.priority}
-              </p>
-              <button
-                className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900"
-                onClick={() => onPriorityUpdate(aiSuggestion.priority)}
-                disabled={prioritySaving}
-              >
-                {prioritySaving ? "Applying..." : "Apply priority"}
-              </button>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Suggested Due Date
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">
-                {new Date(aiSuggestion.due_date).toLocaleDateString()}
-              </p>
-              <p className="mt-2 text-xs text-slate-600">
-                Est. {aiSuggestion.estimated_hours}h effort
-              </p>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Why</p>
-              <p className="mt-1 text-sm text-slate-700">{aiSuggestion.reason}</p>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3 lg:col-span-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Suggested Checklist
-              </p>
-              <ul className="mt-2 space-y-1">
-                {aiSuggestion.checklist.map((item) => (
-                  <li key={item} className="text-sm text-slate-700">
-                    • {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Activity/Comments */}
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-base font-semibold text-slate-900">Activity</h3>
+        <div className="space-y-1 border-b border-slate-100 pb-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            Overview
+          </p>
+          <h3 className="text-sm font-semibold text-slate-900">Activity</h3>
+        </div>
         <div className="space-y-4">
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-4">
             <div className="bg-blue-600/20 text-blue-600 rounded-full size-10 flex items-center justify-center text-xs font-bold flex-shrink-0">
               U
             </div>
@@ -543,6 +455,6 @@ export default function TaskOverviewTab({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

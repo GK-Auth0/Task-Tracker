@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { testCasesAPI, type TestCaseModuleOption } from "../../services/testCases";
+import {
+  testCasesAPI,
+  type TestCaseExecutionAttachment,
+  type TestCaseModuleOption,
+} from "../../services/testCases";
 import type { TestCaseRecord, TestCaseStatus } from "../../types/testCase";
 
 interface TaskTestCasesProps {
@@ -14,7 +18,15 @@ interface TaskTestCasesProps {
   testCasesLoading: boolean;
   testCaseRunLoadingId: string;
   projectModuleOptions: TestCaseModuleOption[];
-  onTestCaseRun: (testCaseId: string, status: Extract<TestCaseStatus, "Passed" | "Failed" | "Blocked">) => void;
+  onTestCaseRun: (
+    testCaseId: string,
+    status: Extract<TestCaseStatus, "Passed" | "Failed" | "Blocked">,
+    options?: {
+      note?: string;
+      actualBehavior?: string;
+      attachments?: TestCaseExecutionAttachment[];
+    },
+  ) => Promise<void> | void;
   onTestCaseCreated: (testCase: TestCaseRecord) => void;
 }
 
@@ -38,6 +50,14 @@ export default function TaskTestCases({
   const [quickStepExpected, setQuickStepExpected] = useState("");
   const [quickTestCaseSubmitting, setQuickTestCaseSubmitting] = useState(false);
   const [quickTestCaseError, setQuickTestCaseError] = useState("");
+  const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null);
+  const [executionStatus, setExecutionStatus] = useState<"Passed" | "Failed" | "Blocked">("Passed");
+  const [executionNote, setExecutionNote] = useState("");
+  const [actualBehavior, setActualBehavior] = useState("");
+  const [executionAttachments, setExecutionAttachments] = useState<TestCaseExecutionAttachment[]>([]);
+  const [executionError, setExecutionError] = useState("");
+  const [uploadingExecutionAttachment, setUploadingExecutionAttachment] = useState(false);
+  const linkedCount = linkedTestCases.length;
 
   const navigateToCreateTestCase = () => {
     navigate(`/test-cases/create?sourceTaskId=${task.id}`);
@@ -100,29 +120,88 @@ export default function TaskTestCases({
     }
   };
 
+  const openExecutionForm = (
+    testCaseId: string,
+    status: Extract<TestCaseStatus, "Passed" | "Failed" | "Blocked">,
+  ) => {
+    setActiveExecutionId(testCaseId);
+    setExecutionStatus(status);
+    setExecutionNote("");
+    setActualBehavior("");
+    setExecutionAttachments([]);
+    setExecutionError("");
+  };
+
+  const handleExecutionAttachmentUpload = async (testCaseId: string, file: File | null) => {
+    if (!file) return;
+
+    try {
+      setUploadingExecutionAttachment(true);
+      setExecutionError("");
+      const response = await testCasesAPI.uploadExecutionAttachment(testCaseId, file);
+      if (response.success) {
+        setExecutionAttachments((current) => [...current, response.data]);
+      }
+    } catch (error: any) {
+      setExecutionError(
+        error?.response?.data?.message || "Failed to upload screenshot.",
+      );
+    } finally {
+      setUploadingExecutionAttachment(false);
+    }
+  };
+
+  const handleExecutionSave = async (testCaseId: string) => {
+    if (executionStatus === "Failed" && !actualBehavior.trim()) {
+      setExecutionError("Actual behavior is required when the execution status is Failed.");
+      return;
+    }
+
+    try {
+      setExecutionError("");
+      await onTestCaseRun(testCaseId, executionStatus, {
+        note: executionNote,
+        actualBehavior: executionStatus === "Failed" ? actualBehavior : undefined,
+        attachments: executionAttachments,
+      });
+      setActiveExecutionId(null);
+      setExecutionStatus("Passed");
+      setExecutionNote("");
+      setActualBehavior("");
+      setExecutionAttachments([]);
+    } catch (error: any) {
+      setExecutionError(error?.message || "Failed to save execution.");
+    }
+  };
+
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">Linked Test Cases</h3>
-          <p className="text-sm text-slate-500">
-            Run and review test coverage for this task directly here.
+        <div className="space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            Quality
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-900">Linked Coverage</h3>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+              {linkedCount} {linkedCount === 1 ? "case" : "cases"}
+            </span>
+          </div>
+          <p className="text-xs leading-5 text-slate-500">
+            Review coverage, run outcomes, and create new linked checks for this task in one place.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => navigate("/test-cases")}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
-          >
-            Open Test Cases
-          </button>
-          <button
-            type="button"
             onClick={() => setShowQuickTestCaseForm(current => !current)}
-            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              showQuickTestCaseForm
+                ? "border border-blue-200 bg-blue-50 text-blue-700"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
           >
-            {showQuickTestCaseForm ? "Close Quick Create" : "Add Test Case Here"}
+            {showQuickTestCaseForm ? "Close Quick Add" : "Quick Add"}
           </button>
           <button
             type="button"
@@ -130,6 +209,13 @@ export default function TaskTestCases({
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
           >
             Full Create Page
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/test-cases")}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+          >
+            Open Library
           </button>
         </div>
       </div>
@@ -262,7 +348,7 @@ export default function TaskTestCases({
 
       {testCasesLoading ? (
         <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-          Loading linked test cases...
+          Loading linked coverage...
         </div>
       ) : linkedTestCases.length ? (
         <div className="space-y-3">
@@ -282,12 +368,25 @@ export default function TaskTestCases({
                       {testCase.reference_code} • {testCase.title}
                     </p>
                   </button>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {testCase.project?.name || "No project"} • {testCase.module} • {testCase.suite}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Status: {testCase.status} • Automation: {testCase.automation} • Last updated{" "}
-                    {new Date(testCase.updated_at).toLocaleDateString()}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                    <span className="rounded-full bg-white px-2 py-1 font-medium text-slate-600">
+                      {testCase.project?.name || "No project"}
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-1 font-medium text-slate-600">
+                      {testCase.module}
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-1 font-medium text-slate-600">
+                      {testCase.suite}
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-1 font-medium text-slate-600">
+                      {testCase.status}
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-1 font-medium text-slate-600">
+                      {testCase.automation}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Last updated {new Date(testCase.updated_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -295,7 +394,7 @@ export default function TaskTestCases({
                     <button
                       key={status}
                       type="button"
-                      onClick={() => onTestCaseRun(testCase.id, status)}
+                      onClick={() => openExecutionForm(testCase.id, status)}
                       disabled={Boolean(testCaseRunLoadingId)}
                       className={`rounded-lg px-3 py-2 text-xs font-semibold text-white ${
                         status === "Passed"
@@ -305,13 +404,137 @@ export default function TaskTestCases({
                             : "bg-amber-600 hover:bg-amber-700"
                       } disabled:opacity-50`}
                     >
-                      {testCaseRunLoadingId === `${testCase.id}:${status}`
-                        ? "Running..."
-                        : `Run ${status}`}
+                      {testCaseRunLoadingId === `${testCase.id}:${status}` ? "Running..." : status}
                     </button>
                   ))}
                 </div>
               </div>
+              {activeExecutionId === testCase.id ? (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-white p-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Execution Status
+                      </span>
+                      <select
+                        value={executionStatus}
+                        onChange={(event) =>
+                          setExecutionStatus(
+                            event.target.value as "Passed" | "Failed" | "Blocked",
+                          )
+                        }
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                      >
+                        {["Passed", "Failed", "Blocked"].map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Note
+                      </span>
+                      <input
+                        value={executionNote}
+                        onChange={(event) => setExecutionNote(event.target.value)}
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                        placeholder="Optional execution note"
+                      />
+                    </label>
+
+                    {executionStatus === "Failed" ? (
+                      <label className="block md:col-span-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Actual Behavior
+                        </span>
+                        <textarea
+                          value={actualBehavior}
+                          onChange={(event) => setActualBehavior(event.target.value)}
+                          className="mt-2 min-h-[96px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"
+                          placeholder="Describe what actually happened"
+                        />
+                      </label>
+                    ) : null}
+
+                    <div className="md:col-span-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Screenshots
+                      </span>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                          <span className="material-symbols-outlined text-base">upload</span>
+                          {uploadingExecutionAttachment ? "Uploading..." : "Add screenshot"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingExecutionAttachment}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] || null;
+                              void handleExecutionAttachmentUpload(testCase.id, file);
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <p className="text-xs text-slate-500">
+                          Add evidence for failed or blocked runs.
+                        </p>
+                      </div>
+                      {executionAttachments.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {executionAttachments.map((attachment) => (
+                            <a
+                              key={attachment.url}
+                              href={attachment.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                            >
+                              <span className="material-symbols-outlined text-sm">image</span>
+                              {attachment.name}
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {executionError ? (
+                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                      {executionError}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveExecutionId(null);
+                        setExecutionError("");
+                        setActualBehavior("");
+                        setExecutionNote("");
+                        setExecutionAttachments([]);
+                      }}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleExecutionSave(testCase.id)}
+                      disabled={testCaseRunLoadingId === `${testCase.id}:${executionStatus}`}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {testCaseRunLoadingId === `${testCase.id}:${executionStatus}`
+                        ? "Saving..."
+                        : "Save Execution"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               {testCase.execution_history.length ? (
                 <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
@@ -324,6 +547,27 @@ export default function TaskTestCases({
                     {testCase.execution_history[0].cycle} • {testCase.execution_history[0].tester} •{" "}
                     {new Date(testCase.execution_history[0].executedAt).toLocaleString()}
                   </p>
+                  {testCase.execution_history[0].actual_behavior ? (
+                    <p className="mt-2 text-xs text-slate-600">
+                      Actual: {testCase.execution_history[0].actual_behavior}
+                    </p>
+                  ) : null}
+                  {testCase.execution_history[0].attachments?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {testCase.execution_history[0].attachments.map((attachment) => (
+                        <a
+                          key={attachment.url}
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700"
+                        >
+                          <span className="material-symbols-outlined text-sm">image</span>
+                          {attachment.name}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -331,7 +575,7 @@ export default function TaskTestCases({
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-          No test cases are linked to this task yet. Add one from here and it will show up in this panel.
+          No linked coverage yet. Create one here and it will appear in this section.
         </div>
       )}
     </div>

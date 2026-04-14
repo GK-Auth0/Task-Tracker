@@ -141,7 +141,7 @@ export default function TaskDetailSidebar({
           <div className="space-y-2">
             <button type="button" onClick={onAddTestCase} className="w-full text-slate-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
               <span className="material-symbols-outlined text-sm">add_task</span>
-              Add Test Case
+              Open Coverage
             </button>
             <button type="button" onClick={onEdit} className="w-full text-slate-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
               <span className="material-symbols-outlined text-sm">edit_square</span>

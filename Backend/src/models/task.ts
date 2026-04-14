@@ -15,6 +15,7 @@ import {
 import { User, Project, Subtask, Comment, Label, TaskLabel, TaskFile } from "./index";
 import Sprint from "./sprint";
 import { TASK_STATUSES, type TaskStatusValue } from "../utils/taskStatus";
+import { TaskStatus } from "../enums";
 
 @Table({
   tableName: "tasks",
@@ -48,7 +49,7 @@ export default class Task extends Model {
   @Column({
     type: DataType.ENUM(...TASK_STATUSES),
     allowNull: false,
-    defaultValue: "To Do",
+    defaultValue: TaskStatus.TODO,
   })
   status!: TaskStatusValue;
 

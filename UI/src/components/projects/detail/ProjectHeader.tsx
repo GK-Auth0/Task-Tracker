@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Project } from "../../../types/project";
 import { ProjectStatus } from "../../../enums";
+import RichTextContent from "../../common/RichTextContent";
 
 interface ProjectHeaderProps {
   project: Project;
@@ -53,9 +54,16 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             </select>
           </div>
 
-          <p className="mt-3 max-w-3xl text-sm text-slate-600 leading-relaxed">
-            {project.description || "No description is available for this project yet."}
-          </p>
+          <div className="mt-4 max-w-4xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Description
+            </p>
+            <RichTextContent
+              content={project.description || ""}
+              emptyText="No description is available for this project yet."
+              className="mt-2 break-words"
+            />
+          </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-4">
             {sprintLabel ? (

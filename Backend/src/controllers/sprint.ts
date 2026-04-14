@@ -186,14 +186,13 @@ const getSprintFamilyRecords = async (sprintId: string, userId: string, role?: s
 const buildSprintInsights = async (familyRecords: Sprint[]) => {
   const familyIds = familyRecords.map((item) => item.id);
   const familyNames = Array.from(new Set(familyRecords.map((item) => item.name).filter(Boolean)));
+  const projectIds = Array.from(new Set(familyRecords.map((item) => item.project_id).filter(Boolean)));
 
   const allTasks = familyRecords.flatMap((item) => item.tasks || []);
   const defects = await Defect.findAll({
     where: {
-      [Op.or]: [
-        { sprint_id: { [Op.in]: familyIds } },
-        { sprint_id: null, sprint_name: { [Op.in]: familyNames } },
-      ],
+      project_id: { [Op.in]: projectIds },
+      [Op.or]: [{ sprint_id: { [Op.in]: familyIds } }, { sprint_id: null, sprint_name: { [Op.in]: familyNames } }],
     },
     attributes: ["id", "status", "priority", "severity", "project_id", "assignee_id"],
     include: [
@@ -203,10 +202,8 @@ const buildSprintInsights = async (familyRecords: Sprint[]) => {
   });
   const testCases = await TestCase.findAll({
     where: {
-      [Op.or]: [
-        { sprint_id: { [Op.in]: familyIds } },
-        { sprint_id: null, sprint_name: { [Op.in]: familyNames } },
-      ],
+      project_id: { [Op.in]: projectIds },
+      [Op.or]: [{ sprint_id: { [Op.in]: familyIds } }, { sprint_id: null, sprint_name: { [Op.in]: familyNames } }],
     },
     attributes: ["id", "status", "project_id", "owner_id"],
     include: [

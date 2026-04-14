@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateProjectRequest } from "../types/project";
 import aiChatAPI from "../services/aiChat";
@@ -9,6 +9,8 @@ import { sprintsAPI } from "../services/sprints";
 import { testCaseModulesAPI } from "../services/testCases";
 import type { Sprint } from "../types/sprint";
 import InviteCollaboratorDialog from "./InviteCollaboratorDialog";
+import RichTextEditor from "./common/RichTextEditor";
+import { plainTextToRichText, richTextToPlainText } from "../utils/richText";
 
 interface User {
   id: string;
@@ -146,7 +148,10 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [selectedExistingModule, setSelectedExistingModule] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const descriptionText = useMemo(
+    () => richTextToPlainText(formData.description),
+    [formData.description],
+  );
 
   // Fetch users when search term changes
   useEffect(() => {
@@ -231,10 +236,12 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     if (!formData.name.trim()) {
       newErrors.name = "Project name is required";
     }
-    if (!formData.description.trim()) {
+    if (!descriptionText.trim()) {
       newErrors.description = "Description is required";
-    } else if (formData.description.trim().length < 10) {
+    } else if (descriptionText.trim().length < 10) {
       newErrors.description = "Description should be at least 10 characters";
+    } else if (descriptionText.length > 2000) {
+      newErrors.description = "Description should not exceed 2000 characters";
     }
     if (!moduleNames.length) {
       newErrors.modules = "At least one module is required";
@@ -307,7 +314,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
   const handleChange = (
     e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      HTMLInputElement | HTMLSelectElement
     >,
   ) => {
     const { name, value } = e.target;
@@ -401,7 +408,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const applyProjectTemplate = () => {
     setFormData((prev) => ({
       ...prev,
-      description: buildProjectTemplate(prev.name),
+      description: plainTextToRichText(buildProjectTemplate(prev.name)),
     }));
     setAiError("");
     if (errors.description) {
@@ -428,7 +435,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       }
       setFormData((prev) => ({
         ...prev,
-        description: draft.slice(0, 2000),
+        description: plainTextToRichText(draft.slice(0, 2000)),
       }));
       if (errors.description) {
         setErrors((prev) => ({ ...prev, description: "" }));
@@ -438,35 +445,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     } finally {
       setAiLoading(false);
     }
-  };
-
-  const formatDescription = (
-    mode: "bold" | "italic" | "bullet" | "numbered" | "quote",
-  ) => {
-    const textarea = descriptionRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = formData.description.slice(start, end);
-    const hasSelection = start !== end;
-
-    const wrap = (prefix: string, suffix: string = "") => {
-      const nextText =
-        formData.description.slice(0, start) +
-        (hasSelection ? `${prefix}${selectedText}${suffix}` : `${prefix}${suffix}`) +
-        formData.description.slice(end);
-      setFormData((prev) => ({ ...prev, description: nextText }));
-      if (errors.description) {
-        setErrors((prev) => ({ ...prev, description: "" }));
-      }
-    };
-
-    if (mode === "bold") wrap("**", "**");
-    if (mode === "italic") wrap("*", "*");
-    if (mode === "bullet") wrap("- ");
-    if (mode === "numbered") wrap("1. ");
-    if (mode === "quote") wrap("> ");
   };
 
   return (
@@ -545,7 +523,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
             {/* Description */}
             <div className="flex flex-col gap-2">
-              <label className="flex flex-col w-full">
+              <div className="flex flex-col w-full">
                 <p className="text-[#0d151b] text-sm font-semibold leading-normal pb-1">
                   Description
                 </p>
@@ -556,7 +534,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     onClick={applyProjectTemplate}
                     disabled={aiLoading}
                   >
-                    Jira Template
+                    Use Template
                   </button>
                   <button
                     type="button"
@@ -564,70 +542,25 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     onClick={generateProjectDescriptionWithAi}
                     disabled={aiLoading}
                   >
-                    {aiLoading ? "Generating..." : "AI Draft"}
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    onClick={() => formatDescription("bold")}
-                  >
-                    Bold
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    onClick={() => formatDescription("italic")}
-                  >
-                    Italic
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    onClick={() => formatDescription("bullet")}
-                  >
-                    Bullet
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    onClick={() => formatDescription("numbered")}
-                  >
-                    Numbered
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 px-2.5 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    onClick={() => formatDescription("quote")}
-                  >
-                    Quote
+                    {aiLoading ? "Generating..." : "Generate Draft"}
                   </button>
                 </div>
-                <textarea
-                  ref={descriptionRef}
-                  name="description"
+                <RichTextEditor
                   value={formData.description}
-                  onChange={handleChange}
+                  onChange={(nextValue) => {
+                    setFormData((prev) => ({ ...prev, description: nextValue }));
+                    if (errors.description) {
+                      setErrors((prev) => ({ ...prev, description: "" }));
+                    }
+                  }}
                   maxLength={2000}
-                  className={`form-input flex w-full min-w-0 flex-1 resize-none rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border bg-white focus:border-blue-600 min-h-[120px] placeholder:text-[#4c759a] p-4 text-base font-normal leading-normal ${
-                    errors.description ? "border-red-300 bg-red-50" : "border-[#cfdce7]"
-                  }`}
+                  error={errors.description}
+                  helperText={
+                    aiError || "Use headings, bold text, lists, highlighting, fonts, and links."
+                  }
                   placeholder="Describe goals, scope, success criteria, and key milestones..."
                 />
-                <div className="mt-1 flex items-center justify-between">
-                  {errors.description ? (
-                    <p className="text-red-500 text-xs">{errors.description}</p>
-                  ) : aiError ? (
-                    <p className="text-amber-700 text-xs">{aiError}</p>
-                  ) : (
-                    <p className="text-xs text-slate-500">
-                      Use simple markdown-style formatting with the buttons.
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-400">
-                    {formData.description.length}/2000
-                  </p>
-                </div>
-              </label>
+              </div>
             </div>
 
             {/* Start and End Dates */}
@@ -663,87 +596,86 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </div>
 
             <div className="space-y-3">
-              <div>
-                <h3 className="text-[#0d151b] text-sm font-semibold leading-tight tracking-tight">
-                  Project Modules
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Pick existing workspace modules or create new ones. The selected module names will be added to this project.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={selectedExistingModule}
-                  onChange={(e) => setSelectedExistingModule(e.target.value)}
-                  className="form-input flex w-full rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border border-[#cfdce7] bg-white focus:border-blue-600 h-12 px-4 text-base font-normal"
-                  disabled={loadingModules}
-                >
-                  <option value="">
-                    {loadingModules ? "Loading existing modules..." : "Choose existing module"}
-                  </option>
-                  {availableModules.map((module) => (
-                    <option key={module.id} value={module.name}>
-                      {module.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={addExistingModule}
-                  className="h-12 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
-                >
-                  Use Existing
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={moduleNameInput}
-                  onChange={(e) => setModuleNameInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addModule();
-                    }
-                  }}
-                  className={`form-input flex w-full rounded-lg text-[#0d151b] focus:outline-0 focus:ring-2 focus:ring-blue-600/20 border h-12 placeholder:text-[#4c759a] px-4 text-base font-normal ${
-                    errors.modules
-                      ? "border-red-300 bg-red-50"
-                      : "border-[#cfdce7] bg-white focus:border-blue-600"
-                  }`}
-                  placeholder="Authentication"
-                />
+              <h3 className="text-[#0d151b] text-sm font-semibold leading-tight tracking-tight">
+                Project Modules
+              </h3>
+
+              <div className="relative flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    value={moduleNameInput}
+                    onChange={(e) => {
+                      setModuleNameInput(e.target.value);
+                      if (errors.modules) setErrors((prev) => ({ ...prev, modules: "" }));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); addModule(); }
+                    }}
+                    onFocus={() => setSelectedExistingModule("focused")}
+                    onBlur={() => setTimeout(() => setSelectedExistingModule(""), 150)}
+                    className={`h-10 w-full rounded-lg border px-3 text-sm text-[#0d151b] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 ${
+                      errors.modules ? "border-red-300 bg-red-50" : "border-[#cfdce7] bg-white focus:border-blue-600"
+                    }`}
+                    placeholder="Type module name or pick from existing..."
+                  />
+                  {/* Suggestions dropdown - show on focus or when typing */}
+                  {selectedExistingModule && (() => {
+                    const filtered = availableModules.filter(
+                      (m) =>
+                        (!moduleNameInput.trim() || m.name.toLowerCase().includes(moduleNameInput.toLowerCase())) &&
+                        !moduleNames.some((n) => n.toLowerCase() === m.name.toLowerCase())
+                    );
+                    return filtered.length > 0 ? (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
+                        {filtered.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setModuleNameInput(m.name);
+                            }}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
                 <button
                   type="button"
                   onClick={addModule}
-                  className="h-12 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="h-10 px-4 rounded-lg bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
                 >
                   Add
                 </button>
               </div>
-              {errors.modules ? (
-                <p className="text-red-500 text-xs">{errors.modules}</p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                {moduleNames.length ? (
-                  moduleNames.map((moduleName) => (
+
+              {errors.modules && <p className="text-red-500 text-xs">{errors.modules}</p>}
+
+              {moduleNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {moduleNames.map((moduleName) => (
                     <span
                       key={moduleName}
-                      className="inline-flex items-center gap-2 rounded-full bg-blue-600/10 px-3 py-1.5 text-xs font-semibold text-blue-600"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600/10 px-3 py-1 text-xs font-semibold text-blue-700"
                     >
                       {moduleName}
                       <button
                         type="button"
                         onClick={() => removeModule(moduleName)}
-                        className="material-symbols-outlined text-[14px] hover:text-blue-800"
+                        className="material-symbols-outlined text-[13px] hover:text-blue-900"
                       >
                         close
                       </button>
                     </span>
-                  ))
-                ) : (
-                  <p className="text-xs text-slate-500">No modules added yet.</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No modules added yet.</p>
+              )}
             </div>
 
             {/* Project Category Color */}

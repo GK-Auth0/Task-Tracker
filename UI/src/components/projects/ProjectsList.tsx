@@ -4,6 +4,7 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { Avatar, Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { ViewMode } from "./ProjectsFilters";
 import ProjectTooltip from "../ProjectTooltip";
+import { getRichTextPreview } from "../../utils/richText";
 import ProjectCard from "../ProjectCard";
 
 interface ProjectsListProps {
@@ -75,6 +76,7 @@ const ProjectsList: React.FC<ProjectsListProps> = ({
       headerAlign: "left",
       align: "left",
       renderCell: (params) => {
+        const descriptionPreview = getRichTextPreview(params.row.description || "", 100);
         return (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%", minWidth: 0 }}>
             <ProjectTooltip project={params.row}>
@@ -91,7 +93,7 @@ const ProjectsList: React.FC<ProjectsListProps> = ({
                 >
                   {params.value}
                 </Typography>
-                {params.row.description && (
+                {descriptionPreview && (
                   <Typography
                     variant="caption"
                     noWrap
@@ -100,7 +102,7 @@ const ProjectsList: React.FC<ProjectsListProps> = ({
                       fontSize: "0.7rem",
                     }}
                   >
-                    {params.row.description}
+                    {descriptionPreview}
                   </Typography>
                 )}
               </Box>

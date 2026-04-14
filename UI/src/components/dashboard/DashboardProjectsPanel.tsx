@@ -1,5 +1,6 @@
 import React from "react";
 import { DashboardInsightsProjectHealth } from "../../services/dashboard";
+import { getRichTextPreview } from "../../utils/richText";
 
 export interface DashboardProjectDetail {
   id: string;
@@ -63,6 +64,7 @@ const DashboardProjectsPanel: React.FC<DashboardProjectsPanelProps> = ({
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
           {projects.map((project) => {
             const health = projectHealthById.get(project.id);
+            const descriptionPreview = getRichTextPreview(project.description || "", 120);
             return (
               <button
                 key={project.id}
@@ -80,9 +82,9 @@ const DashboardProjectsPanel: React.FC<DashboardProjectsPanelProps> = ({
                     {prettyLabel(project.status)}
                   </span>
                 </div>
-                {project.description && (
+                {descriptionPreview && (
                   <p className="mt-1 text-xs text-slate-600 line-clamp-2">
-                    {project.description}
+                    {descriptionPreview}
                   </p>
                 )}
                 <div className="mt-3 flex items-center justify-between text-xs">

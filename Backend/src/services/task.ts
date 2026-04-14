@@ -7,6 +7,7 @@ import type {
   UpdateSubtaskDto,
   UpdateTaskDto,
 } from "../types/task";
+import { TaskIssueType, TaskPriority, TaskStatus } from "../enums";
 
 const getUserOrganizationId = async (userId: string) => {
   const user = await User.findByPk(userId, {
@@ -97,7 +98,7 @@ const syncLinkedTaskToSubtask = async (linkedTaskId: string) => {
 
   await subtask.update({
     title: linkedTask.title,
-    is_completed: linkedTask.status === "Done",
+    is_completed: linkedTask.status === TaskStatus.DONE,
     assignee_id: linkedTask.assignee_id || null,
   });
 };
@@ -620,9 +621,9 @@ export async function createSubtask(
     project_id: task.project.id,
     title: dto.title,
     description: `Subtask for ${task.title}. Open this item for the full task workflow.`,
-    status: "To Do",
-    priority: "Medium",
-    issue_type: "Task",
+    status: TaskStatus.TODO,
+    priority: TaskPriority.MEDIUM,
+    issue_type: TaskIssueType.TASK,
     creator_id: userId,
     assignee_id: dto.assignee_id || null,
     sprint_id: task.get("sprint_id") || null,
@@ -705,7 +706,7 @@ export async function updateSubtask(
       {
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.is_completed !== undefined
-          ? { status: dto.is_completed ? "Done" : "To Do" }
+          ? { status: dto.is_completed ? TaskStatus.DONE : TaskStatus.TODO }
           : {}),
         ...(dto.assignee_id !== undefined ? { assignee_id: dto.assignee_id || null } : {}),
       },

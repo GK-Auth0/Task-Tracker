@@ -3,17 +3,20 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import TaskDetailHeader from "./task-detail/TaskDetailHeader";
 import TaskDetailSidebar from "./task-detail/TaskDetailSidebar";
 import TaskOverviewTab from "./task-detail/TaskOverviewTab";
+import TaskAiTab from "./task-detail/TaskAiTab";
 import TaskTestCases from "./task-detail/TaskTestCases";
 import TaskPRsTab from "./task-detail/TaskPRsTab";
 import TaskActivityTab from "./task-detail/TaskActivityTab";
 import TaskAttachmentsTab from "./task-detail/TaskAttachmentsTab";
 import { useTaskDetails } from "../hooks/useTaskDetails";
 import { isDoneTaskStatus, type TaskStatusValue } from "../utils/taskStatus";
+import { TaskStatus } from "../enums";
 
-type TaskTab = "overview" | "prs" | "activity" | "attachments";
+type TaskTab = "overview" | "ai" | "prs" | "activity" | "attachments";
 
 const isTaskTab = (value: string | null): value is TaskTab =>
   value === "overview" ||
+  value === "ai" ||
   value === "prs" ||
   value === "activity" ||
   value === "attachments";
@@ -36,6 +39,9 @@ export default function TaskDetails() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TaskTab>("overview");
   const testCasesRef = useRef<HTMLDivElement | null>(null);
+  const fetchedPrTabForTaskRef = useRef<string | null>(null);
+  const fetchedActivityTabForTaskRef = useRef<string | null>(null);
+  const fetchedAiTabForTaskRef = useRef<string | null>(null);
 
   const {
     task,
@@ -75,6 +81,14 @@ export default function TaskDetails() {
   } = useTaskDetails();
 
   useEffect(() => {
+    const taskId = task?.id || null;
+    fetchedPrTabForTaskRef.current = null;
+    fetchedActivityTabForTaskRef.current = null;
+    fetchedAiTabForTaskRef.current = null;
+    if (!taskId) return;
+  }, [task?.id]);
+
+  useEffect(() => {
     const urlTab = searchParams.get("tab");
     if (isTaskTab(urlTab)) {
       setActiveTab(urlTab);
@@ -90,13 +104,29 @@ export default function TaskDetails() {
   }, [activeTab, setSearchParams]);
 
   useEffect(() => {
-    if (activeTab === "prs") {
+    if (activeTab === "prs" && task?.id && fetchedPrTabForTaskRef.current !== task.id) {
+      fetchedPrTabForTaskRef.current = task.id;
       fetchPRData();
     }
-    if (activeTab === "activity") {
+    if (
+      activeTab === "ai" &&
+      task?.id &&
+      fetchedAiTabForTaskRef.current !== task.id &&
+      !aiSuggestion &&
+      !aiLoading
+    ) {
+      fetchedAiTabForTaskRef.current = task.id;
+      fetchAiSuggestion();
+    }
+    if (
+      activeTab === "activity" &&
+      task?.id &&
+      fetchedActivityTabForTaskRef.current !== task.id
+    ) {
+      fetchedActivityTabForTaskRef.current = task.id;
       fetchActivityLogs();
     }
-  }, [activeTab, fetchPRData, fetchActivityLogs]);
+  }, [activeTab, task?.id, aiLoading, aiSuggestion, fetchAiSuggestion, fetchPRData, fetchActivityLogs]);
 
   const handleStatusChange = async (newStatus: TaskStatusValue) => {
     await handleStatusUpdate(newStatus);
@@ -214,6 +244,7 @@ export default function TaskDetails() {
 
   const taskTabs: Array<{ id: TaskTab; label: string; icon: string; count?: number }> = [
     { id: "overview", label: "Overview", icon: "description" },
+    { id: "ai", label: "AI Assistant", icon: "auto_awesome" },
     { id: "prs", label: "PRs & Code", icon: "code", count: pullRequests.length || undefined },
     { id: "activity", label: "Activity", icon: "history", count: activityLogs.length || undefined },
     { id: "attachments", label: "Attachments", icon: "attach_file" },
@@ -258,25 +289,12 @@ export default function TaskDetails() {
             taskStatus={task.status}
             taskPriority={task.priority}
             priorityColors={derived.priorityColors}
-            slaLabel={derived.slaLabel}
-            issueHealthTone={derived.issueHealthTone}
             createdDateLabel={derived.createdDateLabel}
             creatorName={task.creator.full_name}
-            daysSinceCreated={derived.daysSinceCreated}
-            pullRequestsCount={pullRequests.length}
-            commitsCount={commits.length}
-            activityPulse={derived.activityPulse}
-            activityLogsCount={activityLogs.length}
-            assigneeLabel={derived.assigneeLabel}
-            sprintName={task.sprint?.name}
-            dueDateLabel={derived.dueDateLabel}
             statusSaving={statusSaving}
             onOpenProject={handleOpenProject}
             onBack={handleBack}
             onStatusChange={handleStatusChange}
-            onEdit={handleEdit}
-            onAddTestCase={handleAddTestCase}
-            onMarkDone={() => handleStatusChange("Done")}
           />
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -293,7 +311,7 @@ export default function TaskDetails() {
                   </div>
                 )}
 
-                <div className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
                   <div className="py-3 sm:hidden">
                     <select
                       aria-label="Task detail tabs"
@@ -308,22 +326,28 @@ export default function TaskDetails() {
                       ))}
                     </select>
                   </div>
-                  <div className="hidden gap-2 overflow-x-auto py-3 scrollbar-hide sm:flex">
+                  <div className="hidden gap-2 overflow-x-auto scrollbar-hide sm:flex">
                     {taskTabs.map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
-                        className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+                        className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap transition-colors ${
                           activeTab === tab.id
-                            ? "border-blue-200 bg-blue-50 text-blue-700 shadow-sm"
-                            : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-blue-600"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-slate-100"
                         }`}
                         onClick={() => setActiveTab(tab.id)}
                       >
                         <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
                         <span>{tab.label}</span>
                         {tab.count ? (
-                          <span className="rounded-full bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                              activeTab === tab.id
+                                ? "bg-white/20 text-white"
+                                : "bg-blue-600/10 text-blue-600"
+                            }`}
+                          >
                             {tab.count}
                           </span>
                         ) : null}
@@ -337,16 +361,10 @@ export default function TaskDetails() {
                     <TaskOverviewTab
                       task={task}
                       workspaceUsers={workspaceUsers}
-                      aiSuggestion={aiSuggestion}
-                      aiLoading={aiLoading}
-                      aiError={aiError}
-                      prioritySaving={prioritySaving}
-                      onPriorityUpdate={handlePriorityChange}
                       onTaskUpdate={handleTaskUpdate}
                       onSubtaskCreate={handleSubtaskCreate}
                       onSubtaskUpdate={handleSubtaskUpdate}
                       onSubtaskDelete={handleSubtaskDelete}
-                      onRefreshAi={fetchAiSuggestion}
                     />
                     <div ref={testCasesRef}>
                       <TaskTestCases
@@ -360,6 +378,17 @@ export default function TaskDetails() {
                       />
                     </div>
                   </>
+                )}
+
+                {activeTab === "ai" && (
+                  <TaskAiTab
+                    aiSuggestion={aiSuggestion}
+                    aiLoading={aiLoading}
+                    aiError={aiError}
+                    prioritySaving={prioritySaving}
+                    onPriorityUpdate={handlePriorityChange}
+                    onRefreshAi={fetchAiSuggestion}
+                  />
                 )}
 
                 {activeTab === "prs" && (
@@ -421,10 +450,10 @@ export default function TaskDetails() {
               <div className="border-t border-slate-200 bg-white p-4 md:hidden">
                 <button
                   className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => handleStatusChange("Done")}
-                  disabled={task.status === "Done" || statusSaving}
+                  onClick={() => handleStatusChange(TaskStatus.DONE)}
+                  disabled={task.status === TaskStatus.DONE || statusSaving}
                 >
-                  {task.status === "Done" ? "Completed" : statusSaving ? "Updating..." : "Mark as Complete"}
+                  {task.status === TaskStatus.DONE ? "Completed" : statusSaving ? "Updating..." : "Mark as Complete"}
                 </button>
               </div>
             </div>
