@@ -39,7 +39,9 @@ export default function RichTextEditor({
     [sanitizedValue],
   );
 
-  // Only sync from parent when not focused (e.g. template applied externally)
+  // Sync external value changes once the editor is not focused anymore.
+  // This keeps typing stable while still allowing template/AI updates to land
+  // after toolbar or helper button interactions blur the editor.
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -48,7 +50,7 @@ export default function RichTextEditor({
       editor.innerHTML = sanitizedValue;
       lastEmittedRef.current = sanitizedValue;
     }
-  }, [sanitizedValue]);
+  }, [sanitizedValue, isFocused]);
 
   // Emit raw HTML while typing — no sanitization to avoid cursor reset
   const emitRaw = () => {

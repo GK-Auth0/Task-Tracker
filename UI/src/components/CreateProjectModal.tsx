@@ -523,7 +523,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
             {/* Description */}
             <div className="flex flex-col gap-2">
-              <label className="flex flex-col w-full">
+              <div className="flex flex-col w-full">
                 <p className="text-[#0d151b] text-sm font-semibold leading-normal pb-1">
                   Description
                 </p>
@@ -560,7 +560,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   }
                   placeholder="Describe goals, scope, success criteria, and key milestones..."
                 />
-              </label>
+              </div>
             </div>
 
             {/* Start and End Dates */}

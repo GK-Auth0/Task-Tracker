@@ -5,10 +5,12 @@ import { chatAPI } from "../../services/chatService";
 import { useAuth } from "../../contexts/AuthContext";
 
 type NotificationType = "chat" | "task" | "project" | "system";
+type NotificationAudience = "org" | "member";
 
 interface NotificationItem {
   id: string;
   type: NotificationType;
+  audience: NotificationAudience;
   title: string;
   subtitle: string;
   createdAt: string;
@@ -35,9 +37,12 @@ const normalizeDate = (value?: string) => {
   return new Date(time).toISOString();
 };
 
-const loadReadIds = () => {
+const getReadIdsStorageKey = (userId?: string, organizationId?: string | null) =>
+  `${READ_IDS_KEY}:${userId || "anonymous"}:${organizationId || "no-org"}`;
+
+const loadReadIds = (storageKey: string) => {
   try {
-    const raw = localStorage.getItem(READ_IDS_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return new Set<string>();
     const parsed = JSON.parse(raw) as string[];
     if (!Array.isArray(parsed)) return new Set<string>();
@@ -47,21 +52,27 @@ const loadReadIds = () => {
   }
 };
 
-const saveReadIds = (readIds: Set<string>) => {
-  localStorage.setItem(READ_IDS_KEY, JSON.stringify([...readIds]));
+const saveReadIds = (storageKey: string, readIds: Set<string>) => {
+  localStorage.setItem(storageKey, JSON.stringify([...readIds]));
 };
 
 export default function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const readIdsStorageKey = getReadIdsStorageKey(user?.id, user?.organization_id);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | NotificationType>("all");
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds());
+  const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds(readIdsStorageKey));
 
   const fetchNotifications = async () => {
+    if (!user?.id || !user.organization_id) {
+      setItems([]);
+      return;
+    }
+
     try {
       setLoading(true);
       const [auditRes, taskRes, groupsRes] = await Promise.allSettled([
@@ -78,10 +89,11 @@ export default function NotificationBell() {
           nextItems.push({
             id: `audit-${log.id}`,
             type: log.entity_type === "task" ? "task" : "project",
-            title: `${label} ${log.action.replace("_", " ")}`,
+            audience: "org",
+            title: `Org ${label.toLowerCase()} ${log.action.replace("_", " ")}`,
             subtitle: log.user?.full_name
-              ? `${log.user.full_name} performed this action`
-              : "Recent activity update",
+              ? `${log.user.full_name} updated your organization workspace`
+              : "Organization workspace update",
             createdAt: normalizeDate(log.created_at),
             route: log.entity_type === "task" ? `/task/${log.entity_id}` : "/projects",
           });
@@ -110,8 +122,9 @@ export default function NotificationBell() {
             nextItems.push({
               id: `due-overdue-${task.id}-${task.due_date}`,
               type: "system",
+              audience: "member",
               title: `Overdue: ${task.title}`,
-              subtitle: "Task is past due date",
+              subtitle: "Assigned or created task is past due date",
               createdAt: normalizeDate(task.updated_at || task.created_at),
               route: `/task/${task.id}`,
             });
@@ -119,6 +132,7 @@ export default function NotificationBell() {
             nextItems.push({
               id: `due-today-${task.id}-${task.due_date}`,
               type: "task",
+              audience: "member",
               title: `Due today: ${task.title}`,
               subtitle: `Priority: ${task.priority}`,
               createdAt: normalizeDate(task.updated_at || task.created_at),
@@ -152,6 +166,7 @@ export default function NotificationBell() {
           nextItems.push({
             id: `chat-${group.id}-${latest.id}`,
             type: "chat",
+            audience: "member",
             title: `New in ${group.name}`,
             subtitle: `${from}: ${preview}`,
             createdAt: normalizeDate(latest.created_at),
@@ -160,20 +175,33 @@ export default function NotificationBell() {
         });
       }
 
-      nextItems.sort(
+      const dedupedItems = nextItems.filter(
+        (item, index, source) => source.findIndex((candidate) => candidate.id === item.id) === index,
+      );
+
+      dedupedItems.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
-      setItems(nextItems.slice(0, 30));
+      setItems(dedupedItems.slice(0, 30));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setReadIds(loadReadIds(readIdsStorageKey));
+  }, [readIdsStorageKey]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setItems([]);
+      return;
+    }
+
     fetchNotifications();
     const timer = window.setInterval(fetchNotifications, POLL_MS);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [user?.id, user?.organization_id]);
 
   useEffect(() => {
     const onClickOutside = (event: PointerEvent) => {
@@ -200,7 +228,7 @@ export default function NotificationBell() {
     setReadIds((prev) => {
       const next = new Set(prev);
       next.add(id);
-      saveReadIds(next);
+      saveReadIds(readIdsStorageKey, next);
       return next;
     });
   };
@@ -209,7 +237,7 @@ export default function NotificationBell() {
     const next = new Set(readIds);
     items.forEach((item) => next.add(item.id));
     setReadIds(next);
-    saveReadIds(next);
+    saveReadIds(readIdsStorageKey, next);
   };
 
   return (
@@ -287,7 +315,20 @@ export default function NotificationBell() {
                   }}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                            item.audience === "org"
+                              ? "bg-slate-200 text-slate-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {item.audience}
+                        </span>
+                      </div>
+                    </div>
                     <span className="text-[11px] text-slate-500 whitespace-nowrap">
                       {getRelativeTime(item.createdAt)}
                     </span>

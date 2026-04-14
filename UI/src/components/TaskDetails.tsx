@@ -39,6 +39,9 @@ export default function TaskDetails() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TaskTab>("overview");
   const testCasesRef = useRef<HTMLDivElement | null>(null);
+  const fetchedPrTabForTaskRef = useRef<string | null>(null);
+  const fetchedActivityTabForTaskRef = useRef<string | null>(null);
+  const fetchedAiTabForTaskRef = useRef<string | null>(null);
 
   const {
     task,
@@ -78,6 +81,14 @@ export default function TaskDetails() {
   } = useTaskDetails();
 
   useEffect(() => {
+    const taskId = task?.id || null;
+    fetchedPrTabForTaskRef.current = null;
+    fetchedActivityTabForTaskRef.current = null;
+    fetchedAiTabForTaskRef.current = null;
+    if (!taskId) return;
+  }, [task?.id]);
+
+  useEffect(() => {
     const urlTab = searchParams.get("tab");
     if (isTaskTab(urlTab)) {
       setActiveTab(urlTab);
@@ -93,16 +104,29 @@ export default function TaskDetails() {
   }, [activeTab, setSearchParams]);
 
   useEffect(() => {
-    if (activeTab === "prs") {
+    if (activeTab === "prs" && task?.id && fetchedPrTabForTaskRef.current !== task.id) {
+      fetchedPrTabForTaskRef.current = task.id;
       fetchPRData();
     }
-    if (activeTab === "ai" && !aiSuggestion && !aiLoading) {
+    if (
+      activeTab === "ai" &&
+      task?.id &&
+      fetchedAiTabForTaskRef.current !== task.id &&
+      !aiSuggestion &&
+      !aiLoading
+    ) {
+      fetchedAiTabForTaskRef.current = task.id;
       fetchAiSuggestion();
     }
-    if (activeTab === "activity") {
+    if (
+      activeTab === "activity" &&
+      task?.id &&
+      fetchedActivityTabForTaskRef.current !== task.id
+    ) {
+      fetchedActivityTabForTaskRef.current = task.id;
       fetchActivityLogs();
     }
-  }, [activeTab, aiLoading, aiSuggestion, fetchAiSuggestion, fetchPRData, fetchActivityLogs]);
+  }, [activeTab, task?.id, aiLoading, aiSuggestion, fetchAiSuggestion, fetchPRData, fetchActivityLogs]);
 
   const handleStatusChange = async (newStatus: TaskStatusValue) => {
     await handleStatusUpdate(newStatus);
