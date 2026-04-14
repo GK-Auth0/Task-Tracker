@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
-import TestCaseSummaryStrip from "../components/testcases/TestCaseSummaryStrip";
 import TestCaseNav from "../components/testcases/TestCaseNav";
 import TestCaseModuleGrid from "../components/testcases/TestCaseModuleGrid";
 import { testCasesAPI } from "../services/testCases";
@@ -43,36 +42,6 @@ export default function TestCases() {
   const taskGroups = useMemo(() => groupTestCasesByTask(testCases), [testCases]);
   const latestSprint =
     testCases.find((item) => item.sprint_name)?.sprint_name || "Workspace QA";
-  const automatedCount = testCases.filter((item) => item.automation === "Automated").length;
-  const readyCount = testCases.filter((item) => item.status === "Ready").length;
-  const linkedTaskCount = testCases.filter((item) => item.linked_task).length;
-
-  const summaryItems = [
-    {
-      label: "Modules",
-      value: moduleGroups.length,
-      note: "Browse the catalog by functional area first",
-      icon: "category",
-    },
-    {
-      label: "Total cases",
-      value: testCases.length,
-      note: "Across all saved modules",
-      icon: "fact_check",
-    },
-    {
-      label: "Ready to run",
-      value: readyCount,
-      note: "Prepared for the current cycle",
-      icon: "verified",
-    },
-    {
-      label: "Linked tasks",
-      value: linkedTaskCount,
-      note: `${automatedCount} already automated`,
-      icon: "device_hub",
-    },
-  ];
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -121,22 +90,6 @@ export default function TestCases() {
                   {option.label}
                 </button>
               ))}
-            </div>
-          </section>
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(640px,auto)] xl:items-center">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Library Overview
-                </p>
-                <h2 className="mt-2 text-xl font-semibold text-slate-900">
-                  Test case directory
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Start with modules, then drill into the specific suite and case list for that area.
-                </p>
-              </div>
-              <TestCaseSummaryStrip items={summaryItems} />
             </div>
           </section>
           {groupMode === "module" ? (

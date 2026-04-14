@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { DataGrid, type GridColDef, type GridPaginationModel } from "@mui/x-data-grid";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
-import TestCaseNav from "../components/testcases/TestCaseNav";
 import TestCaseFiltersBar from "../components/testcases/TestCaseFiltersBar";
-import TestCaseCardsGrid from "../components/testcases/TestCaseCardsGrid";
 import { testCasesAPI } from "../services/testCases";
 import type { TestAutomation, TestCaseRecord, TestCaseStatus } from "../types/testCase";
+import { automationClasses, statusClasses } from "../data/testManagement";
 import { decodeModuleSlug } from "../utils/testCases";
 
 export default function TestCaseModuleDetail() {
@@ -14,11 +14,14 @@ export default function TestCaseModuleDetail() {
   const moduleName = decodeModuleSlug(moduleSlug);
 
   const [testCases, setTestCases] = useState<TestCaseRecord[]>([]);
-  const [selectedCaseId, setSelectedCaseId] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | TestCaseStatus>("All");
   const [automationFilter, setAutomationFilter] = useState<"All" | TestAutomation>("All");
   const [loading, setLoading] = useState(true);
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 10,
+  });
 
   useEffect(() => {
     const loadTestCases = async () => {
@@ -53,21 +56,87 @@ export default function TestCaseModuleDetail() {
     });
   }, [automationFilter, query, statusFilter, testCases]);
 
-  useEffect(() => {
-    if (!filteredCases.length) {
-      setSelectedCaseId("");
-      return;
-    }
-
-    if (!filteredCases.some((item) => item.id === selectedCaseId)) {
-      setSelectedCaseId(filteredCases[0].id);
-    }
-  }, [filteredCases, selectedCaseId]);
-
-  const selectedCase = filteredCases.find((item) => item.id === selectedCaseId) || null;
   const projects = Array.from(new Set(testCases.map((item) => item.project?.name).filter(Boolean)));
   const sprints = Array.from(new Set(testCases.map((item) => item.sprint_name).filter(Boolean)));
   const linkedTaskCount = testCases.filter((item) => item.linked_task).length;
+  const columns = useMemo<GridColDef<TestCaseRecord>[]>(
+    () => [
+      {
+        field: "reference_code",
+        headerName: "Case",
+        minWidth: 290,
+        flex: 1.3,
+        sortable: false,
+        renderCell: (params) => (
+          <div className="py-2">
+            <p className="text-sm font-semibold text-slate-900">{params.row.reference_code}</p>
+            <p className="mt-1 truncate text-xs text-slate-500">{params.row.title}</p>
+          </div>
+        ),
+      },
+      {
+        field: "suite",
+        headerName: "Suite",
+        minWidth: 170,
+        flex: 0.9,
+      },
+      {
+        field: "status",
+        headerName: "Status",
+        minWidth: 130,
+        flex: 0.75,
+        renderCell: (params) => (
+          <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${statusClasses[params.row.status]}`}>
+            {params.row.status}
+          </span>
+        ),
+      },
+      {
+        field: "automation",
+        headerName: "Automation",
+        minWidth: 140,
+        flex: 0.8,
+        renderCell: (params) => (
+          <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${automationClasses[params.row.automation]}`}>
+            {params.row.automation}
+          </span>
+        ),
+      },
+      {
+        field: "owner",
+        headerName: "Owner",
+        minWidth: 180,
+        flex: 0.9,
+        valueGetter: (_value, row) => row.owner?.full_name || "Unknown",
+      },
+      {
+        field: "linked_task",
+        headerName: "Linked Task",
+        minWidth: 220,
+        flex: 1,
+        sortable: false,
+        valueGetter: (_value, row) => row.linked_task?.title || "No linked task",
+      },
+      {
+        field: "open",
+        headerName: "",
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        width: 120,
+        renderCell: (params) => (
+          <button
+            type="button"
+            onClick={() => navigate(`/test-cases/case/${params.row.id}`)}
+            className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+          >
+            Open
+          </button>
+        ),
+      },
+    ],
+    [navigate],
+  );
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -93,8 +162,6 @@ export default function TestCaseModuleDetail() {
         />
 
         <div className="space-y-5">
-          <TestCaseNav />
-
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -120,32 +187,6 @@ export default function TestCaseModuleDetail() {
             </div>
           </div>
 
-          {selectedCase ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Focus item
-                  </p>
-                  <h2 className="mt-2 text-lg font-semibold text-slate-900">
-                    {selectedCase.title}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedCase.project?.name || "No project"} • {selectedCase.suite} •{" "}
-                    {selectedCase.linked_task?.title || "No linked task"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/test-cases/case/${selectedCase.id}`)}
-                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Open full case page
-                </button>
-              </div>
-            </div>
-          ) : null}
-
           <TestCaseFiltersBar
             query={query}
             statusFilter={statusFilter}
@@ -155,12 +196,80 @@ export default function TestCaseModuleDetail() {
             onAutomationChange={setAutomationFilter}
           />
 
-          <TestCaseCardsGrid
-            items={filteredCases}
-            selectedCaseId={selectedCaseId}
-            loading={loading}
-            onSelect={setSelectedCaseId}
-          />
+          {!loading && !filteredCases.length ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center">
+              <p className="text-sm font-semibold text-slate-900">
+                No test cases match the current filters.
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Try another status, automation type, or search phrase to broaden the result.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-32px_rgba(15,23,42,0.25)]">
+              <DataGrid
+                rows={filteredCases}
+                columns={columns}
+                loading={loading}
+                pagination
+                paginationModel={paginationModel}
+                onPaginationModelChange={setPaginationModel}
+                pageSizeOptions={[10, 25, 50]}
+                disableRowSelectionOnClick
+                rowHeight={62}
+                columnHeaderHeight={52}
+                sx={{
+                  border: 0,
+                  background:
+                    "linear-gradient(180deg, rgba(248,250,252,0.45) 0%, rgba(255,255,255,1) 16%)",
+                  "& .MuiDataGrid-main": {
+                    backgroundColor: "transparent",
+                  },
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "rgba(248, 250, 252, 0.92)",
+                    color: "rgb(51, 65, 85)",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    borderBottom: "1px solid rgb(226, 232, 240)",
+                  },
+                  "& .MuiDataGrid-cell": {
+                    borderBottom: "1px solid rgb(241, 245, 249)",
+                    borderRight: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "10px 14px",
+                  },
+                  "& .MuiDataGrid-row": {
+                    minHeight: "62px !important",
+                    maxHeight: "62px !important",
+                    "&:hover": {
+                      backgroundColor: "rgba(248, 250, 252, 0.78)",
+                    },
+                  },
+                  "& .MuiDataGrid-columnSeparator": {
+                    display: "none",
+                  },
+                  "& .MuiDataGrid-footerContainer": {
+                    minHeight: 56,
+                    borderTop: "1px solid rgb(226, 232, 240)",
+                    backgroundColor: "rgba(248, 250, 252, 0.72)",
+                  },
+                  "& .MuiTablePagination-root": {
+                    color: "rgb(71, 85, 105)",
+                  },
+                  "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                  },
+                  "& .MuiIconButton-root": {
+                    borderRadius: "10px",
+                  },
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

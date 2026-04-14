@@ -762,38 +762,6 @@ export default function SprintBoards() {
     }
   };
 
-  const overviewStats = useMemo(
-    () => [
-      {
-        label: "Open tasks",
-        value: String(sprintInsights?.summary.tasks_total
-          ? sprintInsights.summary.tasks_total - sprintInsights.summary.tasks_done
-          : sprintTasks.filter((task) => task.status !== "Done").length),
-        detail: "Tasks still moving through the sprint",
-        icon: "task",
-      },
-      {
-        label: "QA ready",
-        value: String(sprintTasks.filter((task) => task.status === "Done").length),
-        detail: "Completed tasks ready for validation",
-        icon: "assignment_turned_in",
-      },
-      {
-        label: "Failed cases",
-        value: String(sprintTestCases.filter((item) => item.status === "Failed").length),
-        detail: "Test cases currently failing",
-        icon: "rule",
-      },
-      {
-        label: "Open defects",
-        value: String(sprintInsights?.summary.open_defects ?? sprintDefects.filter((item) => item.status === "Open").length),
-        detail: "Defects waiting for review",
-        icon: "bug_report",
-      },
-    ],
-    [sprintDefects, sprintInsights, sprintTasks, sprintTestCases],
-  );
-
   const boardSummary = useMemo(
     () => [
       {
@@ -901,18 +869,16 @@ export default function SprintBoards() {
           description="Plan, deliver, and review one sprint family across projects with a tighter Jira-style workflow."
           metaLabel="Active sprint"
           metaValue={`${activeSprint} • ${activeRelease}`}
-          showStaticBanner={false}
-        />
-
-        {activeTab !== "create" ? (
-          <>
-            <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Sprint scope</p>
-                  <p className="text-xs text-slate-500">
-                    Select a sprint to inspect its board, quality, and health.
+          metaPosition="right"
+          showMeta={false}
+          actions={
+            activeTab !== "create" ? (
+              <div className="flex w-full min-w-[280px] flex-col gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:w-auto sm:min-w-[360px] sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Sprint
                   </p>
+                  <p className="truncate text-sm font-semibold text-slate-900">{activeSprint}</p>
                 </div>
                 <select
                   value={selectedSprintId}
@@ -924,23 +890,18 @@ export default function SprintBoards() {
                       return next;
                     })
                   }
-                  className="min-w-[240px] rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:bg-white"
+                  className="min-w-[220px] rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:bg-white"
                 >
                   {sprintFamilies.length === 0 ? <option value="">No sprints available</option> : null}
                   {sprintFamilies.map((family) => (
-                    <option key={family.key} value={family.primary.id}>
-                      {family.name} • {family.records.length} project{family.records.length === 1 ? "" : "s"}
-                    </option>
+                    <option key={family.key} value={family.primary.id}>{family.name}</option>
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div className="mb-5">
-              <SprintStatStrip items={overviewStats} />
-            </div>
-          </>
-        ) : null}
+            ) : null
+          }
+          showStaticBanner={false}
+        />
 
         <div className="mb-5">
           <SprintCompactTabs items={mainTabs} value={activeTab} onChange={setActiveTab} />
