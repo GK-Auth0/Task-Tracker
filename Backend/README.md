@@ -66,6 +66,22 @@ SMTP_PORT=465
 OTP_FROM_EMAIL=TaskTracker <your-email@gmail.com>
 ```
 
+To allow email delivery only for specific recipients in local or staging environments, set:
+
+```env
+EMAIL_ALLOWED_RECIPIENTS=alice@example.com,bob@example.com
+```
+
+If `EMAIL_ALLOWED_RECIPIENTS` is empty, email delivery stays open for all users.
+
+To block particular email addresses, set:
+
+```env
+EMAIL_RESTRICTED_RECIPIENTS=blocked@example.com,test@example.com
+```
+
+Restricted recipients are always skipped. If both variables are set, the restricted list still wins.
+
 ### 3. Database Setup
 
 Start PostgreSQL with Docker:

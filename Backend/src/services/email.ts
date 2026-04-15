@@ -32,6 +32,14 @@ const EMAIL_RETRY_BASE_DELAY_MS = parseInt(
   process.env.EMAIL_RETRY_BASE_DELAY_MS || "500",
   10,
 );
+const EMAIL_ALLOWED_RECIPIENTS = (process.env.EMAIL_ALLOWED_RECIPIENTS || "")
+  .split(",")
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+const EMAIL_RESTRICTED_RECIPIENTS = (process.env.EMAIL_RESTRICTED_RECIPIENTS || "")
+  .split(",")
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
 
 const getPrimaryUrl = (...values: Array<string | undefined>) => {
   for (const value of values) {
@@ -107,6 +115,40 @@ const postWithRetries = async <T>(action: () => Promise<T>) => {
 
 const getOtpExpiresMinutes = () => process.env.OTP_EXPIRES_MINUTES || "10";
 
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const isEmailRecipientAllowed = (email: string) => {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (EMAIL_RESTRICTED_RECIPIENTS.includes(normalizedEmail)) {
+    return false;
+  }
+
+  if (EMAIL_ALLOWED_RECIPIENTS.length === 0) {
+    return true;
+  }
+
+  return EMAIL_ALLOWED_RECIPIENTS.includes(normalizedEmail);
+};
+
+const guardEmailRecipient = (email: string, context: string) => {
+  if (isEmailRecipientAllowed(email)) {
+    return true;
+  }
+
+  if (EMAIL_RESTRICTED_RECIPIENTS.includes(normalizeEmail(email))) {
+    console.warn(
+      `[email] Skipping ${context} email for restricted recipient: ${email}`,
+    );
+    return false;
+  }
+
+  console.warn(
+    `[email] Skipping ${context} email for non-allowlisted recipient: ${email}`,
+  );
+  return false;
+};
+
 const sendResendEmail = async (options: {
   to: string;
   subject: string;
@@ -141,6 +183,10 @@ export const sendOtpEmail = async (
   otp: string,
   purpose: "login" | "register" | "auth0" | "passwordReset",
 ) => {
+  if (!guardEmailRecipient(to, "otp")) {
+    return;
+  }
+
   if (EMAIL_PROVIDER === "smtp") {
     if (!EMAIL_USER || !EMAIL_PASS) {
       throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
@@ -258,6 +304,10 @@ export const sendOtpEmail = async (
 };
 
 export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
+  if (!guardEmailRecipient(to, "password reset")) {
+    return;
+  }
+
   if (EMAIL_PROVIDER === "smtp") {
     if (!EMAIL_USER || !EMAIL_PASS) {
       throw new Error("EMAIL_USER or EMAIL_PASS missing for SMTP delivery");
@@ -368,6 +418,10 @@ export const sendWorkspaceInviteEmail = async (options: {
   projectId?: string;
   taskId?: string;
 }) => {
+  if (!guardEmailRecipient(options.to, "workspace invite")) {
+    return;
+  }
+
   const inviteUrl = `${UI_APP_URL}/signup?invite=${options.inviteToken}&type=${options.contextType}${
     options.projectId ? `&project=${options.projectId}` : ""
   }${options.taskId ? `&task=${options.taskId}` : ""}`;
@@ -502,6 +556,10 @@ export const sendWelcomeEmail = async (
   fullName: string,
   orgCode?: string,
 ) => {
+  if (!guardEmailRecipient(to, "welcome")) {
+    return;
+  }
+
   const subject = "Welcome to TaskTracker - Your Account Details";
   const html = buildWelcomeHtml(fullName, temporaryPassword, UI_APP_URL, orgCode);
 
@@ -560,6 +618,10 @@ export const sendWelcomeEmail = async (
 };
 
 export const sendSignupWelcomeEmail = async (to: string, fullName: string) => {
+  if (!guardEmailRecipient(to, "signup welcome")) {
+    return;
+  }
+
   const subject = "Welcome to TaskTracker";
   const html = buildSignupWelcomeHtml(fullName, UI_APP_URL);
 
