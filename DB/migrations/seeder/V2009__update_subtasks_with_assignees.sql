@@ -1,5 +1,5 @@
 -- Update existing subtasks with assignee data
--- Migration: V2028__update_subtasks_with_assignees.sql
+-- Migration: V2009__update_subtasks_with_assignees.sql
 
 DO $$
 DECLARE

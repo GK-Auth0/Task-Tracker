@@ -31,11 +31,11 @@ services:
         value: neondb_owner
       - key: FLYWAY_PASSWORD
         value: npg_N06aIYFAUEiS
-      - key: FLYWAY_LOCATIONS
-        value: filesystem:/flyway/sql/schema,filesystem:/flyway/sql/seeder
       - key: FLYWAY_BASELINE_ON_MIGRATE
-        value: true
-      - key: FLYWAY_OUT_OF_ORDER
         value: true
       - key: FLYWAY_VALIDATE_ON_MIGRATE
         value: true
+      - key: FLYWAY_SCHEMA_TABLE
+        value: flyway_schema_history_schema
+      - key: FLYWAY_SEED_TABLE
+        value: flyway_schema_history_seeder

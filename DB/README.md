@@ -22,6 +22,7 @@ DB/
 │   │   └── _down.sh
 │   └── Dockerfile
 ├── flyway.conf
+├── run-migrations.sh
 ├── docker-compose.yml
 ├── up.sh
 └── down.sh
@@ -73,8 +74,20 @@ DB/
 
 ## Migration Numbering
 
-Flyway uses a single global version order across all configured locations.
-That means versions in `schema/` and `seeder/` still share the same sequence.
+Schema and seeder now run as two separate Flyway tracks.
 
-- Use a version greater than the current highest applied migration.
-- Do not add a new `V1xxx` migration after `V2xxx` files have already been applied in production unless you intentionally rely on out-of-order execution.
+- `schema/` uses its own history table: `flyway_schema_history_schema`
+- `seeder/` uses its own history table: `flyway_schema_history_seeder`
+- Keep schema migrations in the `V1xxx` range.
+- Keep seed migrations in the `V2xxx` range.
+
+This removes the need to maintain one shared version sequence across both folders.
+
+## How Migrations Run
+
+Use `run-migrations.sh` instead of running one Flyway command over both folders together.
+
+- First pass: `schema/`
+- Second pass: `seeder/`
+
+That keeps schema changes and sample/demo data versioning independent while still applying them in a predictable order.

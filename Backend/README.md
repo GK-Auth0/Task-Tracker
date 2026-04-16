@@ -257,8 +257,14 @@ Create new migration:
 DB/migrations/schema/V1005__add_new_table.sql
 
 # Data seeding
-DB/migrations/seeder/V2003__seed_new_data.sql
+DB/migrations/seeder/V2011__seed_new_data.sql
 ```
+
+Versioning rule:
+
+- Keep schema migrations in the `V1xxx` range.
+- Keep seed migrations in the `V2xxx` range.
+- The DB migrator now runs them in two separate Flyway tracks, so you do not need one shared sequence across both folders.
 
 Run migrations:
 
@@ -292,7 +298,7 @@ yarn start
 
 2. **Migration Failures**
    - Check migration syntax
-   - Ensure proper migration order
+   - Ensure schema files use `V1xxx` and seed files use `V2xxx`
 
 3. **Authentication Issues**
    - Verify JWT_SECRET is set
