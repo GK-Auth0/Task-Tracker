@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { User, Invite, Organization } from '../models';
 import { sendWelcomeEmail } from './email';
+import { buildFullName, splitFullName } from "../utils/userName";
 
 const generateInviteCode = (): string => {
   return randomBytes(16).toString('hex');
@@ -96,7 +97,8 @@ export const createInvite = async (
   const newUser = await User.create({
     email: inviteeEmail,
     password_hash: hashedPassword,
-    full_name: inviteeEmail.split('@')[0], // Use email prefix as default name
+    first_name: inviteeEmail.split('@')[0],
+    last_name: "",
     role: role,
     password_reset_required: true,
     is_invited_user: true,
@@ -108,7 +110,7 @@ export const createInvite = async (
 
   // Send welcome email with temporary password
   try {
-    await sendWelcomeEmail(inviteeEmail, temporaryPassword, newUser.full_name);
+    await sendWelcomeEmail(inviteeEmail, temporaryPassword, buildFullName(newUser));
   } catch (emailError) {
     console.error('Failed to send welcome email:', emailError);
     // Don't throw error - user is created, they can still login
@@ -141,12 +143,19 @@ export const acceptInvite = async (inviteCode: string, newPassword: string, full
     throw new Error('User account not found for this invite');
   }
 
+  const nameParts = fullName ? splitFullName(fullName) : null;
+
   // Update user with new password and remove reset requirement
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   await invite.invitee.update({
     password_hash: hashedPassword,
     password_reset_required: false,
-    full_name: fullName || invite.invitee.full_name,
+    ...(nameParts
+      ? {
+          first_name: nameParts.first_name,
+          last_name: nameParts.last_name,
+        }
+      : {}),
   });
 
   // Mark invite as accepted
@@ -162,8 +171,8 @@ export const getInviteByCode = async (inviteCode: string) => {
   return await Invite.findOne({
     where: { invite_code: inviteCode },
     include: [
-      { model: User, as: 'inviter', attributes: ['id', 'full_name', 'email'] },
-      { model: User, as: 'invitee', attributes: ['id', 'full_name', 'email'] }
+      { model: User, as: 'inviter', attributes: ['id', 'first_name', 'last_name', 'email'] },
+      { model: User, as: 'invitee', attributes: ['id', 'first_name', 'last_name', 'email'] }
     ]
   });
 };
@@ -172,7 +181,7 @@ export const getInvitesByInviter = async (inviterId: string) => {
   return await Invite.findAll({
     where: { inviter_id: inviterId },
     include: [
-      { model: User, as: 'invitee', attributes: ['id', 'full_name', 'email', 'role', 'avatar_url'] }
+      { model: User, as: 'invitee', attributes: ['id', 'first_name', 'last_name', 'email', 'role', 'avatar_url'] }
     ],
     order: [['created_at', 'DESC']]
   });

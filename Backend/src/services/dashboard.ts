@@ -178,7 +178,7 @@ export async function getDashboardOverview(
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
         required: false,
       },
     ],
@@ -241,7 +241,7 @@ export async function getDashboardOverview(
       {
         model: User,
         as: "user",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
     ],
     order: [["created_at", "DESC"]],

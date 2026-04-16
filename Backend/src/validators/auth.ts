@@ -1,3 +1,7 @@
+import { error } from "console";
+import { NotEmpty } from "sequelize-typescript";
+import { isAlpha } from "validator";
+
 export const registerSchema = {
   email: {
     isEmail: {
@@ -25,11 +29,33 @@ export const registerSchema = {
       errorMessage: "Last name is required",
     },
     isLength: {
-      options: { min: 2, max: 50 },
+      options: { min: 1, max: 50 },
       errorMessage: "Last name must be between 2 and 50 characters",
     },
   },
 };
+
+
+export const updateSchema = {
+  firstName: {
+    optional: true,
+    // isAlpha: {
+    //   errorMessage: "firstName name should contains only"
+    // },
+    isLength: {
+      options: { min: 2, max: 50 },
+      errorMessage: "First name must be between 2 and 50 characters"
+    }
+  },
+  lastName: {
+    optional: true,
+    isLength: {
+      options: { min: 1, max: 50 },
+      errorMessage: "Last name must be between 1 and 50 characters"
+    }
+  }
+}
+
 
 export const loginSchema = {
   email: {
@@ -142,4 +168,5 @@ export const changePasswordInvitedSchema = {
     },
   },
 };
+
 

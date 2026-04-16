@@ -74,6 +74,8 @@ const buildUser = (overrides: Record<string, unknown> = {}) => {
   const plainUser = {
     id: "user-123",
     email: "john@example.com",
+    first_name: "John",
+    last_name: "Doe",
     full_name: "John Doe",
     role: "Member",
     password_hash: "hashed-password",
@@ -111,6 +113,8 @@ describe("auth service", () => {
       user: {
         id: "user-123",
         email: "john@example.com",
+        first_name: "John",
+        last_name: "Doe",
         full_name: "John Doe",
         role: "Member",
         password_reset_required: false,
@@ -175,6 +179,8 @@ describe("auth service", () => {
     expect(result).toEqual({
       id: "user-123",
       email: "john@example.com",
+      first_name: "John",
+      last_name: "Doe",
       full_name: "John Doe",
       role: "Member",
       password_reset_required: false,

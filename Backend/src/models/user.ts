@@ -18,6 +18,7 @@ import { Task } from "./index";
 import { Comment } from "./index";
 import UserMetadata from "./userMetadata";
 import Organization from "./organization";
+import { buildFullName, splitFullName } from "../utils/userName";
 
 @Table({
   tableName: "users",
@@ -33,7 +34,28 @@ export default class User extends Model {
     type: DataType.STRING(255),
     allowNull: false,
   })
-  full_name!: string;
+  first_name!: string;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: false,
+    defaultValue: "",
+  })
+  last_name!: string;
+
+  @Column(DataType.VIRTUAL)
+  get full_name(): string {
+    return buildFullName({
+      first_name: this.getDataValue("first_name"),
+      last_name: this.getDataValue("last_name"),
+    });
+  }
+
+  set full_name(value: string) {
+    const { first_name, last_name } = splitFullName(value);
+    this.setDataValue("first_name", first_name);
+    this.setDataValue("last_name", last_name);
+  }
 
   @Unique
   @Column({

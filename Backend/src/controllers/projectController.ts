@@ -198,8 +198,8 @@ export class ProjectController {
               id: { [Op.in]: allowedUserIds },
               organization_id: organizationId,
             },
-            attributes: ["id", "full_name", "email", "role"],
-            order: [["full_name", "ASC"]],
+            attributes: ["id", "first_name", "last_name", "email", "role"],
+            order: [["first_name", "ASC"], ["last_name", "ASC"]],
           })
         : [];
 
@@ -345,7 +345,7 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url'],
+            attributes: ['id', 'first_name', 'last_name', 'email', 'avatar_url'],
             where: { organization_id: requester.organization_id },
           },
           {
@@ -459,7 +459,7 @@ export class ProjectController {
           {
             model: User,
             as: "owner",
-            attributes: ["id", "full_name", "email"],
+            attributes: ["id", "first_name", "last_name", "email"],
             where: { organization_id: requester.organization_id },
           },
         ],
@@ -546,7 +546,7 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url', 'organization_id'],
+            attributes: ['id', 'first_name', 'last_name', 'email', 'avatar_url', 'organization_id'],
             where: { organization_id: requester.organization_id },
           },
           {
@@ -556,7 +556,7 @@ export class ProjectController {
               {
                 model: User,
                 as: 'user',
-                attributes: ['id', 'full_name', 'email', 'avatar_url']
+                attributes: ['id', 'first_name', 'last_name', 'email', 'avatar_url']
               }
             ]
           }
@@ -734,7 +734,7 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url'],
+            attributes: ['id', 'first_name', 'last_name', 'email', 'avatar_url'],
             where: { organization_id: requester.organization_id },
           }
         ]
@@ -838,7 +838,7 @@ export class ProjectController {
           {
             model: User,
             as: 'owner',
-            attributes: ['id', 'full_name', 'email', 'avatar_url'],
+            attributes: ['id', 'first_name', 'last_name', 'email', 'avatar_url'],
             where: { organization_id: requesterOrgId },
           }
         ]
@@ -1147,7 +1147,7 @@ export class ProjectController {
           {
             model: ProjectFileUser,
             as: 'uploader',
-            attributes: ['id', 'full_name', 'email']
+            attributes: ['id', 'first_name', 'last_name', 'email']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1258,7 +1258,7 @@ export class ProjectController {
           {
             model: ProjectFileUser,
             as: 'uploader',
-            attributes: ['id', 'full_name', 'email']
+            attributes: ['id', 'first_name', 'last_name', 'email']
           }
         ]
       });
@@ -1307,15 +1307,16 @@ export class ProjectController {
 
       if (search) {
         whereClause[Op.or] = [
-          { full_name: { [Op.iLike]: `%${search}%` } },
+          { first_name: { [Op.iLike]: `%${search}%` } },
+          { last_name: { [Op.iLike]: `%${search}%` } },
           { email: { [Op.iLike]: `%${search}%` } }
         ];
       }
 
       const users = await User.findAll({
         where: whereClause,
-        attributes: ['id', 'full_name', 'email', 'role', 'avatar_url'],
-        order: [['full_name', 'ASC']],
+        attributes: ['id', 'first_name', 'last_name', 'email', 'role', 'avatar_url'],
+        order: [['first_name', 'ASC'], ['last_name', 'ASC']],
         limit: 50
       });
 
@@ -2098,7 +2099,7 @@ export class ProjectController {
           {
             model: User,
             as: "requester",
-            attributes: ["id", "full_name", "email", "role"],
+            attributes: ["id", "first_name", "last_name", "email", "role"],
           },
         ],
         order: [["requested_at", "DESC"]],

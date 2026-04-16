@@ -33,7 +33,8 @@ export async function getAllUsers(options: GetUsersOptions) {
   
   if (search) {
     whereClause[Op.or] = [
-      { full_name: { [Op.iLike]: `%${search}%` } },
+      { first_name: { [Op.iLike]: `%${search}%` } },
+      { last_name: { [Op.iLike]: `%${search}%` } },
       { email: { [Op.iLike]: `%${search}%` } }
     ];
   }
@@ -43,9 +44,9 @@ export async function getAllUsers(options: GetUsersOptions) {
   }
 
   const { rows: users, count: total } = await User.findAndCountAll({
-    attributes: ["id", "full_name", "email", "role", "avatar_url"],
+    attributes: ["id", "first_name", "last_name", "email", "role", "avatar_url"],
     where: whereClause,
-    order: [["full_name", "ASC"]],
+    order: [["first_name", "ASC"], ["last_name", "ASC"]],
     limit,
     offset,
   });
@@ -77,7 +78,8 @@ export async function getUserById(userId: string, requesterId: string) {
   const user = await User.findByPk(userId, {
     attributes: [
       "id",
-      "full_name",
+      "first_name",
+      "last_name",
       "email",
       "role",
       "avatar_url",

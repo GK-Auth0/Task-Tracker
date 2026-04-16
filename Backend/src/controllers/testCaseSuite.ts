@@ -113,7 +113,7 @@ export const listTestCaseSuites = async (req: AuthenticatedRequest, res: Respons
       where,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
       ],
       order: [["name", "ASC"]],
     });
@@ -191,7 +191,7 @@ export const createTestCaseSuite = async (req: AuthenticatedRequest, res: Respon
       },
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
       ],
     });
 
@@ -212,7 +212,7 @@ export const createTestCaseSuite = async (req: AuthenticatedRequest, res: Respon
     const saved = await TestCaseSuite.findByPk(created.id, {
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
       ],
     });
 

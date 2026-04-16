@@ -455,7 +455,7 @@ export const uploadTaskAttachment = async (req: Request, res: Response) => {
         {
           model: User,
           as: "uploader",
-          attributes: ["id", "full_name", "email"],
+          attributes: ["id", "first_name", "last_name", "email"],
         },
       ],
     });

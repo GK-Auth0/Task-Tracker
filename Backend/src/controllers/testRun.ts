@@ -110,7 +110,7 @@ export const listTestRuns = async (req: AuthenticatedRequest, res: Response) => 
       where,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
         { model: TestPlan, as: "plan", attributes: ["id", "reference_code", "name", "status", "suite_names", "project_id", "sprint_id"] },
       ],
@@ -178,7 +178,7 @@ export const createTestRunRecord = async (req: AuthenticatedRequest, res: Respon
     const created = await TestRun.findByPk(run.id, {
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Sprint, as: "sprint", attributes: ["id", "name", "status"] },
         { model: TestPlan, as: "plan", attributes: ["id", "reference_code", "name", "status", "suite_names", "project_id", "sprint_id"] },
       ],

@@ -13,6 +13,7 @@ import {
   createRefreshSession,
   refreshAuthSession,
   revokeRefreshSession,
+  updateUser,
 } from "../services/auth";
 import sequelize from "../config/database";
 import { appConfig } from "../config/app";
@@ -153,13 +154,13 @@ const buildSessionUserPayload = (result: any) => ({
     : {}),
   ...(result?.requiresOtp
     ? {
-        requiresOtp: result.requiresOtp,
-        otpSessionId: result.otpSessionId,
-        email: result.email,
-        expiresAt: result.expiresAt,
-        ...(result?.otp ? { otp: result.otp } : {}),
-        ...(result?.resent ? { resent: result.resent } : {}),
-      }
+      requiresOtp: result.requiresOtp,
+      otpSessionId: result.otpSessionId,
+      email: result.email,
+      expiresAt: result.expiresAt,
+      ...(result?.otp ? { otp: result.otp } : {}),
+      ...(result?.resent ? { resent: result.resent } : {}),
+    }
     : {}),
 });
 
@@ -170,7 +171,7 @@ export const register = async (req: Request, res: Response) => {
   try {
     const clientIP = extractClientIp(req);
     const userAgent = extractUserAgent(req);
-    
+
     const userData = {
       email: req.body.email,
       password: req.body.password,
@@ -180,7 +181,7 @@ export const register = async (req: Request, res: Response) => {
       userAgent,
     };
 
-    const result = await registerUser(userData,transaction);
+    const result = await registerUser(userData, transaction);
     await transaction.commit();
     return res.status(201).json({
       success: true,
@@ -197,6 +198,39 @@ export const register = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const user = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+  try {
+    const userId = (req as any).user?.id
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+        error: "UNAUTHORIZED",
+      });
+    }
+
+    const userData = {
+      userId,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+    }
+
+    const updatedUser = await updateUser(userData);
+    return res.status(200).json({
+      success: true,
+      message: "User profile updated",
+      data: updatedUser,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to update user profile",
+      error: (error as any).message,
+    })
+  }
+}
 
 export const login = async (req: Request, res: Response) => {
   if (handleValidationErrors(req, res)) return;
@@ -457,13 +491,13 @@ export const logout = async (req: Request, res: Response) => {
 };
 
 
-export const invite=async(req:Request,res:Response)=>{
-   if (handleValidationErrors(req, res)) return;
-   const transaction=await sequelize.transaction()
-   try{
- const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
+export const invite = async (req: Request, res: Response) => {
+  if (handleValidationErrors(req, res)) return;
+  const transaction = await sequelize.transaction()
+  try {
+    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string;
     const userAgent = extractUserAgent(req);
-    
+
     const userData = {
       email: req.body.email,
       password: req.body.password,
@@ -473,7 +507,7 @@ export const invite=async(req:Request,res:Response)=>{
       userAgent,
     };
 
-    const result = await registerUser(userData,transaction);
+    const result = await registerUser(userData, transaction);
     await transaction.commit();
     return res.status(201).json({
       success: true,
@@ -481,7 +515,7 @@ export const invite=async(req:Request,res:Response)=>{
       data: result,
     });
 
-   }catch(error){
+  } catch (error) {
 
-   }
+  }
 }
