@@ -57,7 +57,7 @@ export default function TestCases() {
             <button
               type="button"
               onClick={() => navigate("/test-cases/create")}
-              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-violet-700 active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">add_task</span>
               New Test Case

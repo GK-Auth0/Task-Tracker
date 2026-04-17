@@ -78,7 +78,7 @@ function RunButton({
         type="button"
         disabled={busy}
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-violet-400 bg-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 active:scale-95 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-400 bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 disabled:opacity-50"
       >
         <span className="material-symbols-outlined text-[14px]">
           {busy ? "progress_activity" : "play_arrow"}
@@ -166,7 +166,7 @@ export default function TestCaseModuleGrid({
         renderCell: (params) => (
           <div className="py-1.5">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-violet-600 tracking-wide">
+              <span className="font-mono text-xs font-bold text-blue-600 tracking-wide">
                 {params.row.reference_code}
               </span>
               <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[caseStatuses[params.row.id] ?? params.row.status] ?? "bg-slate-400"}`} />
@@ -245,13 +245,13 @@ export default function TestCaseModuleGrid({
           const isExpanded = expandedModule === params.row.module;
           return (
             <div className="flex items-center gap-3 py-2">
-              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${isExpanded ? "bg-violet-600" : "bg-slate-100"}`}>
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${isExpanded ? "bg-blue-600" : "bg-slate-100"}`}>
                 <span className={`material-symbols-outlined text-[15px] transition-all ${isExpanded ? "rotate-90 text-white" : "text-slate-500"}`}>
                   chevron_right
                 </span>
               </div>
               <div>
-                <p className={`text-sm font-bold transition-colors ${isExpanded ? "text-violet-700" : "text-slate-900"}`}>
+                <p className={`text-sm font-bold transition-colors ${isExpanded ? "text-blue-700" : "text-slate-900"}`}>
                   {params.row.module}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-400">{params.row.linkedTasks} linked tasks</p>
@@ -308,7 +308,7 @@ export default function TestCaseModuleGrid({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpenModule(params.row.moduleSlug); }}
-            className="text-xs font-bold text-slate-400 transition hover:text-violet-700"
+            className="text-xs font-bold text-slate-400 transition hover:text-blue-700"
           >
             Full page →
           </button>
@@ -335,7 +335,7 @@ export default function TestCaseModuleGrid({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-violet-400">category</span>
+              <span className="material-symbols-outlined text-[18px] text-blue-400">category</span>
               <h2 className="text-base font-extrabold tracking-tight text-white">Module Directory</h2>
             </div>
             <p className="mt-1 text-xs font-medium text-slate-400">
@@ -346,7 +346,7 @@ export default function TestCaseModuleGrid({
             <span className="rounded-lg border border-slate-600 bg-slate-700/60 px-3 py-1.5 text-xs font-bold text-slate-200">
               {rows.length} modules
             </span>
-            <span className="rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-bold text-violet-300">
+            <span className="rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-300">
               {items.reduce((acc, g) => acc + g.items.length, 0)} cases
             </span>
           </div>
@@ -401,14 +401,14 @@ export default function TestCaseModuleGrid({
 
       {/* ── Inline expanded panel ────────────────────────────────────── */}
       {expandedModule && (
-        <div className="border-t-[3px] border-violet-600">
+        <div className="border-t-[3px] border-blue-600">
 
           {/* Panel header */}
-          <div className="flex items-center justify-between gap-3 bg-violet-600 px-6 py-3">
+          <div className="flex items-center justify-between gap-3 bg-blue-600 px-6 py-3">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[18px] text-violet-200">view_list</span>
+              <span className="material-symbols-outlined text-[18px] text-blue-200">view_list</span>
               <p className="text-sm font-extrabold tracking-tight text-white">{expandedModule}</p>
-              <span className="rounded-md border border-violet-400/50 bg-violet-500/40 px-2.5 py-0.5 text-xs font-bold text-white">
+              <span className="rounded-md border border-blue-400/50 bg-blue-500/40 px-2.5 py-0.5 text-xs font-bold text-white">
                 {expandedCases.length} cases
               </span>
             </div>
