@@ -12,6 +12,7 @@ import {
   changePasswordInvited,
   refreshSession,
   logout,
+  user,
 } from "../controllers/auth";
 import {
   registerSchema,
@@ -22,6 +23,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordInvitedSchema,
+  updateSchema,
 } from "../validators/auth";
 import { authenticateToken } from "../middleware/auth";
 import { authRateLimiter } from "../middleware/rateLimit";
@@ -40,5 +42,6 @@ router.post("/change-password-invited", authThrottle, authRateLimiter, checkSche
 router.post("/refresh", authThrottle, authRateLimiter, refreshSession);
 router.post("/logout", logout);
 router.get("/me", authenticateToken, me);
+router.patch("/user", authenticateToken, authThrottle, authRateLimiter, checkSchema(updateSchema), user)
 
 export default router;

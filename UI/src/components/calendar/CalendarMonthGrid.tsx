@@ -1,6 +1,7 @@
 import React from "react";
 import { TASK_COLOR_CLASSES } from "./calendarColors";
 import { CalendarDayCell, CalendarTask } from "./types";
+import { getFullName } from "../../utils/user";
 
 interface CalendarMonthGridProps {
   days: CalendarDayCell[];
@@ -81,13 +82,13 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                             className={`${TASK_COLOR_CLASSES[taskColor as keyof typeof TASK_COLOR_CLASSES] || TASK_COLOR_CLASSES.blue} rounded-lg border-l-2 px-3 py-2 text-xs font-medium`}
                             title={
                               calendarType === "team" && task.assignee
-                                ? `${task.assignee.full_name}: ${task.title}`
+                                ? `${getFullName(task.assignee)}: ${task.title}`
                                 : task.title
                             }
                           >
                             <p className="truncate">
                               {calendarType === "team" && task.assignee
-                                ? `${task.assignee.full_name.split(" ")[0]}: ${task.title}`
+                                ? `${getFullName(task.assignee).split(" ")[0]}: ${task.title}`
                                 : task.title}
                             </p>
                           </div>
@@ -163,12 +164,12 @@ const CalendarMonthGrid: React.FC<CalendarMonthGridProps> = ({
                             className={`${TASK_COLOR_CLASSES[taskColor as keyof typeof TASK_COLOR_CLASSES] || TASK_COLOR_CLASSES.blue} cursor-pointer truncate rounded border-l-2 px-1.5 py-0.5 text-[10px] font-medium hover:opacity-80 lg:px-2`}
                             title={
                               calendarType === "team" && task.assignee
-                                ? `${task.assignee.full_name}: ${task.title}`
+                                ? `${getFullName(task.assignee)}: ${task.title}`
                                 : task.title
                             }
                           >
                             {calendarType === "team" && task.assignee
-                              ? `${task.assignee.full_name.split(" ")[0]}: ${task.title}`
+                              ? `${getFullName(task.assignee).split(" ")[0]}: ${task.title}`
                               : task.title}
                           </div>
                         );

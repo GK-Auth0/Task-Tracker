@@ -177,7 +177,10 @@ export interface OrganizationSummary {
 export interface AuthenticatedUser {
   id: string;
   email: string;
-  full_name: string;
+  first_name?: string;
+  last_name?: string;
+  /** @deprecated Use first_name + last_name via getFullName() */
+  full_name?: string;
   role: string;
   organization_id?: string | null;
   organization: OrganizationSummary | null;

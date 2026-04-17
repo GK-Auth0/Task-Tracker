@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { getFullName } from "../utils/user";
 import { useEffect, useMemo, useState } from "react";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
 import { defectsAPI } from "../services/defects";
@@ -242,10 +243,10 @@ export default function DefectDetailPage() {
                         People
                       </p>
                       <p className="mt-2 font-semibold text-slate-900">
-                        {defect.creator?.full_name || "Unknown creator"}
+                        {getFullName(defect.creator)}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Assigned to {defect.assignee?.full_name || "Unassigned"}
+                        Assigned to {defect.assignee ? getFullName(defect.assignee) : "Unassigned"}
                       </p>
                     </div>
                     <div>
@@ -479,7 +480,7 @@ export default function DefectDetailPage() {
                           <div className="flex items-start justify-between gap-4 border-t border-slate-100 pt-4">
                             <dt className="text-slate-400">Created by</dt>
                             <dd className="text-right font-semibold text-slate-900">
-                              {defect.creator?.full_name || "Unknown creator"}
+                              {getFullName(defect.creator)}
                             </dd>
                           </div>
                           <div className="flex items-start justify-between gap-4 border-t border-slate-100 pt-4">

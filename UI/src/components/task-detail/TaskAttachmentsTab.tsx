@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getFullName } from "../../utils/user";
 
 interface TaskAttachment {
   id: string;
@@ -9,7 +10,9 @@ interface TaskAttachment {
   created_at: string;
   uploader?: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   };
 }
@@ -88,7 +91,7 @@ export default function TaskAttachmentsTab({
                   </p>
                   <p className="text-xs text-slate-500">
                     {(attachment.file_size / 1024).toFixed(1)} KB
-                    {attachment.uploader ? ` • ${attachment.uploader.full_name}` : ""}
+                    {attachment.uploader ? ` • ${getFullName(attachment.uploader)}` : ""}
                   </p>
                 </div>
               </div>

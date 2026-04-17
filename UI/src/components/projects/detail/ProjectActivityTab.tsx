@@ -1,4 +1,5 @@
 import type { ActivityLog } from "../../../services/dashboard";
+import { getFullName } from "../../../utils/user";
 
 interface ProjectActivityTabProps {
   activityLoading: boolean;
@@ -31,7 +32,7 @@ export default function ProjectActivityTab({
           {activityLogs.map((log) => (
             <div key={log.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-semibold text-slate-900">{log.user.full_name}</span>
+                <span className="font-semibold text-slate-900">{getFullName(log.user)}</span>
                 <span className="text-slate-600">{log.action.replace(/_/g, " ")}</span>
               </div>
               <p className="mt-1 text-xs text-slate-500">

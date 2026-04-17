@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { getFullName } from "../utils/user";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { GridRowSelectionModel } from "@mui/x-data-grid";
 import { useQuery, useQueryClient } from "react-query";
@@ -85,8 +86,14 @@ export default function Tasks() {
     ["tasks-page-data", taskFilters],
     async () => {
       const response = await tasksAPI.getTasks(taskFilters);
+      const tasks = (response.data as any[]).map((t) => ({
+        ...t,
+        assignee: t.assignee
+          ? { ...t.assignee, full_name: getFullName(t.assignee) }
+          : undefined,
+      }));
       return {
-        tasks: response.data,
+        tasks,
         pagination: response.pagination || null,
       };
     },

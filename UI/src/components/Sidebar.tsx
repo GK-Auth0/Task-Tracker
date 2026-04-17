@@ -1,4 +1,5 @@
 import { useAuth } from "../contexts/AuthContext";
+import { getFullName, getUserInitials } from "../utils/user";
 import { Link, useLocation } from "react-router-dom";
 import {
   hasMinimumWorkspaceRole,
@@ -194,15 +195,12 @@ export default function Sidebar({
             }`}
           >
             <div className="bg-blue-600/20 text-blue-600 rounded-full size-8 flex items-center justify-center text-xs font-bold shrink-0">
-              {user?.full_name
-                ?.split(" ")
-                .map((n) => n[0])
-                .join("") || "U"}
+              {getUserInitials(user)}
             </div>
             {!isCollapsed && (
               <div className="flex flex-col overflow-hidden">
                 <p className="text-sm font-medium truncate">
-                  {user?.full_name || "User"}
+                  {getFullName(user)}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
                   {user?.role || "Member"}{isWorkspaceAdmin(user?.role) ? " • Workspace Admin" : ""}

@@ -1,5 +1,5 @@
 -- Add missing columns to subtasks table
--- Migration: V2027__add_missing_subtasks_columns.sql
+-- Migration: V1042__add_missing_subtasks_columns.sql
 
 -- Add assignee_id column to subtasks table
 ALTER TABLE subtasks 

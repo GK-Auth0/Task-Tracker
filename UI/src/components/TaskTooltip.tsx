@@ -1,5 +1,6 @@
 import React from "react";
 import { Tooltip, TooltipProps } from "@mui/material";
+import { getFullName } from "../utils/user";
 
 interface TaskItem {
   id: string;
@@ -65,7 +66,7 @@ const TaskTooltip: React.FC<TaskTooltipProps> = ({
         <div><span className="font-medium text-white">Status:</span> {task.status}</div>
         <div><span className="font-medium text-white">Priority:</span> {task.priority}</div>
         {task.assignee && (
-          <div><span className="font-medium text-white">Assignee:</span> {task.assignee.full_name}</div>
+          <div><span className="font-medium text-white">Assignee:</span> {getFullName(task.assignee)}</div>
         )}
         {dateInfo && (
           <div><span className="font-medium text-white">Due:</span> {dateInfo.text}</div>

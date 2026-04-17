@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getFullName } from "../../utils/user";
 import { useNavigate } from "react-router-dom";
 import { auditLogsAPI, tasksAPI } from "../../services/dashboard";
 import { chatAPI } from "../../services/chatService";
@@ -91,8 +92,8 @@ export default function NotificationBell() {
             type: log.entity_type === "task" ? "task" : "project",
             audience: "org",
             title: `Org ${label.toLowerCase()} ${log.action.replace("_", " ")}`,
-            subtitle: log.user?.full_name
-              ? `${log.user.full_name} updated your organization workspace`
+            subtitle: log.user
+              ? `${getFullName(log.user)} updated your organization workspace`
               : "Organization workspace update",
             createdAt: normalizeDate(log.created_at),
             route: log.entity_type === "task" ? `/task/${log.entity_id}` : "/projects",
@@ -154,7 +155,7 @@ export default function NotificationBell() {
           if (!latest) return;
           const group = groups[index];
           if (latest.user_id === user?.id) return;
-          const from = latest.user?.full_name || "User";
+          const from = latest.user ? getFullName(latest.user) : "User";
           const preview = latest.content?.trim()
             ? latest.content.slice(0, 72)
             : latest.attachment_name

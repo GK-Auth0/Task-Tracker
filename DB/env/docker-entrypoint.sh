@@ -4,4 +4,8 @@
 URL="jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB?useSSL=false&allowPublicKeyRetrieval=true"
 
 echo "---------- running migrations ----------"
-flyway -schemas="public" -user=$POSTGRES_USER -password=$POSTGRES_PASSWORD -url=$URL -locations=filesystem:./migrations/schema,filesystem:./migrations/seeder,filesystem:./migrations/views -outOfOrder=true migrate
+FLYWAY_URL="$URL" \
+FLYWAY_USER="$POSTGRES_USER" \
+FLYWAY_PASSWORD="$POSTGRES_PASSWORD" \
+FLYWAY_SQL_ROOT="./migrations" \
+./run-migrations.sh

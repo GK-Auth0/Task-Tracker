@@ -2,11 +2,11 @@
 -- Migration: V2001__seed_base_data.sql
 
 -- Seed Users (password: 'password123' for all users)
-INSERT INTO users (id, full_name, email, password_hash, avatar_url, role, created_at, updated_at) VALUES
-(uuid_generate_v4(), 'Giri Gk', 'giri.gk@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150', 'Admin', NOW(), NOW()),
-(uuid_generate_v4(), 'Giridharan Gk', 'giridharan.gk@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150', 'Member', NOW(), NOW()),
-(uuid_generate_v4(), 'Mike Johnson', 'mike.johnson@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', 'Member', NOW(), NOW()),
-(uuid_generate_v4(), 'Sarah Wilson', 'sarah.wilson@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150', 'Viewer', NOW(), NOW());
+INSERT INTO users (id, first_name, last_name, email, password_hash, avatar_url, role, created_at, updated_at) VALUES
+(uuid_generate_v4(), 'Giri', 'Gk', 'giri.gk@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150', 'Admin', NOW(), NOW()),
+(uuid_generate_v4(), 'Giridharan', 'Gk', 'giridharan.gk@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150', 'Member', NOW(), NOW()),
+(uuid_generate_v4(), 'Mike', 'Johnson', 'mike.johnson@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', 'Member', NOW(), NOW()),
+(uuid_generate_v4(), 'Sarah', 'Wilson', 'sarah.wilson@company.com', '$2b$10$xnMtU0Gh8uMNYYtfjYzxeeHr2DSER6MJb0GGSycSkocEtaEYhefHO', 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150', 'Viewer', NOW(), NOW());
 
 -- Seed Projects
 INSERT INTO projects (id, name, description, owner_id, status, created_at) VALUES

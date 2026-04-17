@@ -1,325 +1,269 @@
-# Task Tracker Frontend
+# Task Tracker — Frontend
 
-A modern React TypeScript frontend for task management with Vite, Tailwind CSS, and Material Icons.
+React + TypeScript SPA built with Vite, Tailwind CSS, and Material UI. Covers authentication, project/task management, sprint boards, QA workflows, defect tracking, real-time chat, and an AI assistant sidebar.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 18 |
+| Language | TypeScript 5 |
+| Build tool | Vite 6 |
+| Styling | Tailwind CSS 3 + Material UI 7 |
+| Routing | React Router v6 |
+| Data fetching | React Query + Axios |
+| Icons | Heroicons + MUI icons |
+| Testing | Vitest |
+
+---
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
-- Yarn package manager
-- Task Tracker Backend running on `http://localhost:3000`
+- Node.js 18+
+- Yarn
+- Backend running on `http://localhost:3000`
+- AI service running on `http://127.0.0.1:8787` (optional)
 
-## Setup & Installation
+---
 
-### 1. Clone and Install Dependencies
+## Setup
+
+### 1. Install dependencies
 
 ```bash
 cd UI
 yarn install
 ```
 
-### 2. Environment Configuration
-
-Create environment file:
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Update `.env` with your configuration:
+Edit `.env`:
 
 ```env
 VITE_API_BASE_URL=http://localhost:3000
 VITE_WS_BASE_URL=ws://localhost:3000
 VITE_AI_ASSISTANT_URL=http://127.0.0.1:8787
 VITE_AI_API_KEY=
+VITE_HIDE_AUTH0=false
+# VITE_AUTH0_DOMAIN=
+# VITE_AUTH0_CLIENT_ID=
+# VITE_AUTH0_AUDIENCE=
 ```
 
-### 3. Start Development Server
+### 3. Start the dev server
 
 ```bash
 yarn dev
 ```
 
-The application will be available at `http://localhost:3001`
+App available at `http://localhost:3001`.
+
+---
 
 ## Available Scripts
 
-- `yarn dev` - Start development server with hot reload
-- `yarn build` - Build production bundle
-- `yarn preview` - Preview production build
-- `yarn lint` - Run ESLint
-- `yarn type-check` - Run TypeScript type checking
+| Script | Description |
+|--------|-------------|
+| `yarn dev` | Vite dev server with HMR |
+| `yarn build` | TypeScript compile + production bundle |
+| `yarn preview` | Preview production build locally |
+| `yarn test` | Vitest test suite |
+| `yarn lint` | ESLint |
+| `yarn format` | Prettier |
 
-## Features
-
-### Authentication
-
-- **User Registration** - Create new account with email/password
-- **User Login** - Secure JWT-based authentication
-- **Protected Routes** - Automatic redirect for unauthenticated users
-- **Persistent Sessions** - Token stored in localStorage
-
-### Dashboard
-
-- **Task Overview** - Summary statistics and metrics
-- **Task List** - Paginated task display (5 items per page)
-- **Filtering** - Filter by status, priority, and project
-- **Real-time Updates** - Automatic data refresh
-
-### Task Management
-
-- **Create Tasks** - Modal form with project assignment
-- **Task Details** - Full task view with status updates
-- **Status Management** - Dropdown and quick complete actions
-- **Priority Levels** - Visual priority indicators
-- **Due Dates** - Date formatting with overdue detection
-
-### Team Management
-
-- **User Listing** - Team member overview
-- **Role Filtering** - Filter by Admin, Member, Viewer
-- **Statistics** - Team performance metrics
-- **User Actions** - Member management interface
-
-### UI/UX
-
-- **Responsive Design** - Mobile-first approach
-- **Material Icons** - Consistent iconography
-- **Tailwind CSS** - Utility-first styling
-- **Loading States** - Skeleton screens and spinners
-- **Error Handling** - User-friendly error messages
+---
 
 ## Project Structure
 
 ```
 UI/
-├── public/
-│   └── index.html       # HTML template
-├── src/
-│   ├── components/      # Reusable components
-│   │   ├── CreateTaskModal.tsx
-│   │   ├── TaskDetails.tsx
-│   │   └── TeamManagement.tsx
-│   ├── contexts/        # React contexts
-│   │   └── AuthContext.tsx
-│   ├── pages/           # Page components
-│   │   ├── Dashboard.tsx
-│   │   ├── Login.tsx
-│   │   ├── Register.tsx
-│   │   └── ComingSoon.tsx
-│   ├── services/        # API services
-│   │   ├── auth.ts
-│   │   └── dashboard.ts
-│   ├── App.tsx          # Main app component
-│   ├── main.tsx         # Entry point
-│   └── index.css        # Global styles
-├── package.json
-├── vite.config.ts       # Vite configuration
-├── tailwind.config.js   # Tailwind configuration
-└── tsconfig.json        # TypeScript configuration
+├── public/                  # Static assets
+└── src/
+    ├── pages/               # Full-page route components
+    ├── components/          # Reusable UI components (grouped by feature)
+    │   ├── auth/
+    │   ├── tasks/
+    │   ├── task-detail/
+    │   ├── projects/
+    │   ├── sprint/
+    │   ├── testcases/
+    │   ├── dashboard/
+    │   ├── ai/
+    │   ├── calendar/
+    │   ├── layout/          # Sidebar, header, navigation
+    │   ├── preferences/
+    │   └── common/
+    ├── services/            # Axios API wrappers
+    ├── contexts/            # React context providers (auth, etc.)
+    ├── hooks/               # Custom React hooks
+    ├── types/               # TypeScript interfaces and enums
+    ├── utils/               # Shared helpers
+    ├── App.tsx              # Router and layout root
+    └── main.tsx             # Entry point
 ```
+
+---
 
 ## Pages & Routes
 
-- `/` - Dashboard (protected)
-- `/login` - User login
-- `/register` - User registration
-- `/task/:id` - Task details modal
-- `/team` - Team management
-- `/coming-soon` - Placeholder for incomplete features
+### Authentication
 
-## Components
+| Route | Page | Description |
+|-------|------|-------------|
+| `/login` | `Login.tsx` | Email/password login |
+| `/register` | `Register.tsx` | New account registration |
+| `/otp-verification` | `OtpVerification.tsx` | OTP input after login/register |
+| `/forgot-password` | `ForgotPassword.tsx` | Request password reset |
+| `/reset-password` | `ResetPassword.tsx` | Reset with token from email |
+| `/change-password` | `ChangePassword.tsx` | Change password (authenticated) |
+| `/auth/callback` | `AuthCallback.tsx` | Auth0 OAuth callback |
 
-### Authentication Context
+### Core App (Protected)
 
-- Global authentication state management
-- JWT token handling
-- User session persistence
-- Protected route wrapper
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | `Dashboard.tsx` / `DashboardContent.tsx` | Overview: stats, recent activity |
+| `/projects` | `Projects.tsx` | Project list and creation |
+| `/projects/:id` | `ProjectDetail.tsx` | Project members, files, settings |
+| `/tasks` | `Tasks.tsx` | Task list with filters |
+| `/tasks/:id` | `TaskDetails.tsx` | Task detail view |
+| `/calendar` | `Calendar.tsx` | Due dates and sprint calendar |
+| `/analytics` | `Analytics.tsx` | Charts and performance metrics |
+| `/activity` | `ActivityLog.tsx` | Audit log and activity history |
+| `/chat` | `Chat.tsx` | Real-time group messaging |
+| `/settings` | `Settings.tsx` | App and team settings |
+| `/profile` | `Profile.tsx` | User profile editing |
 
-### Dashboard
+### Sprint Management
 
-- Task list with pagination
-- Filter controls (status, priority)
-- Summary statistics
-- Create task modal
+| Route | Page | Description |
+|-------|------|-------------|
+| `/sprints` | `SprintBoards.tsx` | Sprint list for a project |
+| `/sprints/:id/dev` | `SprintDevBoard.tsx` | Developer kanban board |
+| `/sprints/:id/qa` | `SprintQaBoard.tsx` | QA-focused sprint board |
 
-### Task Details
+### QA & Test Management
 
-- Full task information display
-- Status update dropdown
-- Priority and due date display
-- Modal overlay interface
+| Route | Page | Description |
+|-------|------|-------------|
+| `/test-cases` | `TestCases.tsx` | Test case list and filters |
+| `/test-cases/create` | `CreateTestCase.tsx` | New test case form |
+| `/test-cases/:id` | `TestCaseDetailPage.tsx` | Test case detail |
+| `/test-cases/modules/:id` | `TestCaseModuleDetail.tsx` | Module-grouped view |
+| `/test-plans` | `TestPlans.tsx` | Test plans list |
+| `/test-runs` | `TestRuns.tsx` | Test run execution |
+| `/test-reports` | `TestReports.tsx` | Pass/fail reports |
+| `/test-traceability` | `TestTraceability.tsx` | Requirement–test mapping |
 
-### Team Management
+### Defect Tracking
 
-- User listing with role badges
-- Filter tabs by role
-- Statistics cards
-- Export and invite actions
+| Route | Page | Description |
+|-------|------|-------------|
+| `/defects` | `TestDefects.tsx` | Defect list |
+| `/defects/raise` | `RaiseDefect.tsx` | Log new defect |
+| `/defects/:id` | `DefectDetailPage.tsx` | Defect details and history |
+| `/defect-reports` | `DefectReports.tsx` | Defect analytics |
 
-## API Integration
+### Organization & Onboarding
 
-### Authentication Service
+| Route | Page | Description |
+|-------|------|-------------|
+| `/onboarding` | `OrganizationOnboarding.tsx` | Create or join an organization |
 
-```typescript
-// Login user
-authAPI.login(email, password);
+---
 
-// Register user
-authAPI.register(userData);
+## Key Components
 
-// Get current user
-authAPI.getCurrentUser();
-```
+| Component | Location | Description |
+|-----------|----------|-------------|
+| `CreateTaskModal` | `components/tasks/` | Full task creation form with all fields |
+| `TaskDetails` | `components/task-detail/` | Task view/edit with subtasks, comments, files |
+| `CreateProjectModal` | `components/projects/` | Project creation form |
+| `ProjectCard` | `components/projects/` | Project summary card with tooltip |
+| `TeamManagement` | `components/` | Member list, role management, invitations |
+| `Sidebar` | `components/layout/` | Main navigation sidebar |
+| `Layout` | `components/layout/` | Page wrapper with sidebar + header |
+| `AuthNavbar` | `components/layout/` | Unauthenticated page header |
+| AI sidebar | `components/ai/` | AI assistant panel (suggestions, chat) |
 
-### Dashboard Service
+---
 
-```typescript
-// Get dashboard summary
-dashboardAPI.getSummary();
+## Services (API Layer)
 
-// Get tasks with pagination
-tasksAPI.getTasks({ page: 1, limit: 5, status: "In Progress" });
+| File | Covers |
+|------|--------|
+| `auth.ts` | Login, register, OTP, token refresh |
+| `taskService.ts` | Task CRUD, comments, files, subtasks |
+| `projectService.ts` | Project CRUD, members, files |
+| `sprints.ts` | Sprint data and task assignments |
+| `testCases.ts` | Test case CRUD |
+| `testManagement.ts` | Plans, runs, reports |
+| `defects.ts` | Defect lifecycle |
+| `dashboard.ts` | Stats, activity |
+| `chatService.ts` | Groups and messages |
+| `aiAssistant.ts` | Suggest-task, plan-day, insights |
+| `aiChat.ts` | Streaming chat context |
+| `organization.ts` | Org management |
+| `inviteService.ts` | Invitations |
+| `search.ts` | Global search |
+| `preferences.ts` | User preferences |
 
-// Update task
-tasksAPI.updateTask(taskId, { status: "Done" });
-```
+All services use Axios and read `VITE_API_BASE_URL` from the environment.
 
-## Styling
-
-### Tailwind CSS
-
-- Utility-first CSS framework
-- Custom color palette
-- Responsive breakpoints
-- Dark mode support (prepared)
-
-### Material Icons
-
-- Google Material Symbols
-- Consistent iconography
-- Outlined and filled variants
-- Proper font loading
-
-### Design System
-
-- **Colors**: Blue primary, slate secondary
-- **Typography**: Inter font family
-- **Spacing**: 4px base unit
-- **Shadows**: Subtle elevation
-- **Borders**: Rounded corners
+---
 
 ## State Management
 
-### React Context
+- **AuthContext** — global auth state (user info, access token, login/logout)
+- **React Query** — server state, caching, background refetch
+- **Local state** — component-level UI state (modals, forms, filters)
 
-- Authentication state
-- User information
-- Token management
-
-### Local State
-
-- Component-specific state
-- Form handling
-- UI interactions
-
-### API State
-
-- Loading states
-- Error handling
-- Data caching
-
-## Development
-
-### Adding New Pages
-
-1. Create component in `src/pages/`
-2. Add route in `App.tsx`
-3. Update navigation links
-4. Add to protected routes if needed
-
-### Adding New Components
-
-1. Create component in `src/components/`
-2. Export from component file
-3. Import where needed
-4. Add TypeScript interfaces
-
-### API Integration
-
-1. Add service functions in `src/services/`
-2. Define TypeScript interfaces
-3. Handle loading and error states
-4. Update components to use service
-
-## Production Build
-
-1. Build the application:
-
-```bash
-yarn build
-```
-
-2. Preview the build:
-
-```bash
-yarn preview
-```
-
-3. Deploy the `dist/` folder to your hosting service
-
-### Production Checklist
-
-1. Set `VITE_API_BASE_URL` to your API domain, or leave empty if your host reverse-proxies `/api` to backend.
-2. Set `VITE_WS_BASE_URL` to your websocket endpoint (`wss://...`) if not same-origin.
-3. Set `VITE_AI_ASSISTANT_URL` or configure reverse-proxy for `/ai-assistant`.
-4. Verify frontend domain is listed in backend `ALLOWED_ORIGINS`.
+---
 
 ## Environment Variables
 
-- `VITE_API_BASE_URL` - Backend API URL. If omitted in production, frontend uses same-origin `/api/*`.
-- `VITE_WS_BASE_URL` - Chat websocket base URL (example: `wss://api.example.com`). Optional; auto-derived when omitted.
-- `VITE_AI_ASSISTANT_URL` - AI assistant service URL for monitoring and suggestions (default: `http://127.0.0.1:8787`).
-- `VITE_HIDE_AUTH0` - Set `true`/`yes`/`1` to hide Auth0 options on login/signup flows.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | (same origin) | Backend REST API base URL |
+| `VITE_WS_BASE_URL` | (derived) | WebSocket base URL for chat |
+| `VITE_AI_ASSISTANT_URL` | `http://127.0.0.1:8787` | AI service URL |
+| `VITE_AI_API_KEY` | — | Optional shared secret for AI service |
+| `VITE_HIDE_AUTH0` | `false` | Set `true` to hide Auth0 login/register options |
+| `VITE_AUTH0_DOMAIN` | — | Auth0 domain (optional) |
+| `VITE_AUTH0_CLIENT_ID` | — | Auth0 client ID (optional) |
+| `VITE_AUTH0_AUDIENCE` | — | Auth0 API audience (optional) |
 
-## Browser Support
+---
 
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
+## Production Build
 
-## Performance
+```bash
+yarn build       # outputs to dist/
+yarn preview     # local preview of the dist/ bundle
+```
 
-- **Code Splitting** - Automatic route-based splitting
-- **Tree Shaking** - Unused code elimination
-- **Asset Optimization** - Image and font optimization
-- **Lazy Loading** - Component lazy loading
-- **Bundle Analysis** - Build size monitoring
+### Production checklist
+
+1. Set `VITE_API_BASE_URL` to your deployed API domain (or configure a reverse proxy for `/api`).
+2. Set `VITE_WS_BASE_URL` to `wss://your-api-domain` if not same-origin.
+3. Set `VITE_AI_ASSISTANT_URL` (or reverse-proxy `/ai-assistant`).
+4. Ensure your backend `ALLOWED_ORIGINS` includes the frontend domain.
+5. Set `VITE_HIDE_AUTH0=true` if Auth0 is not configured.
+
+---
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **API Connection Error**
-   - Ensure backend is running on port 3000
-   - Check CORS configuration
-   - Verify API base URL
-
-2. **Authentication Issues**
-   - Clear localStorage tokens
-   - Check JWT token expiration
-   - Verify backend authentication
-
-3. **Build Errors**
-   - Run `yarn type-check` for TypeScript errors
-   - Check import paths
-   - Verify environment variables
-
-### Development Tips
-
-- Use React DevTools for debugging
-- Check Network tab for API calls
-- Use TypeScript strict mode
-- Follow component naming conventions
+| Problem | Fix |
+|---------|-----|
+| Blank page / network errors | Check `VITE_API_BASE_URL` and that the backend is running |
+| WebSocket connection refused | Verify `VITE_WS_BASE_URL` and backend WS support |
+| Auth loops / 401s | Clear localStorage, check JWT expiry and refresh token logic |
+| Build TypeScript errors | Run `yarn tsc --noEmit` to see full error list |
+| CORS errors | Add the frontend URL to backend `ALLOWED_ORIGINS` |

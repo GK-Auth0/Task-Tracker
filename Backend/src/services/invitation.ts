@@ -51,13 +51,19 @@ export const processInvites = async ({
         [Op.in]: emails,
       },
     },
-    attributes: ["id", "email", "full_name"],
+    attributes: ["id", "first_name", "last_name", "email"],
   });
 
   const existingByEmail = new Map(
     existingUsers.map((user) => [
       String(user.email).toLowerCase(),
-      user.get({ plain: true }) as { id: string; email: string; full_name: string },
+      user.get({ plain: true }) as {
+        id: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        full_name: string;
+      },
     ]),
   );
 

@@ -54,16 +54,14 @@ export default function TestCases() {
           metaValue={latestSprint}
           showStaticBanner={false}
           actions={
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/test-cases/create")}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-700"
-              >
-                <span className="material-symbols-outlined text-lg">add_task</span>
-                <span>New Test Case</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/test-cases/create")}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">add_task</span>
+              New Test Case
+            </button>
           }
         />
 

@@ -155,7 +155,7 @@ const getSprintFamilyRecords = async (sprintId: string, userId: string, role?: s
           },
         ],
       },
-      { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+      { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
       {
         model: Task,
         as: "tasks",
@@ -173,7 +173,7 @@ const getSprintFamilyRecords = async (sprintId: string, userId: string, role?: s
         ],
         include: [
           { model: Project, as: "project", attributes: ["id", "name"] },
-          { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+          { model: User, as: "assignee", attributes: ["id", "first_name", "last_name", "email"] },
         ],
       },
     ],
@@ -197,7 +197,7 @@ const buildSprintInsights = async (familyRecords: Sprint[]) => {
     attributes: ["id", "status", "priority", "severity", "project_id", "assignee_id"],
     include: [
       { model: Project, as: "project", attributes: ["id", "name"] },
-      { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+      { model: User, as: "assignee", attributes: ["id", "first_name", "last_name", "email"] },
     ],
   });
   const testCases = await TestCase.findAll({
@@ -208,7 +208,7 @@ const buildSprintInsights = async (familyRecords: Sprint[]) => {
     attributes: ["id", "status", "project_id", "owner_id"],
     include: [
       { model: Project, as: "project", attributes: ["id", "name"] },
-      { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+      { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
     ],
   });
 
@@ -349,7 +349,7 @@ const getSprintWithAccess = async (sprintId: string, userId: string, role?: stri
   const sprint = await Sprint.findByPk(sprintId, {
     include: [
       { model: Project, as: "project", attributes: ["id", "name", "owner_id"] },
-      { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+      { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
       { model: Task, as: "tasks", attributes: ["id", "title", "status", "project_id", "sprint_id"] },
     ],
   });
@@ -392,7 +392,7 @@ export const listSprints = async (req: AuthenticatedRequest, res: Response) => {
             },
           ],
         },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "tasks", attributes: ["id"] },
       ],
       order: [["created_at", "DESC"]],
@@ -563,7 +563,7 @@ export const createSprintRecord = async (req: AuthenticatedRequest, res: Respons
     const created = await Sprint.findByPk(sprint.id, {
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "tasks", attributes: ["id"] },
       ],
     });

@@ -24,44 +24,39 @@ export default function WorkspacePageHeader({
   showMeta = true,
   showStaticBanner = true,
 }: WorkspacePageHeaderProps) {
+  const metaPill = showMeta ? (
+    <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+        {metaLabel}
+      </p>
+      <p className="mt-0.5 text-sm font-bold text-slate-900">{metaValue}</p>
+    </div>
+  ) : null;
+
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-      <div className="flex flex-wrap items-start gap-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-semibold">
+    <div className="mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+
+        {/* ── Left: title block ── */}
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">
             {eyebrow}
           </p>
-          <h1 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">{title}</h1>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">
+          <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-slate-900">
+            {title}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
             {description}
           </p>
         </div>
 
-        {showMeta && metaPosition === "inline" ? (
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
-              {metaLabel}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-slate-900 sm:text-sm">
-              {metaValue}
-            </p>
-          </div>
-        ) : null}
-      </div>
+        {/* ── Right: meta + actions ── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          {showStaticBanner ? <StaticDataBanner /> : null}
+          {metaPosition === "inline" || metaPosition === "right" ? metaPill : null}
+          {actions}
+        </div>
 
-      <div className="flex flex-col items-start gap-3 sm:items-end">
-        {showStaticBanner ? <StaticDataBanner /> : null}
-        {showMeta && metaPosition === "right" ? (
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">
-              {metaLabel}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-slate-900 sm:text-sm">
-              {metaValue}
-            </p>
-          </div>
-        ) : null}
-        {actions}
       </div>
     </div>
   );

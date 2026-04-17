@@ -1,287 +1,407 @@
-# Task Tracker Backend
+# Task Tracker — Backend
 
-A Node.js/TypeScript backend API for task management with Express, PostgreSQL, and Sequelize.
+Node.js/TypeScript REST API built with Express, PostgreSQL, and Sequelize. Handles authentication, project/task management, sprint planning, QA workflows, real-time chat, and AI proxy.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js 18+ |
+| Language | TypeScript 5 |
+| Framework | Express 5 |
+| ORM | Sequelize 6 + sequelize-typescript |
+| Database | PostgreSQL 12+ |
+| Auth | JWT (access + refresh tokens), bcrypt, OTP |
+| Email | Nodemailer (SMTP / Resend / webhook) |
+| File uploads | Multer + Cloudinary |
+| API docs | Swagger / OpenAPI |
+| Testing | Jest |
+| Formatter | Prettier |
+
+---
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
-- PostgreSQL (v12 or higher)
-- Docker & Docker Compose
-- Yarn package manager
+- Node.js 18+
+- Yarn
+- PostgreSQL 12+ (or Docker)
 
-## Setup & Installation
+---
 
-### 1. Clone and Install Dependencies
+## Setup
+
+### 1. Install dependencies
 
 ```bash
 cd Backend
 yarn install
 ```
 
-### 2. Environment Configuration
-
-Create environment file:
+### 2. Configure environment
 
 ```bash
 cp config/env/.env.example config/env/.env
 ```
 
-Update `.env` with your configuration:
+Minimum required values:
 
 ```env
 NODE_ENV=development
 PORT=3000
+
+# Database
 DB_HOST=localhost
-DB_PORT=5433
-DB_NAME=task_tracker_db
+DB_PORT=5432
+DB_NAME=task_tracker
 DB_USER=postgres
-DB_PASSWORD=postgres
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRES_IN=7d
-AI_PROVIDER=ollama
-# OLLAMA_BASE_URL=http://127.0.0.1:11434
-# OLLAMA_MODEL=llama3.2:3b
-# GEMINI_API_KEY=your-gemini-api-key
-# GEMINI_MODEL=gemini-2.0-flash
-# GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
-# AI_TIMEOUT_MS=20000
-```
+DB_PASSWORD=password
 
-### Email/OTP Delivery
+# JWT
+JWT_SECRET=change-me
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_SECRET=change-me-refresh
+JWT_REFRESH_EXPIRES_IN=30d
 
-OTP emails are sent using the provider selected by `EMAIL_PROVIDER`. Common issues when OTPs are not received:
-
-- `EMAIL_PROVIDER=resend` requires a verified sender domain. If you do not have a domain, use SMTP instead.
-- `EMAIL_PROVIDER=smtp` requires `EMAIL_USER` and `EMAIL_PASS` (use an app password for Gmail).
-- `EMAIL_PROVIDER=webhook` requires `OTP_EMAIL_WEBHOOK_URL`.
-
-Recommended local setup when you don't have a domain:
-
-```env
+# Email (choose one provider)
 EMAIL_PROVIDER=smtp
-EMAIL_USER=your-email@gmail.com
+EMAIL_USER=your@gmail.com
 EMAIL_PASS=your-app-password
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
-OTP_FROM_EMAIL=TaskTracker <your-email@gmail.com>
+OTP_FROM_EMAIL=TaskTracker <your@gmail.com>
 ```
 
-### 3. Database Setup
+See `config/env/.env.example` for the full list of optional variables.
 
-Start PostgreSQL with Docker:
+### 3. Start the database and run migrations
 
 ```bash
+# From the DB/ directory (one level up):
 docker-compose up -d postgres
-```
-
-Run database migrations:
-
-```bash
 docker-compose up migrator
 ```
 
-### 4. Start Development Server
+Or point `DB_*` variables at an existing PostgreSQL instance and run migrations manually.
+
+### 4. Start the dev server
 
 ```bash
 yarn dev
 ```
 
-The API will be available at `http://localhost:3000`
+API runs at `http://localhost:3000`.
 
-Health endpoints:
-- `GET /health` - liveness
-- `GET /ready` - readiness (checks database connectivity)
+---
 
 ## Available Scripts
 
-- `yarn dev` - Start development server with hot reload
-- `yarn build` - Build production bundle
-- `yarn start` - Start production server
-- `yarn test` - Run tests
-- `yarn lint` - Run ESLint
-- `yarn format` - Format code with Prettier
+| Script | Description |
+|--------|-------------|
+| `yarn dev` | Hot-reload dev server (nodemon + ts-node) |
+| `yarn build` | Compile TypeScript to `dist/` |
+| `yarn start` | Run compiled server |
+| `yarn test` | Jest test suite |
+| `yarn format` | Prettier (write) |
+| `yarn format:check` | Prettier (check only) |
 
-## API Documentation
-
-Swagger documentation available at: `http://localhost:3000/api-docs`
-
-### Authentication Endpoints
-
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user
-
-### Task Endpoints
-
-- `GET /api/tasks` - Get tasks with pagination and filters
-- `POST /api/tasks` - Create new task
-- `GET /api/tasks/:id` - Get task by ID
-- `PATCH /api/tasks/:id` - Update task
-- `DELETE /api/tasks/:id` - Delete task
-
-### Project Endpoints
-
-- `GET /api/projects` - Get all projects
-- `POST /api/projects` - Create new project
-- `GET /api/projects/:id` - Get project by ID
-- `PATCH /api/projects/:id` - Update project
-- `DELETE /api/projects/:id` - Delete project
-
-### User Endpoints
-
-- `GET /api/users` - Get all users
-- `GET /api/users/:id` - Get user by ID
-
-### Dashboard Endpoints
-
-- `GET /api/dashboard/summary` - Get dashboard statistics
-
-### AI Provider Configuration
-
-- `AI_PROVIDER=ollama` uses the local Ollama endpoint.
-- `AI_PROVIDER=gemini` uses Gemini via `GEMINI_API_KEY`.
-- `AI_PROVIDER=auto` prefers Gemini (when key exists), otherwise falls back to Ollama.
-- If the selected provider fails, the backend returns a safe local fallback response.
-
-## Database Schema
-
-### Users
-
-- `id` (UUID, Primary Key)
-- `full_name` (String)
-- `email` (String, Unique)
-- `password_hash` (String)
-- `avatar_url` (String, Optional)
-- `role` (Enum: Admin, Member, Viewer)
-- `created_at`, `updated_at` (Timestamps)
-
-### Projects
-
-- `id` (UUID, Primary Key)
-- `name` (String)
-- `description` (Text, Optional)
-- `owner_id` (UUID, Foreign Key to Users)
-- `status` (Enum: Active, Archived)
-- `created_at` (Timestamp)
-
-### Tasks
-
-- `id` (UUID, Primary Key)
-- `project_id` (UUID, Foreign Key to Projects)
-- `title` (String)
-- `description` (Text, Optional)
-- `status` (Enum: To Do, In Progress, Done)
-- `priority` (Enum: Low, Medium, High)
-- `due_date` (Date, Optional)
-- `creator_id` (UUID, Foreign Key to Users)
-- `assignee_id` (UUID, Foreign Key to Users, Optional)
-- `created_at`, `updated_at` (Timestamps)
-
-## Features
-
-- **JWT Authentication** - Secure user authentication
-- **Role-based Access Control** - Admin, Member, Viewer roles
-- **Task Management** - CRUD operations with filtering and pagination
-- **Project Management** - Organize tasks by projects
-- **User Management** - Team member management
-- **Dashboard Analytics** - Task statistics and insights
-- **API Documentation** - Swagger/OpenAPI documentation
-- **Database Migrations** - Flyway migration system
-- **Input Validation** - Request validation with express-validator
-- **Error Handling** - Centralized error handling
-- **CORS Support** - Cross-origin resource sharing
-- **Pagination** - Efficient data pagination (5 items per page)
+---
 
 ## Project Structure
 
 ```
 Backend/
 ├── src/
-│   ├── controllers/     # Route handlers
-│   ├── services/        # Business logic
-│   ├── models/          # Sequelize models
-│   ├── routes/          # API routes
-│   ├── middleware/      # Custom middleware
-│   ├── validators/      # Input validation
-│   ├── config/          # Configuration files
-│   ├── docs/            # API documentation
-│   └── utils/           # Utility functions
+│   ├── controllers/      # Route handlers (one file per resource)
+│   ├── services/         # Business logic
+│   ├── models/           # Sequelize models
+│   ├── routes/           # Express routers
+│   ├── middleware/       # Auth, rate limiting, validation, error handling
+│   ├── validators/       # express-validator rule sets
+│   ├── config/           # Sequelize init, app bootstrap
+│   ├── docs/swagger/     # OpenAPI YAML specs
+│   └── utils/            # Shared helpers
 ├── config/
-│   └── env/             # Environment files
-├── DB/
-│   └── migrations/      # Database migrations
-├── docker-compose.yml   # Docker services
+│   └── env/              # .env and .env.example
 └── package.json
 ```
 
-## Docker Services
+---
 
-- **postgres** - PostgreSQL database (port 5433)
-- **migrator** - Flyway migration runner
-- **backend** - Node.js API server (port 3000)
+## API Routes
 
-## Development
+Full interactive docs: `http://localhost:3000/api-docs`
 
-### Adding New Features
+### Auth — `/api/auth`
 
-1. Create model in `src/models/`
-2. Add migration in `DB/migrations/schema/`
-3. Create service in `src/services/`
-4. Add controller in `src/controllers/`
-5. Define routes in `src/routes/`
-6. Add validation in `src/validators/`
-7. Update Swagger docs in `src/docs/swagger/`
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/register` | Register a new user |
+| POST | `/login` | Login, returns access + refresh tokens |
+| POST | `/logout` | Invalidate refresh token |
+| GET | `/me` | Current authenticated user |
+| POST | `/refresh` | Refresh access token |
+| POST | `/otp/send` | Send OTP to email |
+| POST | `/otp/verify` | Verify OTP code |
+| POST | `/forgot-password` | Send password reset email |
+| POST | `/reset-password` | Reset password with token |
+| POST | `/change-password` | Change password (authenticated) |
+| POST | `/auth0` | Auth0 callback handler |
 
-### Database Migrations
+### Users — `/api/users`
 
-Create new migration:
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List all users |
+| GET | `/:id` | Get user by ID |
+| PATCH | `/:id` | Update user profile |
+| DELETE | `/:id` | Delete user |
 
-```bash
-# Schema migration
-DB/migrations/schema/V1005__add_new_table.sql
+### Projects — `/api/projects`
 
-# Data seeding
-DB/migrations/seeder/V2003__seed_new_data.sql
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List projects (with filters) |
+| POST | `/` | Create project |
+| GET | `/:id` | Get project details |
+| PATCH | `/:id` | Update project |
+| DELETE | `/:id` | Delete project |
+| GET | `/:id/members` | List project members |
+| POST | `/:id/members` | Add member |
+| DELETE | `/:id/members/:userId` | Remove member |
+| GET | `/:id/files` | List project files |
+| POST | `/:id/files` | Upload file |
+| GET | `/:id/stats` | Project statistics |
+| GET | `/:id/roadmap` | Project roadmap |
+| POST | `/:id/access-requests` | Request confidential access |
+| GET | `/:id/access-requests` | List access requests |
+| PATCH | `/:id/access-requests/:reqId` | Approve/deny request |
+
+### Tasks — `/api/tasks`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List tasks (pagination, filters) |
+| POST | `/` | Create task |
+| GET | `/:id` | Get task |
+| PATCH | `/:id` | Update task |
+| DELETE | `/:id` | Delete task |
+| POST | `/:id/subtasks` | Add subtask |
+| PATCH | `/:id/subtasks/:subId` | Update subtask |
+| DELETE | `/:id/subtasks/:subId` | Delete subtask |
+| POST | `/:id/comments` | Add comment |
+| GET | `/:id/comments` | List comments |
+| POST | `/:id/files` | Attach file |
+| GET | `/:id/files` | List task files |
+| POST | `/:id/labels` | Add label |
+| DELETE | `/:id/labels/:labelId` | Remove label |
+| GET | `/:id/links` | Task relationships |
+
+### Sprints — `/api/sprints`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List sprints (by project) |
+| POST | `/` | Create sprint |
+| GET | `/:id` | Get sprint |
+| PATCH | `/:id` | Update sprint |
+| DELETE | `/:id` | Delete sprint |
+| POST | `/:id/tasks` | Add task to sprint |
+| DELETE | `/:id/tasks/:taskId` | Remove task from sprint |
+
+### Test Cases — `/api/test-cases`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List test cases |
+| POST | `/` | Create test case |
+| GET | `/:id` | Get test case |
+| PATCH | `/:id` | Update test case |
+| DELETE | `/:id` | Delete test case |
+| GET | `/suites` | List suites |
+| GET | `/modules` | List modules |
+
+### Test Plans — `/api/test-plans`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List test plans |
+| POST | `/` | Create plan |
+| GET | `/:id` | Get plan |
+| PATCH | `/:id` | Update plan |
+| DELETE | `/:id` | Delete plan |
+
+### Test Runs — `/api/test-runs`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List test runs |
+| POST | `/` | Create test run |
+| GET | `/:id` | Get run details |
+| PATCH | `/:id` | Update run results |
+
+### Defects — `/api/defects`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List defects |
+| POST | `/` | Create defect |
+| GET | `/:id` | Get defect |
+| PATCH | `/:id` | Update defect |
+| DELETE | `/:id` | Delete defect |
+
+### Dashboard — `/api/dashboard`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/summary` | Task counts, project overview |
+| GET | `/activity` | Recent activity feed |
+
+### Chat — `/api/chat` + WebSocket `/ws/chat`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/groups` | List chat groups |
+| POST | `/groups` | Create group |
+| GET | `/groups/:id/messages` | Message history |
+| WS | `/ws/chat` | Real-time messaging |
+
+### Organizations — `/api/organizations`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Get organization info |
+| POST | `/` | Create organization |
+| PATCH | `/:id` | Update organization |
+| GET | `/:id/members` | List members |
+| POST | `/:id/members` | Add member |
+
+### Other Modules
+
+| Prefix | Description |
+|--------|-------------|
+| `/api/invites` | Invitation management |
+| `/api/search` | Full-text search |
+| `/api/audit-logs` | Audit trail |
+| `/api/preferences` | User preferences |
+| `/api/ai` | AI assistant proxy |
+
+---
+
+## Middleware
+
+| Middleware | Purpose |
+|-----------|---------|
+| `authenticateToken` | Verify JWT access token |
+| `cors` | Cross-origin control (env-configured origins) |
+| `helmet` | Security headers |
+| `express-rate-limit` | Per-route rate limiting |
+| `throttle` | Delay-based request throttling |
+| Request timeout | 30s guard on all routes |
+| Cache-Control | No-store headers on API responses |
+| Global error handler | Consistent JSON error shape |
+
+---
+
+## Authentication Flow
+
+```
+Register → OTP sent to email → verify OTP → account active
+Login    → access token (15 min) + refresh token (30 days)
+         → use refresh token at /api/auth/refresh to get new access token
+         → logout invalidates refresh token
 ```
 
-Run migrations:
+**Token storage:** The frontend stores the access token in memory and the refresh token in an httpOnly cookie (or localStorage depending on client implementation).
 
-```bash
-docker-compose up migrator
-```
+---
+
+## Email / OTP Configuration
+
+OTPs are delivered through the provider set in `EMAIL_PROVIDER`:
+
+| Provider | Required Variables |
+|----------|-------------------|
+| `smtp` | `SMTP_HOST`, `SMTP_PORT`, `EMAIL_USER`, `EMAIL_PASS` |
+| `resend` | `RESEND_API_KEY`, `OTP_FROM_EMAIL` (must use verified domain) |
+| `webhook` | `OTP_EMAIL_WEBHOOK_URL` |
+
+**Recipient filtering:**
+- `EMAIL_ALLOWED_RECIPIENTS` — comma-separated whitelist (empty = all allowed)
+- `EMAIL_RESTRICTED_RECIPIENTS` — comma-separated blocklist (always wins)
+
+---
+
+## AI Provider Configuration
+
+The backend proxies AI requests to either Ollama (local) or Gemini (cloud):
+
+| `AI_PROVIDER` | Behaviour |
+|---------------|-----------|
+| `ollama` | Local Ollama endpoint (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`) |
+| `gemini` | Gemini API (`GEMINI_API_KEY`, `GEMINI_MODEL`) |
+| `auto` | Prefers Gemini when key exists, falls back to Ollama |
+
+On provider failure the backend returns a safe fallback response.
+
+---
+
+## Database Schema (Key Tables)
+
+> For the full migration history see [DB/README.md](../DB/README.md).
+
+| Table | Description |
+|-------|-------------|
+| `users` | first_name, last_name, email, password_hash, role (Admin/Member/Viewer) |
+| `projects` | name, description, owner_id, status, priority, start/end dates |
+| `project_members` | project_id, user_id, role |
+| `tasks` | title, description, status, priority, issue_type, assignee_id, sprint_id |
+| `subtasks` | task_id, title, is_completed, position |
+| `comments` | task_id, user_id, content |
+| `labels` / `task_labels` | tagging many-to-many |
+| `sprints` | project_id, name, status, start/end dates, goal |
+| `defects` | project_id, title, priority, status, assigned_to |
+| `test_cases` | suite_id, module_id, title, steps, expected_result, status |
+| `test_plans` | project_id, name, scope |
+| `test_runs` | plan_id, status, passed_count, failed_count |
+| `chat_groups` / `chat_messages` | group messaging |
+| `organizations` | multi-tenant org |
+| `auth_otps` | OTP codes, purpose, expiry, attempt count |
+| `auth_refresh_tokens` | hashed refresh tokens |
+| `audit_logs` | full activity trail |
+
+---
+
+## Adding a New Feature
+
+1. Add a SQL migration in `DB/migrations/schema/` (next `V1xxx` number)
+2. Create a Sequelize model in `src/models/`
+3. Write business logic in `src/services/`
+4. Add route handlers in `src/controllers/`
+5. Register routes in `src/routes/` and mount in the app
+6. Add validation rules in `src/validators/`
+7. Document in `src/docs/swagger/`
+
+---
 
 ## Production Deployment
 
-1. Build the application:
-
 ```bash
 yarn build
-```
-
-2. Set production environment variables (start from `config/env/.env.example`)
-3. Run database migrations
-4. Start the server:
-
-```bash
 yarn start
 ```
 
+Set `NODE_ENV=production` and all required env vars. Migrations run automatically via the Flyway migrator container before the API starts (see `render.yaml`).
+
+---
+
 ## Troubleshooting
 
-### Common Issues
-
-1. **Database Connection Error**
-   - Ensure PostgreSQL is running on port 5433
-   - Check database credentials in `.env`
-
-2. **Migration Failures**
-   - Check migration syntax
-   - Ensure proper migration order
-
-3. **Authentication Issues**
-   - Verify JWT_SECRET is set
-   - Check token expiration settings
-
-### Logs
-
-Application logs are available in the console during development. For production, configure proper logging with winston or similar.
+| Problem | Fix |
+|---------|-----|
+| `ECONNREFUSED` on DB | Ensure PostgreSQL is running and `DB_*` vars match |
+| Migration failures | Check version numbering (schema = V1xxx, seeds = V2xxx) |
+| OTP emails not arriving | Verify `EMAIL_PROVIDER` config; check `EMAIL_ALLOWED_RECIPIENTS` |
+| 401 on all routes | Check `JWT_SECRET` matches between token issue and verification |
+| CORS errors from UI | Add frontend origin to `ALLOWED_ORIGINS` env var |

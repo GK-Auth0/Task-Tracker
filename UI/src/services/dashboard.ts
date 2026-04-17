@@ -24,7 +24,9 @@ export interface DashboardOverviewUpcomingTask {
   } | null;
   assignee: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
 }
@@ -43,7 +45,9 @@ export interface DashboardOverviewActivity {
   created_at: string;
   user: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
 }
@@ -192,7 +196,9 @@ export interface ActivityLog {
     | "unassigned";
   user: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   };
   old_values?: any;
@@ -272,7 +278,8 @@ export const usersAPI = {
     success: boolean;
     data: {
       id: string;
-      full_name: string;
+      first_name: string;
+      last_name: string;
       email: string;
       role: "Admin" | "Member" | "Viewer";
       avatar_url?: string;

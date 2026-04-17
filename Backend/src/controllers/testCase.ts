@@ -186,7 +186,7 @@ export const listTestCases = async (req: AuthenticatedRequest, res: Response) =>
       where,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
@@ -418,7 +418,7 @@ export const createTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
@@ -518,7 +518,7 @@ export const updateTestCaseRecord = async (req: AuthenticatedRequest, res: Respo
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
@@ -553,7 +553,7 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
@@ -597,7 +597,7 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
 
     const currentHistory = Array.isArray(testCase.execution_history) ? testCase.execution_history : [];
     const executor = await User.findByPk(userId, {
-      attributes: ["id", "full_name"],
+      attributes: ["id", "first_name", "last_name"],
     });
 
     const nextEntry = {
@@ -619,7 +619,7 @@ export const addTestCaseExecution = async (req: AuthenticatedRequest, res: Respo
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "owner", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "owner", attributes: ["id", "first_name", "last_name", "email"] },
         { model: Task, as: "linked_task", attributes: ["id", "title"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]

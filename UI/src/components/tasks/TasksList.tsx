@@ -4,6 +4,8 @@ import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
 import { Avatar, Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { ViewMode } from "./TasksFiltersBar";
 import TaskTooltip from "../TaskTooltip";
+import UserAvatar from "../UserAvatar";
+import { getUserInitials } from "../../utils/user";
 import {
   getTaskStatusTone,
   isDoneTaskStatus,
@@ -351,7 +353,7 @@ const TasksList: React.FC<TasksListProps> = ({
                 border: "1px solid rgba(96, 165, 250, 0.18)",
               }}
             >
-              {getInitials(params.value.full_name)}
+              {getUserInitials(params.value)}
           </Avatar>
         );
       },
@@ -573,15 +575,10 @@ const TasksList: React.FC<TasksListProps> = ({
 
           <div className="flex items-center justify-between">
             {task.assignee ? (
-              <div className="size-6 rounded-full border border-white bg-blue-600/20 flex items-center justify-center text-xs font-bold text-blue-700">
-                {task.assignee.full_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </div>
+              <UserAvatar user={task.assignee} size="sm" className="border border-white" showTooltip />
             ) : (
               <div className="size-6 rounded-full border border-white bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
-                ??
+                ?
               </div>
             )}
             <div className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
@@ -670,15 +667,10 @@ const TasksList: React.FC<TasksListProps> = ({
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-3">
             {task.assignee ? (
-              <div className="size-8 rounded-full border-2 border-white bg-blue-600/20 flex items-center justify-center text-[10px] font-bold text-blue-700">
-                {task.assignee.full_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </div>
+              <UserAvatar user={task.assignee} size="md" className="border-2 border-white" showTooltip />
             ) : (
               <div className="size-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                ??
+                ?
               </div>
             )}
             <div

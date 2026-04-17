@@ -30,3 +30,9 @@ export interface ResetPasswordDto {
   otp: string;
   newPassword: string;
 }
+
+export interface updateUserDto {
+  userId: string
+  firstName: string;
+  lastName: string
+}

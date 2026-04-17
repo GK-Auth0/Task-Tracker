@@ -1,4 +1,5 @@
 import { ActivityLog } from "../../services/dashboard";
+import { getFullName } from "../../utils/user";
 
 interface TaskActivityTabProps {
   activityLogs: ActivityLog[];
@@ -111,7 +112,7 @@ export default function TaskActivityTab({ activityLogs, activityLoading }: TaskA
       {activityLogs.length > 0 ? (
         <div className="space-y-4">
           {activityLogs.map(log => {
-            const actorName = log.user?.full_name || "System";
+            const actorName = log.user ? getFullName(log.user) : "System";
             const actionIcon = getActionIcon(log.action);
 
             return (

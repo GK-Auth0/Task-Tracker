@@ -12,9 +12,10 @@ import {
   User,
   UserMetadata,
 } from "../models";
-import type { LoginDto, RegisterDto } from "../types/auth";
+import type { LoginDto, RegisterDto, updateUserDto } from "../types/auth";
 import { getIPGeolocation, parseUserAgent } from "./geolocation";
 import { sendOtpEmail, sendPasswordResetEmail, sendSignupWelcomeEmail } from "./email";
+import { buildFullName, splitFullName } from "../utils/userName";
 
 const ACCESS_TOKEN_SECRET = appConfig.jwt.accessSecret;
 const REFRESH_TOKEN_SECRET = appConfig.jwt.refreshSecret;
@@ -104,15 +105,16 @@ const getUserWithoutPassword = (user: User) => {
   const { password_hash, ...userWithoutPassword } = user.get({ plain: true });
   return {
     ...userWithoutPassword,
+    full_name: buildFullName(user),
     organization: user.organization
       ? {
-          id: user.organization.id,
-          name: user.organization.name,
-          org_code: user.organization.org_code,
-          slug: user.organization.slug,
-          status: user.organization.status,
-          logo_url: user.organization.logo_url,
-        }
+        id: user.organization.id,
+        name: user.organization.name,
+        org_code: user.organization.org_code,
+        slug: user.organization.slug,
+        status: user.organization.status,
+        logo_url: user.organization.logo_url,
+      }
       : null,
     onboardingRequired: !user.organization_id,
   };
@@ -140,7 +142,8 @@ const issueJwtForUser = (user: User) => {
   const tokenPayload = {
     id: user.id,
     email: user.email,
-    full_name: user.full_name,
+    first_name: user.first_name,
+    last_name: user.last_name,
     role: user.role,
     organization_id: user.organization_id ?? null,
     token_type: "access",
@@ -702,9 +705,9 @@ const getRegisterOtpStatus = async (userId: string): Promise<"none" | "pending" 
 };
 
 export async function registerUser(dto: RegisterDto, transaction: any): Promise<OtpChallengeResult> {
-  const existingUser = await User.findOne({ 
+  const existingUser = await User.findOne({
     where: { email: dto.email },
-    transaction 
+    transaction
   });
 
   if (existingUser) {
@@ -721,7 +724,8 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   const user = await User.create({
     email: dto.email,
     password_hash: hashedPassword,
-    full_name: `${dto.firstName} ${dto.lastName}`,
+    first_name: dto.firstName.trim(),
+    last_name: dto.lastName.trim(),
     role: "Member",
   }, { transaction });
 
@@ -750,6 +754,31 @@ export async function registerUser(dto: RegisterDto, transaction: any): Promise<
   }
 
   return createOtpChallengeForUser(user, "register", transaction);
+}
+
+export async function updateUser(dto: updateUserDto) {
+  const user = await User.findOne({
+    where: {
+      id: dto.userId
+    }
+  })
+
+  if (!user) {
+    throw new Error("user not found")
+  }
+
+  if (dto.firstName !== undefined) {
+    user.first_name = dto.firstName.trim()
+  }
+
+  if (dto.lastName !== undefined) {
+    user.last_name = dto.lastName.trim()
+  }
+
+  await user.save()
+
+  return getUserWithoutPassword(user)
+
 }
 
 export async function loginUser(
@@ -806,11 +835,13 @@ export async function loginWithAuth0AccessToken(
   if (!user) {
     const generatedName =
       fullName && fullName.length > 0 ? fullName : email.split("@")[0];
+    const nameParts = splitFullName(generatedName);
 
     user = await User.create({
       email,
       password_hash: await bcrypt.hash(randomUUID(), 10),
-      full_name: generatedName,
+      first_name: nameParts.first_name,
+      last_name: nameParts.last_name,
       role: "Member",
     });
   }
@@ -823,11 +854,10 @@ export async function verifyOtpAndIssueToken(sessionId: string, otp: string) {
   const user = await verifyOtpSession(sessionId, otp, "register");
 
   try {
-    await sendSignupWelcomeEmail(user.email, user.full_name || "there");
+    await sendSignupWelcomeEmail(user.email, buildFullName(user) || "there");
   } catch (error) {
     console.error(
-      `[auth] Failed to send signup welcome email (userId=${user.id}): ${
-        (error as any)?.message || error
+      `[auth] Failed to send signup welcome email (userId=${user.id}): ${(error as any)?.message || error
       }`,
     );
   }

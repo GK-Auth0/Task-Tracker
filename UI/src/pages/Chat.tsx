@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { getFullName } from "../utils/user";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { chatAPI, ChatGroup, ChatMessage } from "../services/chatService";
@@ -6,7 +7,9 @@ import { WS_BASE_URL } from "../config/api";
 
 type SearchPerson = {
   id: string;
-  full_name: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
   email: string;
   avatar_url?: string;
 };
@@ -496,7 +499,7 @@ const Chat: React.FC = () => {
       const inMembers =
         group.members?.some(
           (member) =>
-            member.full_name.toLowerCase().includes(normalized) ||
+            getFullName(member).toLowerCase().includes(normalized) ||
             member.email.toLowerCase().includes(normalized),
         ) || false;
       return inName || inMembers;
@@ -718,7 +721,7 @@ const Chat: React.FC = () => {
                   className="w-full px-4 py-2 text-left hover:bg-slate-50"
                   onClick={() => handleStartDirect(person.id)}
                 >
-                  <p className="text-sm font-semibold text-slate-800">{person.full_name}</p>
+                  <p className="text-sm font-semibold text-slate-800">{getFullName(person)}</p>
                   <p className="text-xs text-slate-500">{person.email}</p>
                 </button>
               ))}
@@ -765,7 +768,7 @@ const Chat: React.FC = () => {
                           setGroupMemberResults([]);
                         }}
                       >
-                        <p className="text-sm font-medium text-slate-800">{person.full_name}</p>
+                        <p className="text-sm font-medium text-slate-800">{getFullName(person)}</p>
                         <p className="text-xs text-slate-500">{person.email}</p>
                       </button>
                     ))}
@@ -779,7 +782,7 @@ const Chat: React.FC = () => {
                         key={person.id}
                         className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"
                       >
-                        <span>{person.full_name}</span>
+                        <span>{getFullName(person)}</span>
                         <button
                           type="button"
                           className="material-symbols-outlined text-[12px]"
@@ -933,7 +936,7 @@ const Chat: React.FC = () => {
                         className={`flex gap-2.5 sm:gap-3 lg:gap-4 ${isCurrentUser ? "flex-row-reverse" : ""}`}
                       >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white lg:h-10 lg:w-10">
-                          {msg.user?.full_name?.charAt(0).toUpperCase() || "U"}
+                          {msg.user ? getFullName(msg.user).charAt(0).toUpperCase() : "U"}
                         </div>
 
                         <div
@@ -947,7 +950,7 @@ const Chat: React.FC = () => {
                             }`}
                           >
                             <span className="text-sm font-bold text-slate-900">
-                              {isCurrentUser ? "You" : msg.user?.full_name || "Unknown User"}
+                              {isCurrentUser ? "You" : msg.user ? getFullName(msg.user) : "Unknown User"}
                             </span>
                             <span className="text-xs text-slate-500">
                               {new Date(msg.created_at).toLocaleTimeString([], {

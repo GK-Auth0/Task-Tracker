@@ -11,6 +11,8 @@ services:
       - db-net
     security_opt:
       - seccomp:unconfined
+    volumes:
+      - postgres_data_local:/var/lib/postgresql/data
 
   migrator:
     env_file: ./env/local/local.env
@@ -24,3 +26,6 @@ networks:
   db-net:
     external: false
     name: db-net
+
+volumes:
+  postgres_data_local:

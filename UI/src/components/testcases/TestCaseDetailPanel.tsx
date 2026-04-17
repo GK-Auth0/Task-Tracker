@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import SprintTabs from "../sprint/SprintTabs";
 import { priorityClasses, statusClasses } from "../../data/testManagement";
+import { getFullName } from "../../utils/user";
 import {
   testCasesAPI,
   type TestCaseExecutionAttachment,
@@ -129,7 +130,7 @@ export default function TestCaseDetailPanel({
 
         <div className="mt-5 grid gap-3 md:grid-cols-4">
           {[
-            { label: "Owner", value: selectedCase.owner?.full_name || "Unknown" },
+            { label: "Owner", value: getFullName(selectedCase.owner) },
             { label: "Suite", value: selectedCase.suite },
             { label: "Status", value: selectedCase.status },
             { label: "Updated", value: formatRelativeDate(selectedCase.updated_at) },

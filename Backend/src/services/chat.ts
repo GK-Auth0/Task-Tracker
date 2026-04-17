@@ -4,6 +4,7 @@ import ChatGroupMember from "../models/chatGroupMember";
 import User from "../models/user";
 import Project from "../models/project";
 import { Op } from "sequelize";
+import { buildFullName } from "../utils/userName";
 
 const getUserOrganizationId = async (userId: string) => {
   const user = await User.findByPk(userId, {
@@ -89,7 +90,7 @@ export const getChatGroups = async (userId: string) => {
               {
                 model: User,
                 as: "user",
-                attributes: ["id", "full_name", "email"],
+                attributes: ["id", "first_name", "last_name", "email"],
               },
             ],
           },
@@ -155,7 +156,7 @@ export const getChatMessagesBefore = async (
       {
         model: User,
         as: "user",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
     ],
     order: [["created_at", "DESC"]],
@@ -184,7 +185,7 @@ export const createChatMessage = async (data: {
       {
         model: User,
         as: "user",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
     ],
   });
@@ -205,12 +206,13 @@ export const searchChatUsers = async (
       id: { [Op.ne]: userId },
       organization_id: organizationId,
       [Op.or]: [
-        { full_name: { [Op.iLike]: `%${query}%` } },
+        { first_name: { [Op.iLike]: `%${query}%` } },
+        { last_name: { [Op.iLike]: `%${query}%` } },
         { email: { [Op.iLike]: `%${query}%` } },
       ],
     },
-    attributes: ["id", "full_name", "email", "avatar_url"],
-    order: [["full_name", "ASC"]],
+    attributes: ["id", "first_name", "last_name", "email", "avatar_url"],
+    order: [["first_name", "ASC"], ["last_name", "ASC"]],
     limit,
   });
   return rows.map((row) => row.get({ plain: true }));
@@ -234,7 +236,7 @@ export const getOrCreateDirectGroup = async (userId: string, targetUserId: strin
 
   if (!group) {
     const target = await User.findByPk(targetUserId, {
-      attributes: ["id", "full_name", "organization_id"],
+      attributes: ["id", "first_name", "last_name", "organization_id"],
     });
     if (!target) {
       throw new Error("Target user not found");
@@ -244,7 +246,7 @@ export const getOrCreateDirectGroup = async (userId: string, targetUserId: strin
     }
 
     group = await ChatGroup.create({
-      name: target.full_name,
+      name: buildFullName(target),
       description: directKey,
       created_by: userId,
       is_project_group: false,

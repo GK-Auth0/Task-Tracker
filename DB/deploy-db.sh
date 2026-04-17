@@ -13,8 +13,7 @@ fi
 
 echo "📦 Running database migrations..."
 
-# Run Flyway migrations (allow out-of-order for environments with older applied versions)
-flyway -url="$DATABASE_URL" -locations=filesystem:./migrations -outOfOrder=true migrate
+FLYWAY_SQL_ROOT="${FLYWAY_SQL_ROOT:-./migrations}" ./run-migrations.sh
 
 if [ $? -eq 0 ]; then
     echo "✅ Database migrations completed successfully!"

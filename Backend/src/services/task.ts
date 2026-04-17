@@ -73,7 +73,7 @@ const subtaskInclude = {
     {
       model: User,
       as: "assignee",
-      attributes: ["id", "full_name", "email"],
+      attributes: ["id", "first_name", "last_name", "email"],
     },
     {
       model: Task,
@@ -214,12 +214,12 @@ export async function getAllTasks(
       {
         model: User,
         as: "creator",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: Sprint,
@@ -315,12 +315,12 @@ export async function createTask(dto: CreateTaskDto) {
       {
         model: User,
         as: "creator",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: Sprint,
@@ -344,7 +344,7 @@ export async function createTask(dto: CreateTaskDto) {
           {
             model: User,
             as: "uploader",
-            attributes: ["id", "full_name", "email"],
+            attributes: ["id", "first_name", "last_name", "email"],
           },
         ],
       },
@@ -392,12 +392,12 @@ export async function getTaskById(taskId: string, userId: string) {
       {
         model: User,
         as: "creator",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: Sprint,
@@ -421,7 +421,7 @@ export async function getTaskById(taskId: string, userId: string) {
           {
             model: User,
             as: "uploader",
-            attributes: ["id", "full_name", "email"],
+            attributes: ["id", "first_name", "last_name", "email"],
           },
         ],
       },
@@ -433,7 +433,7 @@ export async function getTaskById(taskId: string, userId: string) {
           {
             model: User,
             as: "user",
-            attributes: ["id", "full_name"],
+            attributes: ["id", "first_name", "last_name"],
           },
         ],
         order: [["created_at", "ASC"]],
@@ -565,12 +565,12 @@ export async function updateTask(
       {
         model: User,
         as: "creator",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: Sprint,
@@ -641,7 +641,7 @@ export async function createSubtask(
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: Task,
@@ -721,7 +721,7 @@ export async function updateSubtask(
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: Task,

@@ -21,7 +21,9 @@ export interface Sprint {
   } | null;
   owner: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
 }
@@ -40,7 +42,9 @@ export interface SprintTaskSummary {
   } | null;
   assignee: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
 }
@@ -71,7 +75,9 @@ export interface SprintInsights {
     } | null;
     owner: {
       id: string;
-      full_name: string;
+      first_name?: string;
+      last_name?: string;
+      full_name?: string;
       email: string;
     } | null;
     release: string | null;
@@ -88,7 +94,9 @@ export interface SprintInsights {
   }>;
   lagging_people: Array<{
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
     overdue_tasks: number;
     in_progress_tasks: number;

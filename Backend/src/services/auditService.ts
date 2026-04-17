@@ -91,7 +91,7 @@ export const getAuditLogs = async (
 
   return await AuditLog.findAll({
     where,
-    include: [{ association: "user", attributes: ["id", "full_name", "email"] }],
+    include: [{ association: "user", attributes: ["id", "first_name", "last_name", "email"] }],
     order: [["created_at", "DESC"]],
     limit,
   });

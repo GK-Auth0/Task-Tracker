@@ -1,5 +1,6 @@
 import { automationClasses, statusClasses } from "../../data/testManagement";
 import type { TestCaseRecord } from "../../types/testCase";
+import { getFullName } from "../../utils/user";
 
 interface TestCaseCardsGridProps {
   items: TestCaseRecord[];
@@ -86,7 +87,7 @@ export default function TestCaseCardsGrid({
                   Owner
                 </p>
                 <p className="mt-1 font-medium text-slate-800">
-                  {testCase.owner?.full_name || "Unknown"}
+                  {getFullName(testCase.owner)}
                 </p>
               </div>
               <div>

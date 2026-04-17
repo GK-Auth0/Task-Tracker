@@ -262,12 +262,12 @@ export const listDefects = async (req: AuthenticatedRequest, res: Response) => {
       {
         model: User,
         as: "creator",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       {
         model: User,
         as: "assignee",
-        attributes: ["id", "full_name", "email"],
+        attributes: ["id", "first_name", "last_name", "email"],
       },
       ...(supportsSprintId
         ? [
@@ -537,8 +537,8 @@ export const createDefectRecord = async (req: AuthenticatedRequest, res: Respons
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
-        { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "creator", attributes: ["id", "first_name", "last_name", "email"] },
+        { model: User, as: "assignee", attributes: ["id", "first_name", "last_name", "email"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
           : []),
@@ -744,8 +744,8 @@ export const updateDefectRecord = async (req: AuthenticatedRequest, res: Respons
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
-        { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "creator", attributes: ["id", "first_name", "last_name", "email"] },
+        { model: User, as: "assignee", attributes: ["id", "first_name", "last_name", "email"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
           : []),
@@ -792,7 +792,7 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
             },
           ],
         },
-        { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "creator", attributes: ["id", "first_name", "last_name", "email"] },
       ],
     });
 
@@ -898,8 +898,8 @@ export const reviewDefectRecord = async (req: AuthenticatedRequest, res: Respons
       attributes,
       include: [
         { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: User, as: "creator", attributes: ["id", "full_name", "email"] },
-        { model: User, as: "assignee", attributes: ["id", "full_name", "email"] },
+        { model: User, as: "creator", attributes: ["id", "first_name", "last_name", "email"] },
+        { model: User, as: "assignee", attributes: ["id", "first_name", "last_name", "email"] },
         ...(supportsSprintId
           ? [{ model: Sprint, as: "sprint", attributes: ["id", "name", "status"] }]
           : []),
