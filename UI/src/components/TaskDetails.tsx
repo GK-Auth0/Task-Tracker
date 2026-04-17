@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getFullName, getUserInitials } from "../utils/user";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TaskDetailHeader from "./task-detail/TaskDetailHeader";
 import TaskDetailSidebar from "./task-detail/TaskDetailSidebar";
@@ -190,15 +191,8 @@ export default function TaskDetails() {
       ? Math.ceil((dueDateObj!.getTime() - now.getTime()) / dayMs)
       : null;
     const completedSubtasks = (task.subtasks || []).filter((subtask) => subtask.is_completed).length;
-    const assigneeLabel = task.assignee?.full_name || "Unassigned";
-    const assigneeInitials = task.assignee?.full_name
-      ? task.assignee.full_name
-          .split(" ")
-          .map((name) => name[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
-      : "?";
+    const assigneeLabel = task.assignee ? getFullName(task.assignee) : "Unassigned";
+    const assigneeInitials = task.assignee ? getUserInitials(task.assignee) : "?";
     const dueDateLabel = hasValidDueDate
       ? dueDateObj!.toLocaleDateString("en-US", {
           month: "short",
@@ -290,7 +284,7 @@ export default function TaskDetails() {
             taskPriority={task.priority}
             priorityColors={derived.priorityColors}
             createdDateLabel={derived.createdDateLabel}
-            creatorName={task.creator.full_name}
+            creatorName={getFullName(task.creator)}
             statusSaving={statusSaving}
             onOpenProject={handleOpenProject}
             onBack={handleBack}

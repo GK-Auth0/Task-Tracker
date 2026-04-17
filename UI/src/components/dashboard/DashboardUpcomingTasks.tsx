@@ -1,5 +1,6 @@
 import React from "react";
 import { DashboardOverviewUpcomingTask } from "../../services/dashboard";
+import { getFullName } from "../../utils/user";
 
 interface DashboardUpcomingTasksProps {
   tasks: DashboardOverviewUpcomingTask[];
@@ -79,7 +80,7 @@ const DashboardUpcomingTasks: React.FC<DashboardUpcomingTasksProps> = ({
                       {formatDueText(task.days_to_due)}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {task.assignee?.full_name || "Unassigned"}
+                      {task.assignee ? getFullName(task.assignee) : "Unassigned"}
                     </td>
                   </tr>
                 ))}

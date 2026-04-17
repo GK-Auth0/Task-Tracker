@@ -56,7 +56,9 @@ export interface TestCaseRecord {
   } | null;
   owner: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
   linked_task: {

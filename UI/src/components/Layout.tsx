@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getFullName, getUserInitials } from "../utils/user";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "./Sidebar";
@@ -124,16 +125,13 @@ export default function Layout() {
                   className="bg-blue-600/20 text-blue-600 rounded-full size-9 flex items-center justify-center text-xs font-bold hover:bg-blue-600/30 transition-colors cursor-pointer"
                   aria-label="Open profile menu"
                 >
-                  {user?.full_name
-                    ?.split(" ")
-                    .map((n) => n[0])
-                    .join("") || "U"}
+                  {getUserInitials(user)}
                 </button>
                 {isProfileOpen && (
                   <div className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100">
                       <p className="text-sm font-semibold text-slate-800 truncate">
-                        {user?.full_name || "User"}
+                        {getFullName(user)}
                       </p>
                       <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                     </div>

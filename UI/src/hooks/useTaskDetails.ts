@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { getFullName } from "../utils/user";
 import { useParams } from "react-router-dom";
 import {
   tasksAPI,
@@ -148,7 +149,7 @@ export function useTaskDetails() {
         setWorkspaceUsers(
           response.data.map((user) => ({
             id: user.id,
-            full_name: user.full_name,
+            full_name: getFullName(user),
             email: user.email,
           }))
         );

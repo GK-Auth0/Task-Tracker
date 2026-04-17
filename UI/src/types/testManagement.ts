@@ -22,7 +22,9 @@ export interface TestPlanRecord {
   } | null;
   owner: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
   sprint: {
@@ -69,7 +71,9 @@ export interface TestRunRecord {
   } | null;
   owner: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   } | null;
 }

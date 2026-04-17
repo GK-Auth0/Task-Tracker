@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { getFullName } from "../utils/user";
 import { useNavigate } from "react-router-dom";
 import { CreateProjectRequest } from "../types/project";
 import aiChatAPI from "../services/aiChat";
@@ -14,7 +15,9 @@ import { plainTextToRichText, richTextToPlainText } from "../utils/richText";
 
 interface User {
   id: string;
-  full_name: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
   email: string;
   avatar_url?: string;
 }
@@ -743,17 +746,17 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                           {member.avatar_url ? (
                             <img
                               src={member.avatar_url}
-                              alt={member.full_name}
+                              alt={getFullName(member)}
                               className="w-6 h-6 rounded-full"
                             />
                           ) : (
                             <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                              {member.full_name.charAt(0)}
+                              {getFullName(member).charAt(0)}
                             </div>
                           )}
                           <div>
                             <p className="text-sm font-medium">
-                              {member.full_name}
+                              {getFullName(member)}
                             </p>
                             <p className="text-xs text-slate-500">
                               {member.email}
@@ -780,15 +783,15 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                         {member.avatar_url ? (
                           <img
                             src={member.avatar_url}
-                            alt={member.full_name}
+                            alt={getFullName(member)}
                             className="w-5 h-5 rounded-full"
                           />
                         ) : (
                           <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                            {member.full_name.charAt(0)}
+                            {getFullName(member).charAt(0)}
                           </div>
                         )}
-                        <span>{member.full_name}</span>
+                        <span>{getFullName(member)}</span>
                         <button
                           type="button"
                           onClick={() => removeMember(member.id)}

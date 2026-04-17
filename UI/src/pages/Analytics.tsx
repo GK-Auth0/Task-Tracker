@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getFullName } from "../utils/user";
 import RingLoader from "../components/RingLoader";
 import SprintStatStrip from "../components/sprint/SprintStatStrip";
 import SprintTabs from "../components/sprint/SprintTabs";
@@ -187,7 +188,7 @@ export default function Analytics() {
     activeTasks.forEach((task) => {
       const key = task.assignee?.id || "unassigned";
       const current = map.get(key) || {
-        name: task.assignee?.full_name || "Unassigned",
+        name: task.assignee ? getFullName(task.assignee) : "Unassigned",
         open: 0,
         high: 0,
         inProgress: 0,

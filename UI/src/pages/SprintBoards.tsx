@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getFullName } from "../utils/user";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { SPRINT_CREATE_CONTEXT } from "../data/testManagement";
 import SprintStatStrip from "../components/sprint/SprintStatStrip";
@@ -567,7 +568,7 @@ export default function SprintBoards() {
         label: "Sprint owner",
         complete: Boolean(draft.owner),
         detail: draft.owner
-          ? users.find((user) => user.id === draft.owner)?.full_name || "Owner selected"
+          ? getFullName(users.find((user) => user.id === draft.owner)) || "Owner selected"
           : "Assign an owner",
       },
       {
@@ -933,7 +934,7 @@ export default function SprintBoards() {
                     {Array.from(
                       new Set(
                         relatedSprintRecords
-                          .map((item) => item.owner?.full_name)
+                          .map((item) => item.owner ? getFullName(item.owner) : null)
                           .filter((value): value is string => Boolean(value)),
                       ),
                     ).join(", ") || "Unassigned"}
@@ -991,7 +992,7 @@ export default function SprintBoards() {
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
-                              {task.project?.name || "No project"} • {task.assignee?.full_name || "Unassigned"} • {task.status}
+                              {task.project?.name || "No project"} • {task.assignee ? getFullName(task.assignee) : "Unassigned"} • {task.status}
                             </p>
                           </button>
                         ))
@@ -1055,7 +1056,7 @@ export default function SprintBoards() {
                     sprintInsights.lagging_people.map((person) => (
                       <div key={person.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-900">{person.full_name}</p>
+                          <p className="text-sm font-semibold text-slate-900">{getFullName(person)}</p>
                           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                             {person.overdue_tasks} overdue
                           </span>
@@ -1111,7 +1112,7 @@ export default function SprintBoards() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      {item.owner?.full_name || "No owner"} • {item.release || "No release"} • {item.capacity ?? 0} pts
+                      {item.owner ? getFullName(item.owner) : "No owner"} • {item.release || "No release"} • {item.capacity ?? 0} pts
                     </p>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
@@ -1258,7 +1259,7 @@ export default function SprintBoards() {
                         <option value="">Select owner</option>
                         {users.map((option) => (
                           <option key={option.id} value={option.id}>
-                            {option.full_name}
+                            {getFullName(option)}
                           </option>
                         ))}
                       </select>
@@ -1360,7 +1361,7 @@ export default function SprintBoards() {
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-slate-500">
-                            {item.tasks_count} tasks • {item.release || "No release"} • {item.owner?.full_name || "No owner"}
+                            {item.tasks_count} tasks • {item.release || "No release"} • {item.owner ? getFullName(item.owner) : "No owner"}
                           </p>
                         </div>
                       ))}
@@ -1413,7 +1414,7 @@ export default function SprintBoards() {
                                 </span>
                               </div>
                               <p className="mt-1 text-[11px] text-slate-500">
-                                {item.project?.name || "No project"} • {item.assignee?.full_name || "Unassigned"} • {item.due_date ? `Due ${formatDate(item.due_date)}` : "No due date"}
+                                {item.project?.name || "No project"} • {item.assignee ? getFullName(item.assignee) : "Unassigned"} • {item.due_date ? `Due ${formatDate(item.due_date)}` : "No due date"}
                               </p>
                             </div>
                           ))
@@ -1445,7 +1446,7 @@ export default function SprintBoards() {
                               <p className="text-xs font-semibold text-slate-900">{item.reference_code}</p>
                               <p className="mt-1 text-xs leading-5 text-slate-600">{item.title}</p>
                               <p className="mt-1 text-[11px] text-slate-500">
-                                {item.project?.name || "No project"} • {item.owner?.full_name || "No owner"} • {item.automation}
+                                {item.project?.name || "No project"} • {item.owner ? getFullName(item.owner) : "No owner"} • {item.automation}
                               </p>
                             </div>
                           ))
@@ -1545,7 +1546,7 @@ export default function SprintBoards() {
                           {incident.title}
                         </p>
                         <p className="mt-2 text-[11px] text-slate-500">
-                          {incident.assignee?.full_name || incident.creator?.full_name || "Unassigned"}
+                          {incident.assignee ? getFullName(incident.assignee) : incident.creator ? getFullName(incident.creator) : "Unassigned"}
                         </p>
                       </div>
                     ))
@@ -1681,7 +1682,7 @@ export default function SprintBoards() {
                       <option value="">Select owner</option>
                       {users.map((option) => (
                         <option key={option.id} value={option.id}>
-                          {option.full_name}
+                          {getFullName(option)}
                         </option>
                       ))}
                     </select>
@@ -1768,7 +1769,7 @@ export default function SprintBoards() {
                   sprintLabel={`Sprint-${draft.sprintNumber || nextSprintNumber}`}
                   goal={draft.goal}
                   release={draft.release}
-                  ownerName={users.find((user) => user.id === draft.owner)?.full_name || ""}
+                  ownerName={getFullName(users.find((user) => user.id === draft.owner))}
                   projectNames={selectedProjects.map((project) => project.name)}
                   capacity={draft.capacity}
                   readinessChecks={readinessChecks}
@@ -1856,7 +1857,7 @@ export default function SprintBoards() {
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold text-slate-900">{task.title}</p>
                                       <p className="mt-1 text-xs text-slate-500">
-                                        {task.status} • {task.priority} • {task.assignee?.full_name || "Unassigned"}
+                                        {task.status} • {task.priority} • {task.assignee ? getFullName(task.assignee) : "Unassigned"}
                                       </p>
                                     </div>
                                   </label>

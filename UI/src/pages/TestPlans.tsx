@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getFullName } from "../utils/user";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
 import TestCaseNav from "../components/testcases/TestCaseNav";
 import { testCasesAPI } from "../services/testCases";
@@ -371,7 +372,7 @@ export default function TestPlans() {
                       </p>
                     </div>
                     <div className="text-sm text-slate-600">
-                      {plan.owner?.full_name || "Unknown"}
+                      {getFullName(plan.owner)}
                     </div>
                     <div className="text-sm font-semibold text-slate-900">{plan.case_count}</div>
                     <div className="text-sm font-semibold text-slate-900">{plan.run_count}</div>

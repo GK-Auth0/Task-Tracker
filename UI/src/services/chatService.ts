@@ -11,7 +11,9 @@ export interface ChatGroup {
   memberCount: number;
   members?: Array<{
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   }>;
   created_at: string;
@@ -29,7 +31,9 @@ export interface ChatMessage {
   updated_at: string;
   user: {
     id: string;
-    full_name: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
     email: string;
   };
 }
@@ -95,7 +99,9 @@ export const chatAPI = {
     success: boolean;
     data: Array<{
       id: string;
-      full_name: string;
+      first_name?: string;
+      last_name?: string;
+      full_name?: string;
       email: string;
       avatar_url?: string;
     }>;

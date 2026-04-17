@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { getFullName } from "../utils/user";
 import { useQuery } from "react-query";
 import WorkspacePageHeader from "../components/WorkspacePageHeader";
 import TestCaseNav from "../components/testcases/TestCaseNav";
@@ -162,7 +163,7 @@ export default function DefectReports() {
                             {defect.reference_code} · {defect.title}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {defect.project?.name || "Unknown project"} · {defect.assignee?.full_name || "Unassigned"} · {formatDate(defect.created_at)}
+                            {defect.project?.name || "Unknown project"} · {defect.assignee ? getFullName(defect.assignee) : "Unassigned"} · {formatDate(defect.created_at)}
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">

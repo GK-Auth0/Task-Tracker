@@ -7,6 +7,7 @@ import { testCasesAPI } from "../services/testCases";
 import type { TestAutomation, TestCaseRecord, TestCaseStatus } from "../types/testCase";
 import { automationClasses, statusClasses } from "../data/testManagement";
 import { decodeModuleSlug } from "../utils/testCases";
+import { getFullName } from "../utils/user";
 
 type RunStatus = "Passed" | "Failed" | "Blocked";
 
@@ -299,7 +300,7 @@ export default function TestCaseModuleDetail() {
         headerName: "Owner",
         minWidth: 160,
         flex: 0.85,
-        valueGetter: (_value, row) => row.owner?.full_name || "Unknown",
+        valueGetter: (_value, row) => getFullName(row.owner),
       },
       {
         field: "updated_at",

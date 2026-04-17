@@ -26,15 +26,25 @@ DB/
 
 ```bash
 cd DB
-docker-compose up -d postgres       # Start PostgreSQL on port 5432
-docker-compose up migrator          # Run all migrations
+./env/local/_up.sh
 ```
 
-Default connection:
-- Host: `localhost` · Port: `5432`
-- Database: `task_tracker` · User: `postgres` · Password: `password`
+This local stack uses [env/local/local.env](/Users/kgiridharan/Documents/Giri/Task-Tracker/DB/env/local/local.env:1) and starts:
+- Postgres on `localhost:5433`
+- The Flyway migrator against `task_tracker_local`
 
-To run only schema migrations or only seed migrations, use `run-migrations.sh` directly.
+Default connection:
+- Host: `localhost`
+- Port: `5433`
+- Database: `task_tracker_local`
+- User: `postgres`
+- Password: `password`
+
+Stop it with:
+
+```bash
+./env/local/_down.sh
+```
 
 ---
 
@@ -81,18 +91,18 @@ Running two separate tracks means you can bump a seed version without touching t
 | V1024 | `invite` | Invitation refinements (columns, constraints) |
 | V1025 | `create_cron_tables` | `cron_types`, `crons`, `cron_executions`, `cron_retries` — scheduler infrastructure |
 | V1026 | `updating_cron_table` | Add `cron_execution_status` ENUM; convert `cron_executions.status` to ENUM; add `updated_at` to cron tables |
-| V1027 | `create_organization_table` | `organizations`, `organization_members` — multi-tenant support |
-| V1028 | `updating_admin_column_org_table` | `is_admin` boolean on `organization_members` |
-| V1029 | `add_org_code_to_invites` | `org_code` column on `user_invitations` |
+| V1027 | `create_organization_table` | `organization` table, organization code sequence, and `users.organization_id` |
+| V1028 | `updating_admin_column_org_table` | Add required `admin` foreign key to `organization` and backfill from `created_by` |
+| V1029 | `add_org_code_to_invites` | Add `org_code` column to `invites` |
 | V1030 | `make_invite_org_codes_unique` | Unique constraint on org invite codes |
-| V1031 | `create_project_access_config_table` | `project_access_config` — fine-grained access control settings |
+| V1031 | `create_project_access_config_table` | `config` table for project access scope and approval settings |
 | V1032 | `create_defects_and_task_links` | `defects` table + `task_links` for task relationships |
-| V1033 | `create_test_cases_table` | `test_cases` — test case steps, expected result, status |
-| V1034 | `create_sprints_and_link_tasks` | `sprints` table + sprint–task link table |
-| V1035 | `create_test_case_modules_table` | `test_case_modules` — grouping test cases by feature area |
-| V1036 | `create_test_plans_table` | `test_plans` — coverage and scope metadata |
-| V1037 | `create_test_runs_table` | `test_runs` — execution records with pass/fail counts |
-| V1038 | `create_test_case_suites_table` | `test_case_suites` — suite organization |
+| V1033 | `create_test_cases_table` | `test_cases` with suite/module names, JSONB steps, linked items, and execution history |
+| V1034 | `create_sprints_and_link_tasks` | `sprints` table and direct `tasks.sprint_id` relationship |
+| V1035 | `create_test_case_modules_table` | `test_case_modules` grouped by project and owner |
+| V1036 | `create_test_plans_table` | `test_plans` with project, sprint, status, owner, and summary metrics |
+| V1037 | `create_test_runs_table` | `test_runs` linked to plans with assignee, build, environment, and execution counts |
+| V1038 | `create_test_case_suites_table` | `test_case_suites` grouped by project and owner |
 | V1039 | `create_auth_refresh_tokens_table` | `auth_refresh_tokens` — hashed refresh token tracking |
 | V1040 | `add_task_issue_type` | `issue_type` column on `tasks` (bug / feature / task) |
 | V1041 | `create_task_files_table` | `task_files` — file attachments on tasks |
@@ -131,12 +141,13 @@ user_metadata       user_id, bio, location, website, social links
 user_preferences    user_id, notification settings, display settings
 ```
 
-### Organizations & Teams
+### Organizations & Invites
 
 ```
-organizations       id, name, code, created_at
-organization_members  org_id, user_id, is_admin
-user_invitations    id, email, token, org_code, status
+organization        id, name, org_code, slug, admin, created_by, status
+users               organization_id
+invites             id, email, invite_code, org_code, status
+user_invitations    id, email, token, full_name, status
 ```
 
 ### Projects & Tasks
@@ -145,7 +156,7 @@ user_invitations    id, email, token, org_code, status
 projects            id, name, description, owner_id, status, priority, start_date, end_date
 project_members     id, project_id, user_id, role
 project_files       id, project_id, file_url, name, size
-project_access_config  project_id, access settings
+config              project_id, organization_id, access_scope, approval_enabled
 
 tasks               id, project_id, title, description, status, priority, issue_type,
                     assignee_id, creator_id, sprint_id, start_date, due_date
@@ -160,19 +171,21 @@ task_links          id, source_task_id, target_task_id, link_type
 ### Sprints
 
 ```
-sprints             id, project_id, name, status, goal, start_date, end_date
-sprint_tasks        sprint_id, task_id
+sprints             id, project_id, name, status, goal, release, squad, start_date, end_date
+tasks               sprint_id
+test_cases          sprint_id, sprint_name
+defects             sprint_id, sprint_name
 ```
 
 ### QA & Defects
 
 ```
-test_case_suites    id, project_id, name
-test_case_modules   id, suite_id, name
-test_cases          id, suite_id, module_id, title, steps, expected_result, status
-test_plans          id, project_id, name, scope
-test_runs           id, plan_id, status, passed_count, failed_count, executed_at
-defects             id, project_id, title, description, priority, status, assigned_to, created_by
+test_case_suites    id, project_id, name, owner_id
+test_case_modules   id, project_id, name, owner_id
+test_cases          id, project_id, title, suite, module, steps, status, linked_task_id, sprint_id
+test_plans          id, project_id, sprint_id, name, status, owner_id, totals
+test_runs           id, plan_id, assignee_id, status, environment, executed_at, totals
+defects             id, project_id, title, severity, priority, status, linked_task_id, sprint_id
 ```
 
 ### Chat
@@ -187,10 +200,10 @@ chat_message_reads  message_id, user_id, read_at
 ### Scheduler (Cron)
 
 ```
-cron_types          id, name, description
-crons               id, type_id, name, schedule_expression, is_active, next_run_at, last_run_at
-cron_executions     id, cron_id, status (cron_execution_status ENUM), retry_count, started_at, ended_at, error_message
-cron_retries        id, execution_id, retry_count, status, retry_time
+cron_types          type_id, type_name, description
+crons               cron_id, type_id, cron_name, schedule_expression, is_active, next_run_at, last_run_at
+cron_executions     execution_id, cron_id, status (cron_execution_status ENUM), retry_count, started_at, ended_at, error_message
+cron_retries        retry_id, execution_id, retry_count, status, retry_time
 ```
 
 `cron_execution_status` ENUM values: `pending`, `running`, `success`, `failed`, `retrying`
@@ -224,7 +237,7 @@ INSERT INTO labels (id, name, color_hex) VALUES (gen_random_uuid(), 'Backend', '
 ### Run migrations
 
 ```bash
-docker-compose up migrator
+./env/local/_up.sh
 ```
 
 ---
@@ -236,12 +249,13 @@ docker-compose up migrator
 | `type "X" already exists` | ENUM created without guard | Wrap `CREATE TYPE` in a `DO $$ IF NOT EXISTS ... $$` block (see V1026 for pattern) |
 | `relation "X" already exists` | Table created without `IF NOT EXISTS` | Add `IF NOT EXISTS` to `CREATE TABLE` |
 | `checksum mismatch` | Migration file edited after it ran | Never edit committed migration files — create a new one instead |
-| `outOfOrder` warning | Migration version lower than current applied | Enable `outOfOrder=true` in `flyway.conf` only for deliberate backfills |
+| Separate schema/seed numbering | Using one shared Flyway history | Run migrations through `run-migrations.sh`, which keeps schema and seed in separate history tables |
 
 ---
 
 ## Troubleshooting
 
-- **Docker volume issues** — Run `docker-compose down -v` to wipe the volume and start fresh (destroys all data).
-- **Connection refused** — Ensure `postgres` container is healthy before `migrator` starts (`depends_on` with `condition: service_healthy` is set in `docker-compose.yml`).
-- **Partial migration failure** — Flyway rolls back on error. Fix the SQL, then re-run `docker-compose up migrator`.
+- **Missing local env file** — Ensure [env/local/local.env](/Users/kgiridharan/Documents/Giri/Task-Tracker/DB/env/local/local.env:1) exists before running `./env/local/_up.sh`.
+- **Docker volume issues** — Run `./env/local/_down.sh` and then `docker volume rm` on the local DB volume if you need a full reset.
+- **Connection refused** — Ensure the local Postgres container is up on port `5433` before the migrator starts.
+- **Partial migration failure** — Flyway rolls back on error. Fix the SQL, then rerun `./env/local/_up.sh`.

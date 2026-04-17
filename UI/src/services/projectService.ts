@@ -97,7 +97,9 @@ export const projectService = {
     success: boolean;
     data: Array<{
       id: string;
-      full_name: string;
+      first_name?: string;
+      last_name?: string;
+      full_name?: string;
       email: string;
       role: string;
       avatar_url?: string;

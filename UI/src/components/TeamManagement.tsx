@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { usersAPI } from "../services/dashboard";
+import { getFullName, getUserInitials } from "../utils/user";
 import { inviteAPI, InviteData, Invite } from "../services/inviteService";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -167,7 +168,7 @@ export default function TeamManagement() {
       invites.map((invite) => ({
         id: `invite-${invite.id}`,
         full_name:
-          invite.invitee?.full_name ||
+          invite.invitee ? getFullName(invite.invitee) :
           invite.invitee_email.split("@")[0] ||
           "Invited User",
         email: invite.invitee_email,
@@ -189,7 +190,7 @@ export default function TeamManagement() {
     () =>
       members.map((member) => ({
         id: member.id,
-        full_name: member.full_name,
+        full_name: getFullName(member),
         email: member.email,
         role: member.role,
         status: "Active",
@@ -208,7 +209,7 @@ export default function TeamManagement() {
     return combinedRows.filter((member) => {
       const matchesQuery =
         query.length === 0 ||
-        member.full_name.toLowerCase().includes(query) ||
+        member.full_name.toLowerCase().includes(query) ||  // full_name set via getFullName in memberRows
         member.email.toLowerCase().includes(query);
       const matchesRole = roleFilter === "All" || member.role === roleFilter;
       const matchesStatus =
@@ -289,7 +290,7 @@ export default function TeamManagement() {
       if (response.success) {
         const inviteRowsForExport = invites.map((invite) => ({
           Name:
-            invite.invitee?.full_name ||
+            invite.invitee ? getFullName(invite.invitee) :
             invite.invitee_email.split("@")[0] ||
             "Invited User",
           Email: invite.invitee_email,
@@ -305,7 +306,7 @@ export default function TeamManagement() {
         const csvData = [
           ...inviteRowsForExport,
           ...response.data.map((member) => ({
-            Name: member.full_name,
+            Name: getFullName(member),
             Email: member.email,
             Role: member.role,
             Status: "Active",
