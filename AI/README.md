@@ -1,26 +1,49 @@
-# Task Tracker AI Assistant (Separate Python Service)
+# Task Tracker — AI Assistant Service
 
-This is a standalone Python helper service for simple, practical AI assistance.
-It runs separately from `Backend` and `UI`.
+Standalone Python HTTP service providing rule-based AI assistance with optional Google Gemini enhancement. No external API key required for basic operation.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Python 3.10+ |
+| HTTP server | `BaseHTTPRequestHandler` + `ThreadingHTTPServer` (stdlib only) |
+| AI provider | Rule-based (default) or Google Gemini (optional) |
+| Dependencies | None for core logic (`requirements.txt` for optional packages) |
+
+---
 
 ## Features
 
-1. `suggest-task`
-   - Suggests priority, due date, estimate, and checklist from task text.
-2. `plan-day`
-   - Creates a focused daily plan from your task list and available hours.
-3. `project-insights`
-   - Gives risk level, warning signals, and actionable recommendations.
-4. `auto-insights`
-   - Returns page-aware insights, top priority tasks, and quick chat actions.
-5. `workload-forecast`
-   - Forecasts near-term workload pressure from due tasks and estimated effort.
-6. `chat-context`
-   - Context-aware chat response based on current page, tasks, and projects.
-7. `metrics`
-   - Lightweight runtime monitoring (uptime, request count, errors, endpoint latency).
+| Endpoint | Description |
+|----------|-------------|
+| `/suggest-task` | Suggests priority, due date, time estimate, and a checklist from task text |
+| `/plan-day` | Builds a focused daily plan from a task list and available hours |
+| `/project-insights` | Risk assessment, warning signals, and recommendations for a project |
+| `/auto-insights` | Page-aware insights, top-priority tasks, and quick chat actions |
+| `/workload-forecast` | 7-day workload pressure forecast based on due dates and estimated hours |
+| `/chat-context` | Context-aware chat with conversation history support |
+| `/health` | Service health (includes provider mode and Gemini config status) |
+| `/ready` | Readiness probe |
+| `/metrics` | Runtime stats: uptime, request counts, errors, per-endpoint latency |
 
-## Run
+---
+
+## Project Structure
+
+```
+AI/
+├── assistant_server.py     # HTTP server, routing, middleware, CORS, auth
+├── assistant_engine.py     # Core rule-based logic + Gemini integration
+├── requirements.txt        # Optional dependencies (requests for Gemini)
+└── README.md
+```
+
+---
+
+## Quick Start
 
 ```bash
 cd AI
@@ -29,82 +52,69 @@ python3 assistant_server.py
 
 Default URL: `http://127.0.0.1:8787`
 
-Optional env vars:
+---
 
-- `AI_ASSISTANT_HOST` (default `127.0.0.1` in dev, `0.0.0.0` in production)
-- `AI_ASSISTANT_PORT` (fallback when `PORT` is not set)
-- `PORT` (Render sets this automatically)
-- `AI_ENV` / `NODE_ENV` (`production` for deployed environments)
-- `AI_MAX_BODY_BYTES` (default `1048576`)
-- `AI_ALLOWED_ORIGINS` (comma-separated origins, use `*` for open CORS)
-- `AI_API_KEY` (optional; if set, POST endpoints require `X-API-Key`)
-- `AI_CHAT_PROVIDER` (`rule-based` default, `gemini`, or `auto`)
-- `GEMINI_API_KEY` (required when `AI_CHAT_PROVIDER=gemini` or `auto`)
-- `GEMINI_MODEL` (default `gemini-2.0-flash`)
-- `GEMINI_BASE_URL` (default `https://generativelanguage.googleapis.com/v1beta`)
-- `GEMINI_TIMEOUT_SEC` (default `12`)
+## Environment Variables
 
-### Gemini integration
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | — | Port (Render sets this automatically) |
+| `AI_ASSISTANT_PORT` | `8787` | Fallback port when `PORT` is not set |
+| `AI_ASSISTANT_HOST` | `127.0.0.1` (dev) / `0.0.0.0` (prod) | Bind address |
+| `AI_ENV` / `NODE_ENV` | `development` | Set to `production` for deployed environments |
+| `AI_MAX_BODY_BYTES` | `1048576` (1 MB) | Max request body size |
+| `AI_ALLOWED_ORIGINS` | — | Comma-separated CORS origins; use `*` for open |
+| `AI_API_KEY` | — | Optional shared secret; if set, POST endpoints require `X-API-Key` header |
+| `AI_CHAT_PROVIDER` | `rule-based` | `rule-based`, `gemini`, or `auto` |
+| `GEMINI_API_KEY` | — | Required when provider is `gemini` or `auto` |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model ID |
+| `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | Gemini endpoint |
+| `GEMINI_TIMEOUT_SEC` | `12` | Gemini request timeout |
 
-- Gemini can enhance all core AI endpoints (`/suggest-task`, `/plan-day`, `/project-insights`, `/auto-insights`, `/workload-forecast`, `/chat-context`).
-- If Gemini fails or is not configured, every endpoint falls back to built-in deterministic logic automatically.
-- `/health` now includes:
-  - `chat_provider` (current provider mode)
-  - `gemini_configured` (`true/false` based on `GEMINI_API_KEY`)
+---
 
-### Free model setup
+## Gemini Integration
 
-If you want stronger AI without paid APIs, the best path here is local/open models through Ollama on the backend side.
+When `GEMINI_API_KEY` is set and `AI_CHAT_PROVIDER` is `gemini` or `auto`, all endpoints use Gemini for richer, more contextual responses. If Gemini is unavailable or times out, every endpoint automatically falls back to the built-in deterministic logic — no errors are surfaced to the caller.
 
-Recommended free models:
+`/health` response includes:
+- `chat_provider` — current provider mode
+- `gemini_configured` — `true` / `false`
 
-- `qwen2.5:7b`
-- `llama3.1:8b`
-- `mistral:7b`
+### Free / local model alternative
 
-Recommended backend env for realistic chat:
+For stronger AI without paid APIs, use Ollama on the backend side:
 
-```bash
+```env
 AI_PROVIDER=ollama
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=qwen2.5:7b
 AI_TIMEOUT_MS=25000
 ```
 
-This repo now supports short conversation history end-to-end, so the chat assistant can answer follow-up questions more naturally instead of treating each message like a brand-new request.
+Recommended open models: `qwen2.5:7b`, `llama3.1:8b`, `mistral:7b`
 
-## Endpoints
+---
 
-### 1) Health check
+## Endpoint Reference
+
+### Health check
 
 ```bash
 curl http://127.0.0.1:8787/health
-```
-
-### 1a) Readiness check
-
-```bash
 curl http://127.0.0.1:8787/ready
-```
-
-### 1b) Metrics
-
-```bash
 curl http://127.0.0.1:8787/metrics
 ```
 
-### 2) Suggest task fields
+### Suggest task fields
 
 ```bash
 curl -X POST http://127.0.0.1:8787/suggest-task \
   -H "Content-Type: application/json" \
-  -d '{
-    "title": "Fix urgent production API bug",
-    "description": "Users cannot submit forms today"
-  }'
+  -d '{"title": "Fix urgent production API bug", "description": "Users cannot submit forms"}'
 ```
 
-### 3) Plan day
+### Plan day
 
 ```bash
 curl -X POST http://127.0.0.1:8787/plan-day \
@@ -112,44 +122,38 @@ curl -X POST http://127.0.0.1:8787/plan-day \
   -d '{
     "focus_hours": 6,
     "tasks": [
-      {"title":"Fix API bug","priority":"High","due_date":"2026-03-03","estimated_hours":3},
-      {"title":"Write docs","priority":"Low","due_date":"2026-03-07","estimated_hours":1.5},
-      {"title":"Code review","priority":"Medium","due_date":"2026-03-04","estimated_hours":2}
+      {"title":"Fix API bug","priority":"High","due_date":"2026-04-20","estimated_hours":3},
+      {"title":"Write docs","priority":"Low","due_date":"2026-04-24","estimated_hours":1.5}
     ]
   }'
 ```
 
-### 4) Project insights
+### Project insights
 
 ```bash
 curl -X POST http://127.0.0.1:8787/project-insights \
   -H "Content-Type: application/json" \
   -d '{
     "tasks": [
-      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-01"},
-      {"title":"Write docs","priority":"Low","status":"Done","due_date":"2026-03-07"}
+      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-04-18"},
+      {"title":"Write docs","priority":"Low","status":"Done","due_date":"2026-04-24"}
     ]
   }'
 ```
 
-### 5) Auto insights for current page
+### Auto insights (page-aware)
 
 ```bash
 curl -X POST http://127.0.0.1:8787/auto-insights \
   -H "Content-Type: application/json" \
   -d '{
     "route_context": "/projects",
-    "tasks": [
-      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-03"},
-      {"title":"Write docs","priority":"Low","status":"Done","due_date":"2026-03-07"}
-    ],
-    "projects": [
-      {"name":"Task Tracker","status":"Active"}
-    ]
+    "tasks": [{"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-04-18"}],
+    "projects": [{"name":"Task Tracker","status":"Active"}]
   }'
 ```
 
-### 6) Workload forecast
+### Workload forecast
 
 ```bash
 curl -X POST http://127.0.0.1:8787/workload-forecast \
@@ -157,13 +161,13 @@ curl -X POST http://127.0.0.1:8787/workload-forecast \
   -d '{
     "days": 7,
     "tasks": [
-      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-03","estimated_hours":4},
-      {"title":"Write docs","priority":"Low","status":"To Do","due_date":"2026-03-06","estimated_hours":2}
+      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-04-20","estimated_hours":4},
+      {"title":"Write docs","priority":"Low","status":"To Do","due_date":"2026-04-23","estimated_hours":2}
     ]
   }'
 ```
 
-### 7) Context-aware chat
+### Context-aware chat (with conversation history)
 
 ```bash
 curl -X POST http://127.0.0.1:8787/chat-context \
@@ -173,46 +177,51 @@ curl -X POST http://127.0.0.1:8787/chat-context \
     "route_context": "/dashboard",
     "response_mode": "balanced",
     "tasks": [
-      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-03-03","estimated_hours":4},
-      {"title":"Write docs","priority":"Low","status":"To Do","due_date":"2026-03-06","estimated_hours":2}
+      {"title":"Fix API bug","priority":"High","status":"In Progress","due_date":"2026-04-18","estimated_hours":4}
     ],
-    "projects": [
-      {"name":"Task Tracker","status":"Active"}
-    ],
+    "projects": [{"name":"Task Tracker","status":"Active"}],
     "history": [
       {"role":"user","text":"What should I focus on first?"},
-      {"role":"assistant","text":"Start with the overdue API work because it is highest risk."}
+      {"role":"assistant","text":"Start with the overdue API work — highest risk."}
     ]
   }'
 ```
 
+---
+
+## Caching
+
+Responses are cached in memory with a 20-second TTL (configurable). Cache hit/miss rates appear in `/metrics`. The cache resets on service restart.
+
+---
+
+## Deployment (Render)
+
+Add a Python web service pointing to the `AI/` directory.
+
+**Build command:**
+```bash
+pip install -r requirements.txt
+```
+
+**Start command:**
+```bash
+python assistant_server.py
+```
+
+**Required env vars:**
+```
+AI_ENV=production
+AI_ALLOWED_ORIGINS=https://your-frontend-domain.com
+AI_API_KEY=<optional shared secret>
+```
+
+If deploying from the repo root with a Render blueprint, set the service `rootDir` to `AI`. The `render.yaml` in the project root already configures this.
+
+---
+
 ## Notes
 
-- No external AI/API key required.
-- Uses rule-based logic for speed and easy local use.
-- You can connect UI/Backend to this service later via HTTP calls.
-- Existing endpoints are preserved, so current behavior is not broken.
-- `/metrics` uses in-memory counters and resets when the AI service restarts.
-
-## Render deployment
-
-1. Create a Python web service for `AI/`.
-2. Build command:
-
-```bash
-cd AI && pip install -r requirements.txt
-```
-
-3. Start command:
-
-```bash
-cd AI && python assistant_server.py
-```
-
-4. Set env vars:
-- `AI_ENV=production`
-- `AI_ALLOWED_ORIGINS=https://your-frontend-domain`
-- `AI_API_KEY=<optional shared secret>`
-
-If you deploy from the repo root with a Render blueprint, set the service `rootDir` to `AI`.
-If `python assistant_server.py` is entered as the build command, Render will fail before the service starts.
+- `/metrics` counters are in-memory and reset on restart.
+- Conversation history in `/chat-context` enables natural follow-up questions.
+- All endpoints degrade gracefully — rule-based fallback is always available.
