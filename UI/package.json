@@ -19,7 +19,7 @@
     "@mui/material": "^7.3.7",
     "@mui/system": "^7.3.7",
     "@mui/x-data-grid": "^8.27.0",
-    "axios": "^1.6.2",
+    "axios": "^1.16.0",
     "clsx": "^2.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
