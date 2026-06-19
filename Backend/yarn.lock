@@ -3968,10 +3968,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nodemailer@npm:^8.0.1":
-  version: 8.0.1
-  resolution: "nodemailer@npm:8.0.1"
-  checksum: c63aa734e41b8a920964f79ade0bd6dd7e6f960bdb4d5ed00712cf1fd52a2facf69d09773b3a8494c844383743f2b7ae832914dead5dcfd1b876b1a9b807b3b0
+"nodemailer@npm:^9.0.1":
+  version: 9.0.1
+  resolution: "nodemailer@npm:9.0.1"
+  checksum: 8/7b8544b855b37e868f0cd596eb2afe5a9d0a54411c3c6db248c42d3f1a493cbe7e27d44ce10ad1720883175a4ad07339faffa596eab24b7ced7ef01fd63e7315
   languageName: node
   linkType: hard
 
@@ -5000,7 +5000,7 @@ __metadata:
     jest: ^30.2.0
     jsonwebtoken: ^9.0.2
     multer: ^2.0.2
-    nodemailer: ^8.0.1
+    nodemailer: ^9.0.1
     nodemon: ^3.1.10
     pg: ^8.16.3
     prettier: ^3.6.2
